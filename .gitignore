@@ -30,3 +30,6 @@ tmp/
 *.bak
 *.bak.*
 
+
+# Private visual references / production captures
+docs/referencias/
