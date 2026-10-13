@@ -1,0 +1,20 @@
+[Unit]
+Description=Nova Gente Salon OS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/margot/salon-os
+Environment=NODE_ENV=production
+Environment=PORT=9331
+Environment=HOST=127.0.0.1
+EnvironmentFile=-/srv/margot/salon-os/.env.runtime
+ExecStart=/usr/bin/node /srv/margot/salon-os/server.mjs
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

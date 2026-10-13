@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#fbf8f5"><title>Salon OS — Nova Gente</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div id="authGate" class="authGate">
+  <div class="authCard">
+    <div class="authBrand"><div class="logo">NG</div><div><strong>Salon OS</strong><small>Nova Gente</small></div></div>
+    <div id="setupPanel" class="authPanel hidden">
+      <p class="eyebrow">PRIMEIRO ACESSO</p><h2>Proteja o salão</h2><p>Crie a conta proprietária. Esta etapa fecha automaticamente depois de concluída.</p>
+      <form id="setupForm">
+        <label>Seu nome<input name="name" autocomplete="name" required></label>
+        <label>E-mail<input name="email" type="email" autocomplete="email" required></label>
+        <label>Senha<input name="password" type="password" minlength="10" autocomplete="new-password" required></label>
+        <button class="primary wide">Criar acesso</button>
+      </form>
+    </div>
+    <div id="loginPanel" class="authPanel hidden">
+      <p class="eyebrow">ACESSO SEGURO</p><h2>Entrar no Salon OS</h2><p id="loginTenant">Entre com a conta do salão.</p>
+      <form id="loginForm">
+        <label>E-mail<input name="email" type="email" autocomplete="username" required></label>
+        <label id="workspaceLoginField" class="hidden">Empresa<input name="workspace" placeholder="ex.: studio-aurora" autocomplete="organization"></label>
+        <label>Senha<input name="password" type="password" autocomplete="current-password" required></label>
+        <button class="primary wide">Entrar</button>
+      </form>
+    </div>
+    <div id="resetPanel" class="authPanel hidden">
+      <p class="eyebrow">REDEFINIR SENHA</p><h2>Crie uma nova senha</h2><p id="resetIdentity">Este link é de uso único.</p>
+      <form id="resetForm">
+        <label>Nova senha<input name="password" type="password" minlength="10" autocomplete="new-password" required></label>
+        <label>Repita a senha<input name="confirm_password" type="password" minlength="10" autocomplete="new-password" required></label>
+        <button class="primary wide">Salvar nova senha</button>
+      </form>
+    </div>
+    <small id="authError" class="authError"></small>
+  </div>
+</div>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">NG</div><div><strong>Salon OS</strong><small>Nova Gente</small></div></div>
+    <nav>
+      <button data-view="dashboard" class="active">⌂ <span>Visão geral</span></button>
+      <button data-view="inbox">✉ <span>Atendimento</span></button>
+      <button data-view="agenda">▦ <span>Agenda</span></button>
+      <button data-view="clients">♡ <span>Clientes</span></button>
+      <button data-view="people">◉ <span>Gente</span></button>
+      <button data-view="productsHub">▦ <span>Produtos</span></button>
+      <button data-view="marketing">✦ <span>Marketing</span></button>
+      <button data-view="technical">⌁ <span>Ficha Técnica</span></button>
+      <button data-view="team">◉ <span>Equipe</span></button>
+      <button data-view="services">◇ <span>Serviços</span></button>
+      <button data-view="packages">▣ <span>Pacotes</span></button>
+      <button data-view="retail">▦ <span>PDV Produtos</span></button>
+      <button data-view="resources">▤ <span>Recursos</span></button>
+      <button data-view="finance">R$ <span>Financeiro</span></button>
+      <button data-view="inventory">□ <span>Estoque</span></button>
+      <button data-view="suppliers">⇄ <span>Fornecedores</span></button>
+      <button data-view="retention">♡ <span>Fidelização</span></button>
+      <button data-view="ownerEye">◎ <span>Olho do Dono</span></button>
+      <button data-view="agents">⚙ <span>Agentes</span></button>
+      <button data-view="admin">☷ <span>Administração</span></button>
+      <button data-view="reports">▤ <span>Relatórios</span></button>
+      <button data-view="intelligence">✦ <span>JEV</span></button>
+    </nav>
+    <div class="sidefoot">
+      <div><span class="dot"></span><small id="health">Conectando…</small></div>
+      <button id="logoutBtn" class="ghostMini">Sair</button>
+    </div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <div><p class="eyebrow">SALON OS · FASES 1–4</p><h1 id="pageTitle">Visão geral</h1><p id="pageSub">O que precisa da sua atenção hoje.</p></div>
+      <button class="primary" id="quickAppointment">+ Agendamento</button>
+    </header>
+
+    <section id="dashboard" class="view active">
+      <div class="metrics">
+        <article><span>Atendimentos hoje</span><strong id="mAppointments">—</strong><small>agenda ativa</small></article>
+        <article><span>Previsto hoje</span><strong id="mForecast">—</strong><small>serviços agendados</small></article>
+        <article><span>Clientes</span><strong id="mClients">—</strong><small>base cadastrada</small></article>
+        <article><span>Profissionais</span><strong id="mPros">—</strong><small>ativos</small></article>
+      </div>
+      <div class="grid2">
+        <article class="panel">
+          <div class="panelhead"><div><h2>Agenda de hoje</h2><p>Atendimentos e status.</p></div><button class="link" data-jump="agenda">Abrir agenda</button></div>
+          <div id="todayList" class="stack"></div>
+        </article>
+        <article class="panel">
+          <div class="panelhead"><div><h2>Comando inteligente</h2><p>Regra local primeiro; JEV só entra quando precisa.</p></div><span class="chip">baixo custo</span></div>
+          <form id="commandForm" class="command"><textarea id="commandText" placeholder="Ex.: Quero marcar unha amanhã com a Bia"></textarea><button class="primary">Interpretar</button></form>
+          <div id="commandResult" class="result muted">Nenhum comando analisado ainda.</div>
+        </article>
+      </div>
+      <article class="panel">
+        <div class="panelhead"><div><h2>Fluxo central</h2><p>A espinha dorsal antes de avançarmos para financeiro e estoque.</p></div></div>
+        <div class="pipeline"><span>WhatsApp</span><i>→</i><span>Cliente</span><i>→</i><span>Agenda</span><i>→</i><span>Atendimento</span><i>→</i><span>Histórico</span></div>
+      </article>
+    </section>
+
+    <section id="inbox" class="view messengerView">
+      <div class="sectionTitle">
+        <div><h2>Central de Mensagens</h2><p>WhatsApp conectado pelo WAHA, organizado como uma mensageria de atendimento.</p></div>
+        <div class="sectionActions"><span id="whatsappBadge" class="chip">verificando</span><button id="syncWhatsappHistory" class="secondary">Sincronizar histórico</button><button id="refreshInbox" class="secondary">Atualizar</button></div>
+      </div>
+      <div class="messengerToolbar">
+        <input id="conversationSearch" type="search" placeholder="Buscar cliente, telefone ou mensagem…">
+        <select id="conversationStatusFilter"><option value="">Todos os status</option><option value="open">Aberta</option><option value="pending">Pendente</option><option value="resolved">Resolvida</option></select>
+        <select id="conversationPriorityFilter"><option value="">Todas as prioridades</option><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option></select>
+        <label class="checkFilter"><input id="conversationUnreadFilter" type="checkbox"> Só não lidas</label>
+      </div>
+      <div class="inboxGrid messengerGrid">
+        <article class="panel inboxListPanel">
+          <div class="panelhead"><div><h2>Conversas</h2><p id="conversationCount">0 conversas</p></div></div>
+          <div id="conversationList" class="conversationList"></div>
+        </article>
+        <article class="panel chatPanel">
+          <div id="chatEmpty" class="chatEmpty"><strong>Selecione uma conversa</strong><p>As mensagens recebidas pelo WAHA aparecem aqui automaticamente.</p></div>
+          <div id="chatActive" class="hidden">
+            <div class="chatHead">
+              <div><strong id="chatClient">Cliente</strong><small id="chatPhone"></small></div>
+              <div class="chatHeadActions"><button id="chatModeButton" class="secondary" type="button">Humano</button><button id="openClientFromChat" class="link">Ver cliente</button></div>
+            </div>
+            <div id="messageList" class="messageList"></div>
+            <form id="messageForm" class="messageComposer"><textarea id="messageText" placeholder="Escreva uma mensagem…"></textarea><button class="primary">Enviar</button></form>
+          </div>
+        </article>
+        <aside class="panel conversationDetailPanel">
+          <div id="conversationDetailEmpty" class="chatEmpty"><strong>Classificação</strong><p>Selecione uma conversa para organizar atendimento, prioridade e responsável.</p></div>
+          <div id="conversationDetail" class="hidden">
+            <div class="detailClient"><span id="detailAvatar" class="avatar">C</span><div><strong id="detailClientName">Cliente</strong><small id="detailClientPhone"></small></div></div>
+            <div id="detailClientTags" class="tags"></div>
+            <div class="detailFields">
+              <label>Status<select id="conversationStatus"><option value="open">Aberta</option><option value="pending">Pendente</option><option value="resolved">Resolvida</option></select></label>
+              <label>Prioridade<select id="conversationPriority"><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></label>
+              <label>Categoria<select id="conversationCategory"><option value="general">Geral</option><option value="lead">Lead</option><option value="appointment">Agendamento</option><option value="waiting">Aguardando</option><option value="finance">Financeiro</option><option value="complaint">Reclamação</option><option value="post_sale">Pós-venda</option><option value="vip">VIP</option><option value="other">Outro</option></select></label>
+              <label>Responsável<select id="conversationAssignee"><option value="">Sem responsável</option></select></label>
+              <label>Etiquetas<input id="conversationLabels" placeholder="ex.: orçamento, retorno, noiva"></label>
+            </div>
+            <button id="saveConversationMeta" class="primary wide">Salvar classificação</button>
+            <div class="detailInfo">
+              <strong>Cliente</strong>
+              <p id="detailClientInfo" class="muted"></p>
+            </div>
+          </div>
+        </aside>
+      </div>
+      <article class="panel waSetup">
+        <div><h2>Conexão WhatsApp</h2><p id="waSetupText">Verificando o provedor WAHA local…</p></div>
+        <div class="waActions"><button id="prepareWaha" class="secondary">Preparar sessão</button><button id="showQr" class="primary">Mostrar QR</button></div>
+        <img id="waQrImage" class="qrImage hidden" alt="QR Code do WhatsApp">
+      </article>
+    </section>
+
+    <section id="agenda" class="view">
+      <div class="sectionTitle"><div><h2>Agenda</h2><p>Cliente, profissional, serviço e recurso sem conflito.</p></div><button class="primary" data-open="appointmentModal">+ Novo</button></div>
+      <article class="panel"><div id="agendaList" class="agenda"></div></article>
+      <article class="panel"><div class="panelhead"><div><h2>Lista de espera</h2><p>Clientes aguardando um encaixe ou horário melhor.</p></div><button class="secondary" data-open="waitlistModal">+ Adicionar</button></div><div id="waitlistList" class="stack"></div></article>
+    </section>
+
+    <section id="clients" class="view">
+      <div class="sectionTitle"><div><h2>Clientes</h2><p>CRM 360º começando pelo que ajuda a recepção.</p></div><div class="sectionActions"><button id="exportClients" class="secondary">Baixar planilha</button><button class="primary" data-open="clientModal">+ Cliente</button></div></div>
+      <article class="panel">
+        <div class="searchrow"><input id="clientSearch" placeholder="Buscar por nome ou WhatsApp"><span id="clientCount"></span></div>
+        <div id="clientList" class="cards"></div>
+      </article>
+    </section>
+
+
+    <section id="people" class="view">
+      <div class="sectionTitle"><div><h2>Gente</h2><p>Pessoas do salão, clientes, equipe e relacionamento em um só lugar.</p></div></div>
+      <div class="hubGrid">
+        <button class="hubCard" data-jump="clients"><span>♡</span><strong>Clientes</strong><small>Cadastro, aniversário, redes sociais, referência e histórico.</small></button>
+        <button class="hubCard" data-jump="team"><span>◉</span><strong>Equipe</strong><small>Profissionais, escala, metas, folgas e desempenho.</small></button>
+        <button class="hubCard" data-jump="retention"><span>◎</span><strong>Fidelização</strong><small>Aniversários, indicações, pós-atendimento e clientes VIP.</small></button>
+        <button class="hubCard" data-jump="agents"><span>⚙</span><strong>Agentes</strong><small>Recepcionista IA e funcionários artificiais.</small></button>
+      </div>
+    </section>
+
+    <section id="productsHub" class="view">
+      <div class="sectionTitle"><div><h2>Produtos</h2><p>Venda, estoque, serviços, pacotes e compras conectados.</p></div></div>
+      <div class="hubGrid">
+        <button class="hubCard" data-jump="retail"><span>▦</span><strong>PDV Produtos</strong><small>Venda de produtos com estoque e financeiro integrados.</small></button>
+        <button class="hubCard" data-jump="inventory"><span>□</span><strong>Estoque</strong><small>Quantidade, custo, validade e consumo automático.</small></button>
+        <button class="hubCard" data-jump="suppliers"><span>⇄</span><strong>Fornecedores</strong><small>Compras, reposição e histórico de preços.</small></button>
+        <button class="hubCard" data-jump="services"><span>◇</span><strong>Serviços</strong><small>Preço, duração, comissão e catálogo de serviços.</small></button>
+        <button class="hubCard" data-jump="packages"><span>▣</span><strong>Pacotes</strong><small>Venda antecipada, créditos e validade.</small></button>
+      </div>
+    </section>
+
+    <section id="marketing" class="view">
+      <div class="sectionTitle"><div><h2>Marketing & Relacionamento</h2><p>Base de clientes, canais, campanhas e oportunidades de retorno.</p></div></div>
+      <div class="hubGrid">
+        <button class="hubCard" data-jump="clients"><span>♡</span><strong>Base de clientes</strong><small>Dados, Instagram, Facebook, aniversário, origem e referência.</small></button>
+        <button class="hubCard" data-jump="retention"><span>↻</span><strong>Relacionamento</strong><small>Aniversários, pós-atendimento, indicação e recuperação.</small></button>
+        <button class="hubCard" data-jump="inbox"><span>✉</span><strong>Mensageria WhatsApp</strong><small>Conversas, etiquetas, prioridade e atendimento por WAHA.</small></button>
+        <button class="hubCard" data-jump="reports"><span>▤</span><strong>Relatórios</strong><small>Meça retorno, frequência e valor movimentado.</small></button>
+      </div>
+      <article class="panel marketingActions">
+        <div class="panelhead"><div><h2>Ações rápidas</h2><p>Atalhos úteis para trabalhar campanhas e relacionamento.</p></div></div>
+        <div class="sectionActions">
+          <button id="marketingExportClients" class="secondary">Baixar base de clientes</button>
+          <button class="secondary" data-jump="retention">Ver aniversários e retornos</button>
+          <button class="primary" data-jump="inbox">Abrir WhatsApp</button>
+        </div>
+      </article>
+    </section>
+
+    <section id="technical" class="view">
+      <div class="sectionTitle"><div><h2>Ficha Técnica da Cliente</h2><p>Fórmulas, observações e histórico do procedimento.</p></div><button class="primary" data-open="technicalRecordModal">+ Registro técnico</button></div>
+      <article class="panel">
+        <div class="technicalFilter"><label>Cliente<select id="technicalClient"></select></label><div id="technicalClientMeta" class="muted">Selecione uma cliente.</div></div>
+      </article>
+      <div id="technicalRecordList" class="cards"></div>
+    </section>
+
+    <section id="team" class="view">
+      <div class="sectionTitle"><div><h2>Equipe</h2><p>Especialidades, escala, metas, faltas e produtividade.</p></div><div class="sectionActions"><input id="staffPeriod" type="month"><button class="secondary" data-open="timeOffModal">+ Folga/ausência</button><button class="primary" data-open="professionalModal">+ Profissional</button></div></div>
+      <div id="teamList" class="cards cols3"></div>
+      <article class="panel">
+        <div class="panelhead"><div><h2>Desempenho do mês</h2><p>Receita, ticket, comissão e meta por profissional.</p></div></div>
+        <div id="staffPerformanceList" class="tableLike"></div>
+      </article>
+      <article class="panel">
+        <div class="panelhead"><div><h2>Folgas & ausências</h2><p>Esses períodos saem automaticamente da disponibilidade da agenda.</p></div></div>
+        <div id="staffTimeOffList" class="tableLike"></div>
+      </article>
+    </section>
+
+    <section id="services" class="view">
+      <div class="sectionTitle"><div><h2>Serviços</h2><p>Preço, duração e comissão estruturados.</p></div><button class="primary" data-open="serviceModal">+ Serviço</button></div>
+      <div id="serviceList" class="cards cols3"></div>
+    </section>
+
+    <section id="retail" class="view">
+      <div class="sectionTitle"><div><h2>PDV · Produtos</h2><p>Venda de produtos com estoque, margem e financeiro integrados.</p></div><button class="primary" data-open="retailSaleModal">+ Nova venda</button></div>
+      <div class="metrics">
+        <article><span>Vendas no mês</span><strong id="rtSales">—</strong><small>transações</small></article>
+        <article><span>Receita de produtos</span><strong id="rtRevenue">—</strong><small>mês atual</small></article>
+        <article><span>Margem bruta</span><strong id="rtMargin">—</strong><small id="rtMarginPct">—</small></article>
+        <article><span>Unidades vendidas</span><strong id="rtUnits">—</strong><small>mês atual</small></article>
+      </div>
+      <div class="grid2">
+        <article class="panel"><div class="panelhead"><div><h2>Produtos para revenda</h2><p>Preço, estoque e comissão comercial.</p></div></div><div id="retailProductList" class="cards"></div></article>
+        <article class="panel"><div class="panelhead"><div><h2>Vendas recentes</h2><p>Cliente, valor e responsável.</p></div></div><div id="retailSalesList" class="tableLike"></div></article>
+      </div>
+    </section>
+
+    <section id="resources" class="view">
+      <div class="sectionTitle"><div><h2>Recursos do salão</h2><p>Cadeiras, salas, lavatórios e equipamentos entram na disponibilidade.</p></div><button class="primary" data-open="resourceModal">+ Recurso</button></div>
+      <div id="resourceList" class="cards cols3"></div>
+    </section>
+
+    <section id="finance" class="view">
+      <div class="sectionTitle"><div><h2>Financeiro & Caixa</h2><p>Receitas, despesas, caixa e comissões em uma mesma leitura.</p></div><button class="primary" data-open="financeEntryModal">+ Lançamento</button></div>
+      <div class="metrics">
+        <article><span>Entradas hoje</span><strong id="fIncome">—</strong><small>recebido</small></article>
+        <article><span>Saídas hoje</span><strong id="fExpense">—</strong><small>pago</small></article>
+        <article><span>Resultado hoje</span><strong id="fNet">—</strong><small>entradas - saídas</small></article>
+        <article><span>Comissões pendentes</span><strong id="fCommission">—</strong><small id="fCommissionCount">0 lançamentos</small></article>
+        <article><span>Contas a pagar</span><strong id="fPayable">—</strong><small id="fPayableCount">0 pendências</small></article>
+      </div>
+      <div class="grid2">
+        <article class="panel">
+          <div class="panelhead"><div><h2>Caixa</h2><p id="cashStatusText">Verificando caixa…</p></div><span id="cashBadge" class="chip">—</span></div>
+          <div id="cashBody" class="cashBody"></div>
+        </article>
+        <article class="panel">
+          <div class="panelhead"><div><h2>Custo e margem dos serviços</h2><p>Produto + comissão, antes dos custos fixos.</p></div></div>
+          <div id="serviceCostList" class="stack"></div>
+        </article>
+      </div>
+      <article class="panel">
+        <div class="panelhead"><div><h2>Movimentações</h2><p>Receitas, despesas e compromissos.</p></div></div>
+        <div id="financeList" class="tableLike"></div>
+      </article>
+      <div class="grid2">
+        <article class="panel">
+          <div class="panelhead"><div><h2>Comissões</h2><p>Geradas automaticamente no fechamento do atendimento.</p></div><button id="payPendingCommissions" class="secondary">Pagar pendentes</button></div>
+          <div id="commissionList" class="tableLike"></div>
+        </article>
+        <article class="panel">
+          <div class="panelhead"><div><h2>DRE gerencial</h2><p>Visão simples de entradas, saídas e resultado do mês.</p></div><input id="dreMonth" type="month"></div>
+          <div id="dreBody" class="dreBody"></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="inventory" class="view">
+      <div class="sectionTitle"><div><h2>Estoque & Consumo</h2><p>Quantidade real, mínimo, custo médio e consumo por serviço.</p></div><button class="primary" data-open="productModal">+ Produto</button></div>
+      <div class="metrics inventoryMetrics">
+        <article><span>Produtos</span><strong id="iProducts">—</strong><small>ativos</small></article>
+        <article><span>Estoque baixo</span><strong id="iLow">—</strong><small>pedem atenção</small></article>
+        <article><span>Consumo automático</span><strong>ON</strong><small>no fechamento</small></article>
+        <article><span>Receitas de serviço</span><strong id="iRecipes">—</strong><small>serviços configurados</small></article>
+      </div>
+      <div id="productList" class="cards cols3"></div>
+      <article class="panel">
+        <div class="panelhead"><div><h2>Consumo padrão por serviço</h2><p>Defina quanto cada serviço deveria consumir.</p></div></div>
+        <div id="recipeServiceList" class="cards"></div>
+      </article>
+      <article class="panel">
+        <div class="panelhead"><div><h2>Extrato de estoque</h2><p>Compras, consumo em atendimento e ajustes manuais.</p></div></div>
+        <div id="stockMovementList" class="tableLike"></div>
+      </article>
+      <article class="panel">
+        <div class="panelhead"><div><h2>Lotes & validade</h2><p>O consumo prioriza automaticamente o lote que vence primeiro.</p></div></div>
+        <div id="lotList" class="tableLike"></div>
+      </article>
+    </section>
+
+    <section id="suppliers" class="view">
+      <div class="sectionTitle"><div><h2>Fornecedores & Compras</h2><p>Contato, reposição, pedidos e recebimento de mercadoria.</p></div><div class="sectionActions"><button class="secondary" data-open="supplierModal">+ Fornecedor</button><button class="primary" data-open="purchaseModal">+ Pedido</button></div></div>
+      <div id="supplierList" class="cards cols3"></div>
+      <article class="panel">
+        <div class="panelhead"><div><h2>Reposição sugerida</h2><p>Produtos abaixo do mínimo e quantidade para voltar ao estoque ideal.</p></div></div>
+        <div id="purchaseSuggestionList" class="tableLike"></div>
+      </article>
+      <article class="panel">
+        <div class="panelhead"><div><h2>Pedidos de compra</h2><p>Do pedido até a entrada automática no estoque.</p></div></div>
+        <div id="purchaseList" class="tableLike"></div>
+      </article>
+      <article class="panel">
+        <div class="panelhead"><div><h2>Histórico de preços</h2><p>Quanto cada fornecedor cobrou pelo mesmo produto ao longo do tempo.</p></div></div>
+        <div id="supplierPriceList" class="tableLike"></div>
+      </article>
+    </section>
+
+    <section id="packages" class="view">
+      <div class="sectionTitle"><div><h2>Pacotes de Serviços</h2><p>Venda antecipada com créditos consumidos sem duplicar receita.</p></div><div class="sectionActions"><button class="secondary" data-open="packageSellModal">Vender pacote</button><button class="primary" data-open="packageModal">+ Novo pacote</button></div></div>
+      <div class="metrics">
+        <article><span>Pacotes ativos</span><strong id="pActive">—</strong><small>em uso por clientes</small></article>
+        <article><span>Valor vendido ativo</span><strong id="pValue">—</strong><small>saldo contratado</small></article>
+        <article><span>Créditos restantes</span><strong id="pCredits">—</strong><small>serviços ainda disponíveis</small></article>
+        <article><span>Modelos</span><strong id="pTemplates">—</strong><small>pacotes configurados</small></article>
+      </div>
+      <div id="packageTemplateList" class="cards cols3"></div>
+      <article class="panel"><div class="panelhead"><div><h2>Pacotes vendidos</h2><p>Cliente, validade e créditos restantes.</p></div></div><div id="clientPackageList" class="tableLike"></div></article>
+    </section>
+
+    <section id="retention" class="view">
+      <div class="sectionTitle"><div><h2>Fidelização & Relacionamento</h2><p>Quem merece carinho, quem indicou e quais contatos precisam acontecer.</p></div><div class="sectionActions"><button id="generateRetention" class="secondary">Gerar ações</button><button class="primary" data-open="referralModal">+ Indicação</button></div></div>
+      <div class="metrics">
+        <article><span>Clientes VIP</span><strong id="rVip">—</strong><small>ouro + diamante</small></article>
+        <article><span>Pontos ativos</span><strong id="rPoints">—</strong><small>fidelidade acumulada</small></article>
+        <article><span>Ações pendentes</span><strong id="rTasks">—</strong><small>pós + aniversário</small></article>
+        <article><span>Indicações convertidas</span><strong id="rReferrals">—</strong><small>novas clientes</small></article>
+      </div>
+      <div class="grid2">
+        <article class="panel"><div class="panelhead"><div><h2>Clientes mais valiosas</h2><p>LTV, visitas, pontos e nível de relacionamento.</p></div></div><div id="retentionClientList" class="tableLike"></div></article>
+        <article class="panel"><div class="panelhead"><div><h2>Ações de relacionamento</h2><p>Pós-atendimento e aniversários aguardando contato.</p></div></div><div id="retentionTaskList" class="stack"></div></article>
+      </div>
+      <article class="panel"><div class="panelhead"><div><h2>Indicações</h2><p>A recompensa só é liberada quando a pessoa indicada conclui o primeiro atendimento.</p></div></div><div id="referralList" class="tableLike"></div></article>
+    </section>
+
+    <section id="ownerEye" class="view">
+      <div class="sectionTitle"><div><h2>Olho do Dono</h2><p>Clientes, receita, margem, equipe e riscos traduzidos em decisão.</p></div><button id="refreshIntelligence" class="secondary">Atualizar leitura</button></div>
+      <div class="metrics">
+        <article><span>Receita 30 dias</span><strong id="oiRevenue">—</strong><small>realizado</small></article>
+        <article><span>Ticket médio</span><strong id="oiTicket">—</strong><small>por atendimento</small></article>
+        <article><span>Recorrência</span><strong id="oiRepeat">—</strong><small>clientes que voltaram</small></article>
+        <article><span>Recuperável</span><strong id="oiRecovery">—</strong><small>clientes atrasados</small></article>
+      </div>
+      <div class="grid2">
+        <article class="panel"><div class="panelhead"><div><h2>Alertas de gestão</h2><p>O que merece atenção agora.</p></div></div><div id="intelligenceAlerts" class="stack"></div></article>
+        <article class="panel"><div class="panelhead"><div><h2>Clientes para recuperar</h2><p>Quem deveria ter voltado e ainda não voltou.</p></div></div><div id="recoveryList" class="stack"></div></article>
+      </div>
+      <div class="grid2">
+        <article class="panel"><div class="panelhead"><div><h2>Equipe</h2><p>Receita, ticket e produtividade por profissional.</p></div></div><div id="performanceList" class="tableLike"></div></article>
+        <article class="panel"><div class="panelhead"><div><h2>Serviços</h2><p>Receita e margem direta.</p></div></div><div id="serviceIntelList" class="tableLike"></div></article>
+      </div>
+      <article class="panel"><div class="panelhead"><div><h2>Previsão de estoque</h2><p>Dias de cobertura e momento provável de reposição.</p></div></div><div id="stockForecastList" class="tableLike"></div></article>
+    </section>
+
+    <section id="agents" class="view">
+      <div class="sectionTitle"><div><h2>Funcionários Artificiais</h2><p>Detectam, preparam e executam ações conforme a autonomia permitida.</p></div><button id="runAgents" class="primary">Rodar varredura</button></div>
+      <article class="panel">
+        <div class="panelhead"><div><h2>Equipe artificial</h2><p>Autonomia 0–10. Dinheiro, compras e mensagens externas continuam sob aprovação.</p></div></div>
+        <div id="agentProfileList" class="cards cols3"></div>
+      </article>
+      <article class="panel">
+        <div class="panelhead"><div><h2>Central de ações</h2><p>Aprovar, rejeitar ou executar o que os agentes prepararam.</p></div><span id="agentPendingBadge" class="chip">0 pendentes</span></div>
+        <div id="agentTaskList" class="tableLike"></div>
+      </article>
+      <article class="panel">
+        <div class="panelhead"><div><h2>Comando para os agentes</h2><p>Regra local primeiro; JEV entra apenas quando o pedido não tem rota clara.</p></div><span class="chip">JEV router</span></div>
+        <form id="agentCommandForm" class="command"><textarea id="agentCommandText" placeholder="Ex.: veja quais clientes estão sumindo e o que vale recuperar"></textarea><button class="primary">Direcionar</button></form>
+        <div id="agentCommandResult" class="result muted">Nenhum comando roteado ainda.</div>
+      </article>
+    </section>
+
+    <section id="admin" class="view">
+      <div class="sectionTitle"><div><h2>Administração & Segurança</h2><p>Backup, integridade, usuários e rastreabilidade.</p></div><span id="adminHealthBadge" class="chip">verificando</span></div>
+      <div class="metrics">
+        <article><span>Banco de dados</span><strong id="adminDbIntegrity">—</strong><small>integridade</small></article>
+        <article><span>Último backup</span><strong id="adminBackupAge">—</strong><small id="adminBackupName">nenhum</small></article>
+        <article><span>Usuários</span><strong id="adminUsersCount">—</strong><small>ativos e cadastrados</small></article>
+        <article><span>Auditorias</span><strong id="adminAuditCount">—</strong><small>eventos recentes</small></article>
+        <article><span>Restauração</span><strong id="adminRestore">—</strong><small id="adminRestoreDate">não verificada</small></article>
+      </div>
+      <div class="grid2">
+        <article class="panel"><div class="panelhead"><div><h2>Saúde do sistema</h2><p>Recursos e persistência.</p></div></div><div id="adminSystemInfo" class="stack"></div></article>
+        <article class="panel"><div class="panelhead"><div><h2>Usuários</h2><p>Perfis com acesso ao salão.</p></div></div><div id="adminUserList" class="tableLike"></div></article>
+      </div>
+      <article class="panel"><div class="panelhead"><div><h2>Trilha de auditoria</h2><p>Quem fez o quê e quando.</p></div></div><div id="adminAuditList" class="tableLike"></div></article>
+      <article class="panel"><div class="panelhead"><div><h2>Backups</h2><p>Snapshots consistentes do SQLite.</p></div></div><div id="adminBackupList" class="tableLike"></div></article>
+    </section>
+
+    <section id="reports" class="view">
+      <div class="sectionTitle"><div><h2>Relatórios & Exportação</h2><p>Visão gerencial por período e arquivos prontos para Excel.</p></div><button id="reportRefresh" class="secondary">Atualizar</button></div>
+      <article class="panel reportFilters">
+        <div class="split">
+          <label>De<input id="reportFrom" type="date"></label>
+          <label>Até<input id="reportTo" type="date"></label>
+        </div>
+      </article>
+      <div class="metrics">
+        <article><span>Entradas reais</span><strong id="repIncome">—</strong><small>financeiro recebido</small></article>
+        <article><span>Saídas pagas</span><strong id="repExpense">—</strong><small>despesas realizadas</small></article>
+        <article><span>Resultado</span><strong id="repNet">—</strong><small>entradas - saídas</small></article>
+        <article><span>Comissões geradas</span><strong id="repCommission">—</strong><small>serviços + produtos</small></article>
+      </div>
+      <div class="grid2">
+        <article class="panel">
+          <div class="panelhead"><div><h2>Composição do período</h2><p>Dinheiro real separado do consumo de pacote.</p></div></div>
+          <div id="reportComposition" class="stack"></div>
+        </article>
+        <article class="panel">
+          <div class="panelhead"><div><h2>Exportar dados</h2><p>CSV compatível com Excel e filtros.</p></div></div>
+          <div class="reportExportGrid">
+            <button class="secondary" data-report-export="finance">Financeiro</button>
+            <button class="secondary" data-report-export="clients">Clientes</button>
+            <button class="secondary" data-report-export="appointments">Agenda</button>
+            <button class="secondary" data-report-export="stock">Estoque</button>
+            <button class="secondary" data-report-export="commissions">Comissões</button>
+            <button class="secondary" data-report-export="staff">Equipe</button>
+            <button class="secondary" data-report-export="retail">Vendas de produtos</button>
+          </div>
+        </article>
+      </div>
+      <article class="panel">
+        <div class="panelhead"><div><h2>Leitura executiva</h2><p>O que aconteceu no período sem misturar regime de caixa com consumo econômico.</p></div></div>
+        <div id="reportExecutive" class="reportExecutive muted">Selecione o período para gerar a leitura.</div>
+      </article>
+    </section>
+
+    <section id="intelligence" class="view">
+      <div class="sectionTitle"><div><h2>JEV · Decisões</h2><p>O que foi resolvido localmente e o que precisou do JEV.</p></div><span class="chip" id="jevState">verificando</span></div>
+      <article class="panel"><div id="receiptList" class="stack"></div></article>
+    </section>
+  </main>
+</div>
+
+<div class="mobileNav">
+  <button data-view="dashboard" class="active">⌂<small>Início</small></button>
+  <button data-view="inbox">✉<small>Whats</small></button>
+  <button data-view="agenda">▦<small>Agenda</small></button>
+  <button data-view="people">◉<small>Gente</small></button>
+  <button data-view="productsHub">▦<small>Produtos</small></button>
+  <button data-view="marketing">✦<small>Marketing</small></button>
+  <button data-view="clients">♡<small>Clientes</small></button>
+  <button data-view="finance">R$<small>Gestão</small></button>
+</div>
+
+<dialog id="clientModal"><form id="clientForm" class="modalForm">
+  <div class="modalHead"><div><h3>Novo cliente</h3><p>Cadastro rápido para não travar a recepção.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Nome<input name="name" required></label>
+  <div class="split"><label>WhatsApp<input name="phone" inputmode="tel"></label><label>E-mail<input name="email" type="email"></label></div>
+  <div class="split"><label>Data de aniversário<input name="birthday" type="date"></label><label>Referência / Quem indicou<input name="referral_reference" placeholder="Ex.: indicada pela Ana"></label></div>
+  <div class="split"><label>Instagram<input name="instagram" placeholder="@usuario ou link"></label><label>Facebook<input name="facebook" placeholder="nome ou link do perfil"></label></div>
+  <label>Origem<select name="source"><option value="manual">Cadastro manual</option><option value="whatsapp">WhatsApp</option><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="referral">Indicação</option><option value="google">Google</option><option value="other">Outro</option></select></label>
+  <label>Observações<textarea name="notes"></textarea></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Salvar cliente</button></div>
+</form></dialog>
+
+<dialog id="professionalModal"><form id="professionalForm" class="modalForm">
+  <div class="modalHead"><div><h3>Novo profissional</h3><p>Equipe operacional.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Nome<input name="name" required></label><label>Função<input name="role" placeholder="Ex.: Cabeleireira"></label>
+  <div class="split"><label>Início<input name="work_start" type="time" value="09:00"></label><label>Fim<input name="work_end" type="time" value="18:00"></label></div>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Salvar</button></div>
+</form></dialog>
+
+<dialog id="serviceModal"><form id="serviceForm" class="modalForm">
+  <div class="modalHead"><div><h3>Novo serviço</h3><p>Preço e duração estruturados.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Serviço<input name="name" required></label><label>Categoria<input name="category" placeholder="Cabelo, Unhas…"></label>
+  <div class="split"><label>Duração (min)<input name="duration_min" type="number" value="60" min="5"></label><label>Preço (R$)<input name="price" type="number" step="0.01" min="0"></label></div>
+  <label>Comissão (%)<input name="commission_pct" type="number" step="0.1" min="0"></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Salvar</button></div>
+</form></dialog>
+
+<dialog id="resourceModal"><form id="resourceForm" class="modalForm">
+  <div class="modalHead"><div><h3>Novo recurso</h3><p>O sistema impedirá dois agendamentos no mesmo recurso.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Nome<input name="name" required placeholder="Ex.: Cadeira 3"></label>
+  <label>Tipo<select name="type"><option value="chair">Cadeira</option><option value="washbasin">Lavatório</option><option value="room">Sala</option><option value="equipment">Equipamento</option><option value="other">Outro</option></select></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Salvar recurso</button></div>
+</form></dialog>
+
+<dialog id="waitlistModal"><form id="waitlistForm" class="modalForm">
+  <div class="modalHead"><div><h3>Adicionar à lista de espera</h3><p>Quando abrir um horário compatível, a recepção já sabe quem chamar.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Cliente<select name="client_id" id="wlClient" required></select></label>
+  <label>Serviço<select name="service_id" id="wlService" required></select></label>
+  <label>Profissional preferido<select name="professional_id" id="wlProfessional"><option value="">Qualquer profissional</option></select></label>
+  <label>Data preferida<input name="preferred_date" type="date"></label>
+  <label>Período<select name="period"><option value="any">Qualquer horário</option><option value="morning">Manhã</option><option value="afternoon">Tarde</option><option value="evening">Noite</option></select></label>
+  <label>Observações<textarea name="notes"></textarea></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Adicionar</button></div>
+</form></dialog>
+
+<dialog id="appointmentModal" class="appointmentDialog"><form id="appointmentForm" class="modalForm appointmentForm">
+  <div class="modalHead"><div><h3>Novo agendamento</h3><p>Cliente + profissional + serviços + recurso + horário.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Cliente<select name="client_id" id="apClient" required></select></label>
+  <div class="appointmentProfessionalLine">
+    <label>Profissional<select name="professional_id" id="apProfessional" required></select></label>
+    <div id="apProfessionalSummary" class="professionalSummary"><span class="muted">Selecione os profissionais dos serviços.</span></div>
+  </div>
+  <label>Serviço principal<select name="service_id" id="apService" required></select></label>
+  <label>Recurso<select name="resource_id" id="apResource"><option value="">Sem recurso específico</option></select></label>
+  <label>Data e hora<input name="start_at" type="datetime-local" required></label>
+
+  <section class="appointmentSection">
+    <div class="configSectionHead"><div><strong>Tags rápidas</strong><small>O sistema sugere algumas automaticamente; clique para incluir ou remover.</small></div></div>
+    <div id="apQuickTags" class="quickTags">
+      <button type="button" data-ap-tag="Cabelo longo">Cabelo longo</button>
+      <button type="button" data-ap-tag="Química">Química</button>
+      <button type="button" data-ap-tag="Retoque">Retoque</button>
+      <button type="button" data-ap-tag="Retorno">Retorno</button>
+      <button type="button" data-ap-tag="Primeira visita">Primeira visita</button>
+      <button type="button" data-ap-tag="Encaixe">Encaixe</button>
+      <button type="button" data-ap-tag="Alergia">Alergia</button>
+      <button type="button" id="addAppointmentTag" class="addTagChip">+ Nova tag</button>
+    </div>
+  </section>
+
+  <section class="appointmentSection">
+    <div class="configSectionHead"><div><strong>Serviços adicionais</strong><small>Cada serviço pode ter quantidade e profissional próprios.</small></div></div>
+    <div id="appointmentExtraServices" class="appointmentExtraServices"></div>
+    <button type="button" id="addAppointmentService" class="secondary wide">+ Adicionar outro serviço</button>
+    <p class="muted tinyHelp">Escolha “Serviço avulso” para lançar algo que ainda não existe no catálogo.</p>
+  </section>
+
+  <label>Observações<textarea name="notes" rows="3" placeholder="Anotações extras, se necessário."></textarea></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Agendar</button></div>
+</form></dialog>
+
+
+<dialog id="financeEntryModal"><form id="financeEntryForm" class="modalForm">
+  <div class="modalHead"><div><h3>Novo lançamento</h3><p>Receita ou despesa manual.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Tipo<select name="kind"><option value="expense">Despesa</option><option value="income">Receita</option></select></label>
+  <label>Categoria<input name="category" placeholder="Ex.: aluguel, marketing, venda"></label>
+  <label>Descrição<input name="description" required></label>
+  <div class="split"><label>Valor (R$)<input name="amount" type="number" step="0.01" min="0.01" required></label><label>Status<select name="status"><option value="paid">Pago/recebido</option><option value="pending">Pendente</option></select></label></div>
+  <div class="split"><label>Forma de pagamento<select name="payment_method"><option value="">Não definida</option><option value="pix">Pix</option><option value="credit_card">Crédito</option><option value="debit_card">Débito</option><option value="cash">Dinheiro</option><option value="other">Outro</option></select></label><label>Vencimento<input name="due_date" type="date"></label></div>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Salvar lançamento</button></div>
+</form></dialog>
+
+<dialog id="cashOpenModal"><form id="cashOpenForm" class="modalForm">
+  <div class="modalHead"><div><h3>Abrir caixa</h3><p>Informe o fundo inicial em dinheiro.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Valor inicial (R$)<input name="opening" type="number" step="0.01" min="0" value="0"></label>
+  <label>Observações<textarea name="notes"></textarea></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Abrir caixa</button></div>
+</form></dialog>
+
+<dialog id="cashCloseModal"><form id="cashCloseForm" class="modalForm">
+  <div class="modalHead"><div><h3>Fechar caixa</h3><p>Conte o dinheiro físico; o sistema compara com o esperado.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Valor contado (R$)<input name="actual" type="number" step="0.01" min="0" required></label>
+  <label>Observações<textarea name="notes"></textarea></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Fechar caixa</button></div>
+</form></dialog>
+
+<dialog id="productModal"><form id="productForm" class="modalForm">
+  <div class="modalHead"><div><h3>Novo produto</h3><p>Produto de consumo ou revenda.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Nome<input name="name" required></label><label>SKU / código<input name="sku"></label>
+  <div class="split"><label>Unidade<select name="unit"><option value="ml">ml</option><option value="g">g</option><option value="un">unidade</option><option value="dose">dose</option></select></label><label>Fornecedor<select name="supplier_id" id="productSupplier"><option value="">Sem fornecedor</option></select></label></div>
+  <div class="split"><label>Estoque atual<input name="stock_qty" type="number" step="0.01" value="0"></label><label>Estoque mínimo<input name="min_qty" type="number" step="0.01" value="0"></label></div>
+  <div class="split"><label>Estoque ideal<input name="ideal_qty" type="number" step="0.01" value="0"></label><label>Custo por unidade (R$)<input name="avg_cost" type="number" step="0.0001" value="0"></label></div>
+  <div class="split"><label>Preço de revenda (R$)<input name="sale_price" type="number" step="0.01" min="0" value="0"></label><label>Comissão na revenda (%)<input name="sale_commission_pct" type="number" step="0.1" min="0" max="100" value="0"></label></div>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Salvar produto</button></div>
+</form></dialog>
+
+<dialog id="supplierModal"><form id="supplierForm" class="modalForm">
+  <div class="modalHead"><div><h3>Novo fornecedor</h3><p>Contato e condições para compra.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Empresa / fornecedor<input name="name" required></label><label>Representante<input name="contact_name"></label>
+  <div class="split"><label>WhatsApp<input name="phone"></label><label>E-mail<input name="email" type="email"></label></div>
+  <div class="split"><label>Prazo médio (dias)<input name="lead_days" type="number" min="0" value="0"></label><label>Condição de pagamento<input name="payment_terms" placeholder="Ex.: 28/56 dias"></label></div>
+  <label>Observações<textarea name="notes"></textarea></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Salvar fornecedor</button></div>
+</form></dialog>
+
+
+<dialog id="purchaseModal"><form id="purchaseForm" class="modalForm">
+  <div class="modalHead"><div><h3>Novo pedido de compra</h3><p>O pedido cria a conta a pagar e, no recebimento, atualiza o estoque.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Fornecedor<select name="supplier_id" id="purchaseSupplier" required></select></label>
+  <div class="split"><label>Previsão de entrega<input name="expected_at" type="date"></label><label>Vencimento<input name="due_date" type="date"></label></div>
+  <div id="purchaseRows" class="purchaseRows"></div>
+  <button type="button" class="secondary" id="addPurchaseRow">+ Produto</button>
+  <label>Observações<textarea name="notes"></textarea></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Criar pedido</button></div>
+</form></dialog>
+
+<dialog id="stockAdjustModal"><form id="stockAdjustForm" class="modalForm">
+  <div class="modalHead"><div><h3>Ajustar estoque</h3><p id="stockAdjustProduct">Produto</p></div><button type="button" class="x" data-close>×</button></div>
+  <input name="product_id" type="hidden">
+  <label>Quantidade (+ entrada / - saída)<input name="qty" type="number" step="0.01" required></label>
+  <label>Motivo<input name="reason" required placeholder="Ex.: contagem, perda, uso não registrado"></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Aplicar ajuste</button></div>
+</form></dialog>
+
+<dialog id="recipeModal"><form id="recipeForm" class="modalForm">
+  <div class="modalHead"><div><h3>Consumo padrão</h3><p id="recipeServiceName">Serviço</p></div><button type="button" class="x" data-close>×</button></div>
+  <input name="service_id" type="hidden">
+  <div id="recipeRows" class="recipeRows"></div>
+  <button type="button" class="secondary" id="addRecipeRow">+ Produto</button>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Salvar consumo</button></div>
+</form></dialog>
+
+<dialog id="checkoutModal"><form id="checkoutForm" class="modalForm">
+  <div class="modalHead"><div><h3>Finalizar atendimento</h3><p id="checkoutLabel">Registrar pagamento, comissão e consumo.</p></div><button type="button" class="x" data-close>×</button></div>
+  <input name="appointment_id" type="hidden">
+  <label>Forma de pagamento<select name="payment_method" id="checkoutPaymentMethod" required><option value="pix">Pix</option><option value="credit_card">Cartão de crédito</option><option value="debit_card">Cartão de débito</option><option value="cash">Dinheiro</option><option value="voucher">Voucher</option><option value="package">Pacote</option><option value="other">Outro</option></select></label>
+  <label id="checkoutPackageWrap" class="hidden">Crédito do pacote<select name="client_package_id" id="checkoutPackage"><option value="">Selecione…</option></select><small id="checkoutPackageHint" class="muted"></small></label>
+  <label>Desconto (R$)<input name="discount" id="checkoutDiscount" type="number" step="0.01" min="0" value="0"></label>
+  <div class="consumptionBox"><div class="panelhead"><div><strong>Consumo deste atendimento</strong><p>Use a média da cliente como referência e ajuste o que foi usado hoje.</p></div></div><div id="checkoutConsumption"></div></div>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Finalizar e receber</button></div>
+</form></dialog>
+
+
+
+
+
+
+<dialog id="retailSaleModal"><form id="retailSaleForm" class="modalForm">
+  <div class="modalHead"><div><h3>Nova venda de produtos</h3><p>Baixa estoque e lança o financeiro automaticamente.</p></div><button type="button" class="x" data-close>×</button></div>
+  <div class="split"><label>Cliente (opcional)<select name="client_id" id="retailClient"><option value="">Venda balcão</option></select></label><label>Profissional (opcional)<select name="professional_id" id="retailProfessional"><option value="">Sem comissão</option></select></label></div>
+  <label>Forma de pagamento<select name="payment_method" required><option value="pix">Pix</option><option value="credit_card">Cartão de crédito</option><option value="debit_card">Cartão de débito</option><option value="cash">Dinheiro</option><option value="other">Outro</option></select></label>
+  <div id="retailRows" class="retailRows"></div>
+  <button type="button" class="secondary" id="addRetailRow">+ Produto</button>
+  <label>Desconto total (R$)<input name="discount" type="number" step="0.01" min="0" value="0"></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Finalizar venda</button></div>
+</form></dialog>
+
+<dialog id="retailConfigModal"><form id="retailConfigForm" class="modalForm">
+  <div class="modalHead"><div><h3>Configurar revenda</h3><p id="retailConfigName">Produto</p></div><button type="button" class="x" data-close>×</button></div>
+  <input name="product_id" type="hidden">
+  <label>Preço de venda (R$)<input name="sale_price" type="number" step="0.01" min="0" required></label>
+  <label>Comissão na venda (%)<input name="sale_commission_pct" type="number" step="0.1" min="0" max="100" value="0"></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Salvar</button></div>
+</form></dialog>
+
+
+<dialog id="agentConfigModal" class="wideDialog">
+  <form id="agentConfigForm" class="modalForm agentConfigForm">
+    <div class="modalHead">
+      <div><p class="eyebrow">WHATSAPP</p><h3>Configurar Recepcionista IA</h3><p>Defina como ela fala, o que pode fazer e quando deve chamar uma pessoa.</p></div>
+      <button type="button" class="x" data-close>×</button>
+    </div>
+    <input type="hidden" name="agent_key" value="receptionist">
+
+    <section class="agentConfigSection">
+      <div class="configSectionHead"><div><strong>Identidade</strong><small>Como a agente se apresenta ao cliente.</small></div></div>
+      <label class="toggleLine agentMasterToggle"><input name="enabled" type="checkbox"> <span><strong>Recepcionista IA ativa</strong><small>Quando pausada, não responde automaticamente nem gera confirmações/lembretes.</small></span></label>
+      <div class="split">
+        <label>Nome visível<input name="display_name" placeholder="Recepcionista IA"></label>
+        <label>Nome de apresentação<input name="greeting_name" placeholder="Assistente do salão"></label>
+      </div>
+      <label>Mensagem de apresentação<textarea name="introduction" rows="3" placeholder="Oi! Eu sou a assistente virtual do salão..."></textarea></label>
+      <label>Assinatura opcional<input name="signature" placeholder="Ex.: — Clara, atendimento Studio Aurora"></label>
+    </section>
+
+    <section class="agentConfigSection llmSection">
+      <div class="configSectionHead">
+        <div><strong>Modelo de IA</strong><small>Escolha qual empresa/modelo será o cérebro principal da Recepcionista.</small></div>
+        <span id="llmStatusBadge" class="chip">carregando</span>
+      </div>
+      <label class="toggleLine"><input name="llm_enabled" type="checkbox"> Usar esta configuração de LLM</label>
+      <div class="split">
+        <label>Empresa / provedor
+          <select name="llm_provider" id="llmProvider">
+            <option value="internal">Margot / OpenCLAW interno</option>
+            <option value="openai">OpenAI</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="gemini">Google Gemini</option>
+          </select>
+        </label>
+        <label>Modelo
+          <input name="llm_model" id="llmModel" placeholder="Digite o ID exato do modelo">
+        </label>
+      </div>
+      <label id="llmKeyLabel">Chave da API
+        <input name="llm_api_key" id="llmApiKey" type="password" autocomplete="new-password" placeholder="Cole a chave aqui; deixe vazio para manter a atual">
+      </label>
+      <div class="llmKeyInfo">
+        <small id="llmKeyStatus">Nenhuma chave carregada.</small>
+        <button type="button" class="secondary" id="testLlmConfig">Testar conexão</button>
+      </div>
+      <p class="muted llmHelp">A chave é criptografada no servidor e não volta para esta tela. Se o provedor externo falhar, a Recepcionista usa o cérebro interno como fallback.</p>
+    </section>
+
+    <section class="agentConfigSection">
+      <div class="configSectionHead"><div><strong>Tom & personalidade</strong><small>Controle fino sem precisar escrever prompt.</small></div></div>
+      <div class="split">
+        <label>Tom<select name="tone"><option value="warm">Acolhedor</option><option value="professional">Profissional</option><option value="casual">Casual</option><option value="luxury">Premium</option><option value="direct">Direto</option></select></label>
+        <label>Emojis<select name="emoji_level"><option value="0">Nenhum</option><option value="1">Quase nenhum</option><option value="2">Leve</option><option value="3">Moderado</option><option value="4">Expressivo</option><option value="5">Bem expressivo</option></select></label>
+      </div>
+      <div class="split">
+        <label>Formalidade <output id="agentFormalityOut">3</output>/10<input name="formality" type="range" min="0" max="10" value="3"></label>
+        <label>Diretividade <output id="agentDirectnessOut">7</output>/10<input name="directness" type="range" min="0" max="10" value="7"></label>
+      </div>
+      <label class="toggleLine"><input name="use_client_first_name" type="checkbox"> Usar o primeiro nome da cliente quando possível</label>
+    </section>
+
+    <section class="agentConfigSection">
+      <div class="configSectionHead"><div><strong>Atendimento</strong><small>O que a agente pode resolver sozinha.</small></div></div>
+      <div class="configChecks">
+        <label><input name="auto_activate_new_conversations" type="checkbox"> Ativar IA automaticamente em novas conversas</label>
+        <label><input name="answer_prices" type="checkbox"> Responder preços</label>
+        <label><input name="list_services" type="checkbox"> Listar serviços</label>
+        <label><input name="suggest_appointments" type="checkbox"> Sugerir horários</label>
+        <label><input name="allow_booking_flow" type="checkbox"> Conduzir fluxo de agendamento</label>
+        <label><input name="allow_cancel" type="checkbox"> Tratar cancelamento sem humano</label>
+        <label><input name="allow_reschedule" type="checkbox"> Tratar reagendamento sem humano</label>
+        <label><input name="transfer_on_complaint" type="checkbox"> Transferir reclamações</label>
+        <label><input name="transfer_on_ambiguity" type="checkbox"> Transferir quando não entender</label>
+        <label><input name="transfer_on_human_request" type="checkbox"> Transferir quando pedirem uma pessoa</label>
+      </div>
+    </section>
+
+    <section class="agentConfigSection">
+      <div class="configSectionHead"><div><strong>Agenda & automações</strong><small>Confirmações, lembretes e quantidade de opções.</small></div></div>
+      <div class="threeCols">
+        <label>Confirmar com antecedência (h)<input name="confirmation_hours_before" type="number" min="1" max="168"></label>
+        <label>Lembrar com antecedência (h)<input name="reminder_hours_before" type="number" min="1" max="24"></label>
+        <label>Horários por resposta<input name="max_slots_to_offer" type="number" min="1" max="8"></label>
+      </div>
+      <label class="toggleLine"><input name="allow_waitlist_offer" type="checkbox"> Oferecer automaticamente vagas da lista de espera</label>
+    </section>
+
+    <section class="agentConfigSection">
+      <div class="configSectionHead"><div><strong>Vendas</strong><small>Como ela conduz oportunidades sem pressionar a cliente.</small></div></div>
+      <div class="configChecks">
+        <label><input name="offer_next_step" type="checkbox"> Sempre sugerir um próximo passo</label>
+        <label><input name="suggest_related_service" type="checkbox"> Sugerir serviço relacionado quando fizer sentido</label>
+        <label><input name="recover_abandoned_lead" type="checkbox"> Permitir recuperação de lead abandonado</label>
+      </div>
+      <label>Política de desconto<textarea name="discount_policy" rows="3"></textarea></label>
+    </section>
+
+    <section class="agentConfigSection">
+      <div class="configSectionHead"><div><strong>Limites</strong><small>Regras que a IA nunca deve ultrapassar.</small></div></div>
+      <div class="configChecks">
+        <label><input name="never_promise_unavailable_slot" type="checkbox"> Nunca prometer horário indisponível</label>
+        <label><input name="never_invent_price" type="checkbox"> Nunca inventar preço</label>
+        <label><input name="never_confirm_without_slot" type="checkbox"> Nunca confirmar sem vaga real</label>
+        <label><input name="never_handle_payment_dispute" type="checkbox"> Não resolver disputa financeira</label>
+        <label><input name="sensitive_topics_handoff" type="checkbox"> Transferir assuntos sensíveis</label>
+      </div>
+    </section>
+
+    <section class="agentConfigSection">
+      <div class="configSectionHead"><div><strong>Instruções personalizadas</strong><small>Regras específicas deste salão. Use linguagem simples.</small></div></div>
+      <textarea name="custom_instructions" rows="7" placeholder="Ex.: Sempre perguntar se a cliente já fez química antes de falar sobre coloração. Não oferecer domingo. Chamar clientes antigas de 'querida' somente quando houver contexto..."></textarea>
+    </section>
+
+    <div class="stickyActions">
+      <button type="button" class="secondary" data-close>Cancelar</button>
+      <button class="primary">Salvar configuração</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="staffManageModal"><form id="staffManageForm" class="modalForm">
+  <div class="modalHead"><div><h3>Escala & meta</h3><p id="staffManageName">Profissional</p></div><button type="button" class="x" data-close>×</button></div>
+  <input name="professional_id" type="hidden">
+  <input name="period" type="hidden">
+  <div class="staffScheduleGrid" id="staffScheduleGrid"></div>
+  <div class="panelhead"><div><strong>Meta do mês</strong><p>Opcional. Serve como referência de gestão.</p></div></div>
+  <div class="split"><label>Receita alvo (R$)<input name="target_revenue" type="number" step="0.01" min="0"></label><label>Atendimentos alvo<input name="target_appointments" type="number" min="0"></label></div>
+  <div class="split"><label>Ticket médio alvo (R$)<input name="target_avg_ticket" type="number" step="0.01" min="0"></label><label>No-show máximo (%)<input name="target_no_show_pct" type="number" step="0.1" min="0" max="100"></label></div>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Salvar escala e meta</button></div>
+</form></dialog>
+
+<dialog id="timeOffModal"><form id="timeOffForm" class="modalForm">
+  <div class="modalHead"><div><h3>Folga ou ausência</h3><p>O período será bloqueado na disponibilidade da agenda.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Profissional<select name="professional_id" id="timeOffProfessional" required></select></label>
+  <label>Tipo<select name="type"><option value="day_off">Folga</option><option value="vacation">Férias</option><option value="medical">Atestado/saúde</option><option value="personal">Ausência pessoal</option><option value="training">Curso/treinamento</option></select></label>
+  <div class="split"><label>Início<input name="start_date" type="date" required></label><label>Fim<input name="end_date" type="date" required></label></div>
+  <label>Observações<textarea name="notes"></textarea></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Registrar</button></div>
+</form></dialog>
+
+<dialog id="packageModal"><form id="packageForm" class="modalForm">
+  <div class="modalHead"><div><h3>Novo pacote</h3><p>Monte os créditos e defina o preço total.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Nome<input name="name" required></label>
+  <label>Descrição<textarea name="description"></textarea></label>
+  <div class="split"><label>Preço (R$)<input name="price" type="number" step="0.01" min="0.01" required></label><label>Validade (dias)<input name="validity_days" type="number" min="1" value="90"></label></div>
+  <div id="packageRows" class="packageRows"></div>
+  <button type="button" class="secondary" id="addPackageRow">+ Serviço</button>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Salvar pacote</button></div>
+</form></dialog>
+
+
+<dialog id="packageSellModal"><form id="packageSellForm" class="modalForm">
+  <div class="modalHead"><div><h3>Vender pacote</h3><p>O pagamento entra agora; os créditos serão consumidos depois.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Cliente<select name="client_id" id="packageSellClient" required></select></label>
+  <label>Pacote<select name="package_id" id="packageSellPackage" required></select></label>
+  <label>Forma de pagamento<select name="payment_method" required><option value="pix">Pix</option><option value="credit_card">Cartão de crédito</option><option value="debit_card">Cartão de débito</option><option value="cash">Dinheiro</option><option value="other">Outro</option></select></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Confirmar venda</button></div>
+</form></dialog>
+
+<dialog id="technicalRecordModal"><form id="technicalRecordForm" class="modalForm">
+  <div class="modalHead"><div><h3>Novo registro técnico</h3><p>Registre a fórmula e o que precisa ser lembrado no próximo atendimento.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Cliente<select name="client_id" id="technicalFormClient" required></select></label>
+  <div class="split"><label>Serviço<select name="service_id" id="technicalService"><option value="">Sem serviço específico</option></select></label><label>Profissional<select name="professional_id" id="technicalProfessional"><option value="">Sem profissional</option></select></label></div>
+  <label>Título<input name="title" required placeholder="Ex.: Fórmula da coloração 06/10"></label>
+  <label>Fórmula / composição<textarea name="formula" rows="5" placeholder="Ex.: 30g 7.0 + 20g 7.1 + OX 20 vol..."></textarea></label>
+  <label>Observações<textarea name="observations" rows="5" placeholder="Tempo de pausa, reação do fio, preferências, ajustes para próxima vez..."></textarea></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Salvar registro</button></div>
+</form></dialog>
+
+<dialog id="referralModal"><form id="referralForm" class="modalForm">
+  <div class="modalHead"><div><h3>Registrar indicação</h3><p>A recompensa fica pendente até a indicada concluir o primeiro atendimento.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Quem indicou<select name="referrer_client_id" id="referrerClient" required></select></label>
+  <label>Quem foi indicada<select name="referred_client_id" id="referredClient" required></select></label>
+  <label>Pontos de recompensa<input name="reward_points" type="number" min="0" value="50"></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Registrar indicação</button></div>
+</form></dialog>
+
+<div id="toast" class="toast"></div>
+<script src="/app.js?v=191" type="module"></script>
+</body></html>

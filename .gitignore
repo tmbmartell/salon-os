@@ -1,0 +1,32 @@
+# Runtime / secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Databases and runtime data
+data/
+backups/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+
+# Logs / process files
+*.log
+*.pid
+
+# Local dependencies / caches
+node_modules/
+.DS_Store
+.cache/
+.tmp/
+tmp/
+
+# Editor / automatic backups
+*.bak
+*.bak.*
+
