@@ -135,7 +135,8 @@ function displayName(payload={}){
 export function listConversations(db,tenantId,limit=120){
   return db.prepare(`select co.*,c.name client_name,c.phone client_phone,c.email client_email,c.tags client_tags,c.source client_source,c.notes client_notes,c.birthday client_birthday,u.name assigned_user_name,
     (select body from messages m where m.conversation_id=co.id order by m.created_at desc limit 1) last_message,
-    (select created_at from messages m where m.conversation_id=co.id order by m.created_at desc limit 1) last_message_created_at
+    (select created_at from messages m where m.conversation_id=co.id order by m.created_at desc limit 1) last_message_created_at,
+    (select direction from messages m where m.conversation_id=co.id order by m.created_at desc limit 1) last_message_direction
     from conversations co left join clients c on c.id=co.client_id left join users u on u.id=co.assigned_user_id
     where co.tenant_id=? order by coalesce(co.last_message_at,co.created_at) desc limit ?`).all(tenantId,limit).map(x=>({...x,labels:(()=>{try{return JSON.parse(x.labels||"[]")}catch{return []}})(),client_tags:(()=>{try{return JSON.parse(x.client_tags||"[]")}catch{return []}})()}));
 }
