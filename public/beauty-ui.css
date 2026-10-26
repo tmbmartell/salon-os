@@ -88,3 +88,11 @@ body{background:var(--bg);color:var(--ink)}
 .ne-session-details{display:grid;gap:4px;min-width:0}
 .ne-session-details small{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
 @media(max-width:600px){.ne-security-grid{grid-template-columns:1fr}.ne-session-item{align-items:flex-start;flex-direction:column}}
+
+/* Marca NOVAGENTE original: wordmark adaptado ao menu escuro. */
+.sidebar .brand,.authBrand{flex-direction:column;align-items:flex-start;gap:6px}
+.logo{width:198px;max-width:100%;height:42px;min-height:42px;flex:0 0 auto;border-radius:8px;background:#000;display:flex;align-items:center;justify-content:center;padding:5px 3px;overflow:hidden}
+.logo img{display:block;width:100%;height:auto;object-fit:contain}
+.sidebar .brand strong,.authBrand strong{font-size:16px;letter-spacing:-.02em}
+.authBrand{margin-bottom:22px}
+@media(max-width:900px){.authBrand .logo{max-width:100%}}
