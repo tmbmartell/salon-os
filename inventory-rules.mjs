@@ -36,7 +36,7 @@ export function allocateConsumption(lines,submitted=[]){
     let allocated=0;
     group.lines.forEach((line,i)=>{
       const last=i===group.lines.length-1;
-      const amount=last?round(total-allocated):round(total*line.standard_qty/group.standard);
+      const amount=last?round(total-allocated):(isWholeUnit(group.unit)?Math.round(total*line.standard_qty/group.standard):round(total*line.standard_qty/group.standard));
       allocated=round(allocated+amount);
       result.push({...line,actual_qty:Math.max(0,amount),variance_qty:round(amount-line.standard_qty)});
     });
