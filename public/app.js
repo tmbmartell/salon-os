@@ -631,11 +631,20 @@ async function loadTechnical(clientId=null){
   $("#technicalClientMeta").textContent=client?((client.allergies?"Alergias/restrições atuais: "+client.allergies:"Sem alergias/restrições registradas.")+(client.notes?" · "+client.notes:"")):"";
   try{
     const rows=await api("/api/clients/"+cid+"/technical");
-    $("#technicalRecordList").innerHTML=rows.map(r=>'<article class="technicalCard"><div class="panelhead"><div><span class="chip">'+(r.service_name||"Registro")+'</span><h3>'+esc(r.title)+'</h3></div><small>'+dateTimeBR(r.created_at)+'</small></div>'+(r.professional_name?'<p><strong>Profissional:</strong> '+esc(r.professional_name)+'</p>':'')+(r.formula?'<div class="technicalBlock"><strong>Fórmula</strong><p>'+esc(r.formula).replace(/\n/g,"<br>")+'</p></div>':'')+(r.observations?'<div class="technicalBlock"><strong>Observações</strong><p>'+esc(r.observations).replace(/\n/g,"<br>")+'</p></div>':'')+(r.allergies_snapshot?'<p class="technicalAlert"><strong>Alergias/restrições naquele dia:</strong> '+esc(r.allergies_snapshot)+'</p>':'')+'</article>').join("")||'<article class="panel"><p class="muted">Ainda não há registro técnico para esta cliente.</p></article>';
+    $("#technicalRecordList").innerHTML=rows.map(r=>{
+      const service=esc(r.service_name||"Registro"),title=esc(r.title||"Ficha técnica");
+      return '<details class="ne-technical-card"><summary><span class="ne-technical-icon" aria-hidden="true">▤</span><span class="ne-technical-title"><small>'+service+'</small><strong>'+title+'</strong><span>'+dateTimeBR(r.created_at)+'</span></span><span class="ne-service-arrow" aria-hidden="true">⌄</span></summary>'+
+        '<div class="ne-technical-body">'+(r.professional_name?'<p><strong>Profissional:</strong> '+esc(r.professional_name)+'</p>':"")+
+        (r.formula?'<div class="technicalBlock"><strong>Fórmula</strong><p>'+esc(r.formula).replace(/\\n/g,"<br>")+'</p></div>':"")+
+        (r.observations?'<div class="technicalBlock"><strong>Observações</strong><p>'+esc(r.observations).replace(/\\n/g,"<br>")+'</p></div>':"")+
+        (r.allergies_snapshot?'<p class="technicalAlert"><strong>Alergias/restrições registradas:</strong> '+esc(r.allergies_snapshot)+'</p>':"")+'</div></details>';
+    }).join("")||'<article class="panel"><p class="muted">Ainda não há registro técnico para esta cliente.</p></article>';
     const add=$("#technical .sectionTitle [data-open]");if(add)add.style.display=state.user?.role==="reception"?"none":"";
   }catch(err){if(err.status!==401&&err.status!==403)toast("Não foi possível carregar a ficha técnica")}
 }
-$("#technicalClient").onchange=e=>loadTechnical(e.target.value);
+$("#technicalClient").onchange=e=>{const linked=$("#neTechnicalAppointmentId");if(linked)linked.value="";loadTechnical(e.target.value)};
+$("#technicalFormClient").onchange=()=>{const linked=$("#neTechnicalAppointmentId");if(linked)linked.value=""};
+$("#technicalRecordModal").addEventListener("close",()=>{const linked=$("#neTechnicalAppointmentId");if(linked)linked.value=""});
 $("#technicalRecordForm").onsubmit=async e=>{
   e.preventDefault();const b=Object.fromEntries(new FormData(e.target)),cid=b.client_id;
   try{await api("/api/clients/"+cid+"/technical",{method:"POST",body:JSON.stringify(b)});$("#technicalRecordModal").close();e.target.reset();fillTechnicalSelects();await loadTechnical(cid);toast("Registro técnico salvo")}catch(err){toast(err.status===403?"Seu perfil pode consultar, mas não alterar a ficha":"Não foi possível salvar o registro")}
