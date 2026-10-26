@@ -221,7 +221,7 @@ export async function syncWahaHistory(db,tenantId,{chatLimit=40,messageLimit=80}
   return stats;
 }
 
-export async function ingestWahaEvent({db,tenantId,event,interpret,autoReply,deliverText=sendText,defaultHandlingMode="human"}){
+export async function ingestWahaEvent({db,tenantId,event,interpret,autoReply,deliverText=sendText,defaultHandlingMode="human",allowAi=false}){
   const expected=sessionForTenant(db,tenantId);if(event?.session!==expected)return {accepted:false,reason:"other_session"};
   const p=event?.payload||{};
   if(event.event==="message.ack"){
@@ -249,7 +249,11 @@ export async function ingestWahaEvent({db,tenantId,event,interpret,autoReply,del
       .run(cid,tenantId,client.id,"whatsapp",p.from,"open",ts,ts,0,initialMode,initialMode==="ai"?"auto":"default",ts);
     co=db.prepare("select * from conversations where id=?").get(cid);
   }
-  if(!p.hasMedia&&defaultHandlingMode==="ai"&&co.handling_mode==="human"&&(co.handling_mode_source||"default")==="default"){
+  if(!allowAi&&co.handling_mode==="ai"){
+    db.prepare("update conversations set handling_mode='human',handling_mode_source='default',updated_at=? where id=? and tenant_id=?").run(ts,co.id,tenantId);
+    co=db.prepare("select * from conversations where id=? and tenant_id=?").get(co.id,tenantId);
+  }
+  if(allowAi&&!p.hasMedia&&defaultHandlingMode==="ai"&&co.handling_mode==="human"&&(co.handling_mode_source||"default")==="default"){
     db.prepare("update conversations set handling_mode='ai',handling_mode_source='auto',updated_at=? where id=? and tenant_id=?").run(ts,co.id,tenantId);
     co=db.prepare("select * from conversations where id=?").get(co.id);
   }
@@ -260,7 +264,7 @@ export async function ingestWahaEvent({db,tenantId,event,interpret,autoReply,del
   let mode=p.hasMedia?"human":co.handling_mode||"human",auto=null;
   if(p.hasMedia)db.prepare("update conversations set last_message_at=?,unread_count=unread_count+1,handling_mode='human',handling_mode_source='handoff',updated_at=? where id=?").run(ts,ts,co.id);
   else db.prepare("update conversations set last_message_at=?,unread_count=unread_count+1,handling_mode=?,updated_at=? where id=?").run(ts,mode,ts,co.id);
-  if(mode==="ai"&&!p.hasMedia&&autoReply){
+  if(allowAi&&mode==="ai"&&!p.hasMedia&&autoReply){
     auto=await autoReply({tenantId,client,conversation:co,text:body,intent});
     if(auto?.handoff){
       mode="human";
