@@ -149,7 +149,7 @@ export function listConversations(db,tenantId,limit=120){
     (select body from messages m where m.conversation_id=co.id order by m.created_at desc limit 1) last_message,
     (select created_at from messages m where m.conversation_id=co.id order by m.created_at desc limit 1) last_message_created_at,
     (select direction from messages m where m.conversation_id=co.id order by m.created_at desc limit 1) last_message_direction
-    from conversations co left join clients c on c.id=co.client_id left join users u on u.id=co.assigned_user_id
+    from conversations co left join clients c on c.id=co.client_id and c.tenant_id=co.tenant_id left join users u on u.id=co.assigned_user_id and u.tenant_id=co.tenant_id
     where co.tenant_id=? order by coalesce(co.last_message_at,co.created_at) desc limit ?`).all(tenantId,limit).map(x=>({...x,labels:(()=>{try{return JSON.parse(x.labels||"[]")}catch{return []}})(),client_tags:(()=>{try{return JSON.parse(x.client_tags||"[]")}catch{return []}})()}));
 }
 export function conversationMessages(db,tenantId,conversationId,limit=200){
@@ -159,7 +159,7 @@ export function markConversationRead(db,tenantId,conversationId){
   db.prepare("update conversations set unread_count=0,updated_at=? where id=? and tenant_id=?").run(new Date().toISOString(),conversationId,tenantId);
 }
 export async function sendConversationMessage(db,tenantId,conversationId,text,userId){
-  const co=db.prepare(`select co.*,c.phone client_phone from conversations co left join clients c on c.id=co.client_id
+  const co=db.prepare(`select co.*,c.phone client_phone from conversations co left join clients c on c.id=co.client_id and c.tenant_id=co.tenant_id
     where co.id=? and co.tenant_id=?`).get(conversationId,tenantId);
   if(!co||!co.client_phone)throw Object.assign(new Error("conversation_or_phone_missing"),{status:404});
   const body=String(text||"").trim().slice(0,4000);if(!body)throw Object.assign(new Error("text_required"),{status:400});
