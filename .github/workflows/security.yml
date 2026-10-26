@@ -1,0 +1,29 @@
+name: NOVAGENTE Estética — validação inicial
+on:
+  push:
+    branches:
+      - feat/beauty-woman-ui-consolidada
+  pull_request:
+    paths:
+      - "auth.mjs"
+      - "server.mjs"
+      - "public/**"
+      - "tests/**"
+      - "package.json"
+      - ".github/workflows/security.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Sintaxe
+        run: npm run check
+      - name: Testes de segurança
+        run: npm test

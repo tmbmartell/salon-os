@@ -759,10 +759,23 @@ async function api(req,res,url){
 }
 
 const MIME={".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".svg":"image/svg+xml",".png":"image/png",".json":"application/json; charset=utf-8",".webmanifest":"application/manifest+json; charset=utf-8"};
+// Proteção de origem em operações mutáveis de navegadores.
+// O webhook WAHA usa autenticação HMAC própria e é tratado separadamente.
+function sameOriginMutation(req,url){
+  if(["GET","HEAD","OPTIONS"].includes(req.method||"GET"))return true;
+  if(url.pathname==="/api/whatsapp/waha/webhook")return true;
+  if(req.headers["sec-fetch-site"]==="cross-site")return false;
+  const origin=req.headers.origin;
+  if(!origin)return true; // integrações de servidor sem Origin continuam permitidas
+  try{
+    const u=new URL(String(origin));
+    return u.host===String(req.headers.host||"") && ["http:","https:"].includes(u.protocol);
+  }catch{return false}
+}
 const handler=async(req,res)=>{
   try{
     const url=new URL(req.url||"/","http://localhost");
-    if(url.pathname.startsWith("/api/")){const retry=trafficLimit(req,url);if(retry)return send(res,429,{error:"rate_limited",retry_after:retry},{"retry-after":String(retry)});return await api(req,res,url)}
+    if(url.pathname.startsWith("/api/")){if(!sameOriginMutation(req,url))return send(res,403,{error:"cross_origin_request_denied"});const retry=trafficLimit(req,url);if(retry)return send(res,429,{error:"rate_limited",retry_after:retry},{"retry-after":String(retry)});return await api(req,res,url)}
     let rel=url.pathname==="/"?"index.html":url.pathname.slice(1);
     rel=path.normalize(rel).replace(/^(\.\.[/\\])+/, "");
     const publicRoot=path.join(__dirname,"public"),file=path.join(publicRoot,rel);

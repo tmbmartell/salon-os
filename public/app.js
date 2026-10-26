@@ -77,7 +77,8 @@ function renderConversationList(){
       '<small>'+esc(c.last_message||c.client_phone||"Sem mensagens")+'</small><span class="conversationLabels">'+labels+(c.category&&c.category!=="general"?'<span class="miniLabel category">'+esc(convCategoryName[c.category]||c.category)+'</span>':"")+'</span></span>'+
       (Number(c.unread_count)>0?'<b class="unreadBadge">'+c.unread_count+'</b>':"")+'</button>';
   }).join("")||'<div class="muted emptyPad">Nenhuma conversa com esses filtros.</div>';
-  $$("[data-conversation]").forEach(b=>b.onclick=()=>openConversation(b.dataset.conversation));
+  if(window.organizeBeautyInbox)window.organizeBeautyInbox(convs);
+  $("[data-conversation]").forEach(b=>b.onclick=()=>openConversation(b.dataset.conversation));
 }
 function updateChatModeButton(){
   const b=$("#chatModeButton"),co=state.selectedConversation;if(!b||!co)return;

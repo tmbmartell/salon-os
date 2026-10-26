@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 
 const SESSION_COOKIE="salon_session";
 const DAY=86400000;
+const SESSION_IDLE_HOURS=8;
 
 function sha(v){return crypto.createHash("sha256").update(String(v)).digest("hex")}
 function scrypt(password,salt){return crypto.scryptSync(password,salt,64).toString("hex")}
@@ -42,6 +43,8 @@ export function installAuth(db){
       metadata TEXT NOT NULL DEFAULT '{}',created_at TEXT NOT NULL
     );
   `);
+  const sessionCols=db.prepare("pragma table_info(auth_sessions)").all().map(x=>x.name);
+  if(!sessionCols.includes("device_label"))db.exec("alter table auth_sessions add column device_label TEXT NOT NULL DEFAULT 'Dispositivo não identificado'");
 }
 
 export function makePasswordHash(password){
@@ -59,8 +62,9 @@ export function authenticate(req,db){
   const token=cookies(req)[SESSION_COOKIE];
   if(!token)return null;
   const row=db.prepare(`select s.id session_id,s.tenant_id,s.user_id,s.expires_at,u.name,u.email,u.role,u.active
-    from auth_sessions s join users u on u.id=s.user_id
-    where s.token_hash=? and datetime(s.expires_at)>datetime('now') limit 1`).get(sha(token));
+    from auth_sessions s join users u on u.id=s.user_id and u.tenant_id=s.tenant_id
+    where s.token_hash=? and datetime(s.expires_at)>datetime('now')
+      and datetime(s.last_seen_at)>datetime('now','-${SESSION_IDLE_HOURS} hours') limit 1`).get(sha(token));
   if(!row||!row.active)return null;
   db.prepare("update auth_sessions set last_seen_at=? where id=?").run(new Date().toISOString(),row.session_id);
   return {sessionId:row.session_id,tenantId:row.tenant_id,id:row.user_id,name:row.name,email:row.email,role:row.role};
@@ -139,11 +143,29 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
     if(!u||!u.active||!verifyPassword(password,u.password_hash))return {handled:true,result:send(res,401,{error:"invalid_credentials"})};
     const token=crypto.randomBytes(32).toString("base64url"),ts=new Date(),expires=new Date(ts.getTime()+7*DAY);
     db.prepare("delete from auth_sessions where datetime(expires_at)<=datetime('now')").run();
-    db.prepare("insert into auth_sessions(id,tenant_id,user_id,token_hash,expires_at,created_at,last_seen_at) values(?,?,?,?,?,?,?)")
-      .run(crypto.randomUUID(),u.tenant_id,u.id,sha(token),expires.toISOString(),ts.toISOString(),ts.toISOString());
+    const deviceLabel=String(req.headers["user-agent"]||"Dispositivo não identificado").slice(0,180);
+    db.prepare("insert into auth_sessions(id,tenant_id,user_id,token_hash,expires_at,created_at,last_seen_at,device_label) values(?,?,?,?,?,?,?,?)")
+      .run(crypto.randomUUID(),u.tenant_id,u.id,sha(token),expires.toISOString(),ts.toISOString(),ts.toISOString(),deviceLabel);
     const user={id:u.id,tenantId:u.tenant_id,name:u.name,email:u.email,role:u.role};
     audit(db,user,"auth.login","user",u.id,{});
     return {handled:true,result:send(res,200,{ok:true,user},{"set-cookie":sessionCookie(req,token,7*24*3600)})};
+  }
+  if(url.pathname==="/api/auth/sessions"&&req.method==="GET"){
+    const user=authenticate(req,db);
+    if(!user)return {handled:true,result:send(res,401,{error:"unauthorized"})};
+    const rows=db.prepare("select id,device_label,created_at,last_seen_at,expires_at from auth_sessions where tenant_id=? and user_id=? and datetime(expires_at)>datetime('now') and datetime(last_seen_at)>datetime('now','-8 hours') order by last_seen_at desc").all(user.tenantId,user.id);
+    return {handled:true,result:send(res,200,{sessions:rows.map(x=>({...x,current:x.id===user.sessionId})),idle_timeout_hours:SESSION_IDLE_HOURS})};
+  }
+  if(url.pathname==="/api/auth/sessions/revoke"&&req.method==="POST"){
+    const user=authenticate(req,db);
+    if(!user)return {handled:true,result:send(res,401,{error:"unauthorized"})};
+    const body=await parseBody(req),sessionId=String(body.session_id||"").trim();
+    if(!sessionId)return {handled:true,result:send(res,400,{error:"session_id_required"})};
+    const out=db.prepare("delete from auth_sessions where id=? and user_id=? and tenant_id=?").run(sessionId,user.id,user.tenantId);
+    if(!out.changes)return {handled:true,result:send(res,404,{error:"session_not_found"})};
+    audit(db,user,"auth.session.revoke","auth_session",sessionId,{self:sessionId===user.sessionId});
+    const headers=sessionId===user.sessionId?{"set-cookie":deleteSessionCookie(req)}:{};
+    return {handled:true,result:send(res,200,{ok:true,revoked:sessionId},headers)};
   }
   if(url.pathname==="/api/auth/logout"&&req.method==="POST"){
     const token=cookies(req)[SESSION_COOKIE];
