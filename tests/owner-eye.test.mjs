@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {DatabaseSync} from "node:sqlite";
 import {makeOwnerEyeSnapshot,handleOwnerEyeApi} from "../owner-eye.mjs";
+import {handlePhase3Api} from "../phase3.mjs";
 
 function fixture(){
   const db=new DatabaseSync(":memory:");
@@ -106,5 +107,19 @@ test("timezone local determina o dia de referência, não o dia UTC",()=>{
     assert.equal(summary.period.to,"2026-10-25");
     assert.equal(summary.period.from,"2026-09-26");
     assert.equal(summary.money.income,50);
+  }finally{db.close()}
+});
+
+test("endpoints antigos de inteligência também recusam perfil da recepção",async()=>{
+  const db=fixture();
+  try{
+    const out=await handlePhase3Api({
+      req:{method:"GET"},res:{},url:new URL("/api/intelligence/clients","http://localhost"),
+      db,user:{id:"reception",role:"reception"},tenant:"a",
+      send:(_res,status,data)=>({status,data}),parseBody:async()=>({}),
+      requirePermission:()=>{},audit:()=>{}
+    });
+    assert.equal(out.status,403);
+    assert.equal(out.data.error,"owner_view_forbidden");
   }finally{db.close()}
 });
