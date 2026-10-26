@@ -6,7 +6,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="/styles.css">
-<link rel="stylesheet" href="/beauty-ui.css?v=3">
+<link rel="stylesheet" href="/beauty-ui.css?v=4">
 </head>
 <body>
 <div id="authGate" class="authGate">
@@ -167,8 +167,23 @@
 
     <section id="agenda" class="view">
       <div class="sectionTitle"><div><h2>Agenda</h2><p>Cliente, profissional, serviço e recurso sem conflito.</p></div><button class="primary" data-open="appointmentModal">+ Novo</button></div>
-      <article class="panel"><div id="agendaList" class="agenda"></div></article>
-      <article class="panel"><div class="panelhead"><div><h2>Lista de espera</h2><p>Clientes aguardando um encaixe ou horário melhor.</p></div><button class="secondary" data-open="waitlistModal">+ Adicionar</button></div><div id="waitlistList" class="stack"></div></article>
+      <div class="ne-work-toolbar" aria-label="Acesso rápido à agenda">
+        <button type="button" class="ne-action-card" data-open="appointmentModal"><span class="ne-action-icon">＋</span><strong>Agendar</strong><small>Novo horário</small></button>
+        <button type="button" class="ne-action-card" data-ne-agenda-filter="today"><span class="ne-action-icon">◷</span><strong>Hoje</strong><small>Atendimentos do dia</small></button>
+        <button type="button" class="ne-action-card" data-ne-agenda-filter="upcoming"><span class="ne-action-icon">▦</span><strong>Próximos</strong><small>Horários futuros</small></button>
+        <button type="button" class="ne-action-card" data-ne-show-waitlist><span class="ne-action-icon">↻</span><strong>Encaixes</strong><small>Lista de espera</small></button>
+      </div>
+      <div class="ne-agenda-tools">
+        <div class="ne-filter-group" role="group" aria-label="Filtrar situação da agenda">
+          <button type="button" class="active" data-ne-agenda-filter="today" aria-pressed="true">Hoje</button>
+          <button type="button" data-ne-agenda-filter="upcoming">Próximos</button>
+          <button type="button" data-ne-agenda-filter="closed">Encerrados</button>
+          <button type="button" data-ne-agenda-filter="all">Todos</button>
+        </div>
+        <label>Profissional <select id="neAgendaProfessional"><option value="">Todos</option></select></label>
+      </div>
+      <article class="panel ne-agenda-panel"><div class="panelhead"><div><h2>Atendimentos</h2><p id="neAgendaCount">Carregando agenda…</p></div></div><div id="agendaList" class="agenda"></div></article>
+      <article class="panel ne-waitlist-panel"><div class="panelhead"><div><h2>Lista de espera</h2><p>Clientes aguardando um encaixe ou horário melhor.</p></div><button class="secondary" data-open="waitlistModal">+ Adicionar</button></div><div id="waitlistList" class="stack"></div></article>
     </section>
 
     <section id="clients" class="view">
@@ -221,9 +236,10 @@
 
     <section id="technical" class="view">
       <div class="sectionTitle"><div><h2>Ficha Técnica da Cliente</h2><p>Fórmulas, observações e histórico do procedimento.</p></div><button class="primary" data-open="technicalRecordModal">+ Registro técnico</button></div>
-      <article class="panel">
+      <article class="panel ne-technical-filter">
         <div class="technicalFilter"><label>Cliente<select id="technicalClient"></select></label><div id="technicalClientMeta" class="muted">Selecione uma cliente.</div></div>
       </article>
+      <p class="ne-hint">As fórmulas e as observações ficam recolhidas até você abrir a ficha correspondente.</p>
       <div id="technicalRecordList" class="cards"></div>
     </section>
 
@@ -242,6 +258,7 @@
 
     <section id="services" class="view">
       <div class="sectionTitle"><div><h2>Serviços</h2><p>Preço, duração e comissão estruturados.</p></div><button class="primary" data-open="serviceModal">+ Serviço</button></div>
+      <div class="ne-service-tools"><div id="neServiceFilters" class="ne-filter-group" role="group" aria-label="Categorias de serviços"></div><span id="neServiceCount" class="ne-hint"></span></div>
       <div id="serviceList" class="cards cols3"></div>
     </section>
 
@@ -823,7 +840,7 @@
 
 <dialog id="technicalRecordModal"><form id="technicalRecordForm" class="modalForm">
   <div class="modalHead"><div><h3>Novo registro técnico</h3><p>Registre a fórmula e o que precisa ser lembrado no próximo atendimento.</p></div><button type="button" class="x" data-close>×</button></div>
-  <label>Cliente<select name="client_id" id="technicalFormClient" required></select></label>
+  <input type="hidden" name="appointment_id" id="neTechnicalAppointmentId"><label>Cliente<select name="client_id" id="technicalFormClient" required></select></label>
   <div class="split"><label>Serviço<select name="service_id" id="technicalService"><option value="">Sem serviço específico</option></select></label><label>Profissional<select name="professional_id" id="technicalProfessional"><option value="">Sem profissional</option></select></label></div>
   <label>Título<input name="title" required placeholder="Ex.: Fórmula da coloração 06/10"></label>
   <label>Fórmula / composição<textarea name="formula" rows="5" placeholder="Ex.: 30g 7.0 + 20g 7.1 + OX 20 vol..."></textarea></label>
@@ -840,7 +857,7 @@
 </form></dialog>
 
 <div id="toast" class="toast"></div>
-<script src="/app.js?v=192" type="module"></script>
+<script src="/app.js?v=193" type="module"></script>
 <script src="/beauty-ui.js?v=2" defer></script>
 <script src="/security-center.js?v=1" defer></script>
 <script src="/whatsapp-onboarding.js?v=1" defer></script>

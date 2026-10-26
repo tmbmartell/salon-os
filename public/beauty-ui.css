@@ -117,3 +117,60 @@ body{background:var(--bg);color:var(--ink)}
 .ne-client-appointment>small{font-size:11px;color:var(--muted);line-height:1.4}
 #chatActive .chatHeadActions{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 @media(max-width:670px){.ne-wa-connection .waActions>*{flex:1 1 150px}.ne-wa-connection .panelhead{flex-wrap:wrap}}
+
+/* Etapa 3 — Agenda e Serviços: nível 1 é sempre um card de ação; detalhes sob clique. */
+.ne-work-toolbar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 18px}
+.ne-action-card{display:grid;justify-items:start;align-content:start;text-align:left;gap:6px;min-height:124px;padding:15px;border:1px solid var(--line);border-radius:16px;background:#fff;color:var(--ink);cursor:pointer;box-shadow:var(--shadow)}
+.ne-action-card strong{font-size:14px}.ne-action-card small{font-size:11px;color:var(--muted)}
+.ne-action-icon{height:31px;width:31px;display:grid;place-items:center;border-radius:10px;background:var(--soft);color:var(--accent);font-size:20px}
+.ne-action-card:hover,.ne-action-card:focus-visible{border-color:var(--accent);outline-offset:2px}
+.ne-agenda-tools,.ne-service-tools{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 14px;flex-wrap:wrap}
+.ne-agenda-tools label{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
+.ne-agenda-tools select{font-size:13px;border:1px solid var(--line);border-radius:10px;padding:9px;background:#fff;color:var(--ink);max-width:220px}
+.ne-filter-group{display:flex;gap:5px;flex-wrap:wrap}
+.ne-filter-group button{padding:9px 12px;border-radius:11px;border:1px solid transparent;background:var(--soft);font-size:12px;color:var(--ink);cursor:pointer;font-weight:650}
+.ne-filter-group button.active,.ne-filter-group button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.ne-filter-group button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ne-agenda-panel{padding:17px}
+.ne-agenda-panel>.panelhead{margin-bottom:10px}
+#agendaList{display:grid;gap:10px}
+.ne-agenda-card,.ne-service-card,.ne-technical-card{display:block;min-width:0;border:1px solid var(--line);border-radius:14px;background:#fff;overflow:hidden}
+.ne-agenda-card summary,.ne-service-card summary,.ne-technical-card summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:12px;padding:15px}
+.ne-agenda-card summary::-webkit-details-marker,.ne-service-card summary::-webkit-details-marker,.ne-technical-card summary::-webkit-details-marker{display:none}
+.ne-agenda-card summary:hover,.ne-service-card summary:hover,.ne-technical-card summary:hover{background:#f6faff}
+.ne-agenda-card summary:focus-visible,.ne-service-card summary:focus-visible,.ne-technical-card summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ne-agenda-card[open],.ne-service-card[open],.ne-technical-card[open]{border-color:#9fc4e6}
+.ne-agenda-time{display:grid;gap:2px;font-weight:800;color:var(--accent);min-width:74px}
+.ne-agenda-time small{font-weight:450;color:var(--muted);font-size:10px;text-transform:capitalize}
+.ne-agenda-summary{flex:1;display:grid;gap:5px;min-width:0}
+.ne-agenda-summary strong{font-size:13px}.ne-agenda-summary small{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ne-agenda-status{border:1px solid var(--line);border-radius:30px;padding:6px 9px;color:var(--ink);font-size:11px;background:var(--soft);white-space:nowrap}
+.ne-agenda-chevron,.ne-service-arrow{color:var(--muted);font-size:17px}
+.ne-agenda-card[open] .ne-agenda-chevron,.ne-service-card[open] .ne-service-arrow,.ne-technical-card[open] .ne-service-arrow{transform:rotate(180deg)}
+.ne-agenda-details,.ne-service-details,.ne-technical-body{border-top:1px solid var(--line);padding:14px;background:#fbfdff;display:grid;gap:14px}
+.ne-agenda-meta,.ne-service-facts{display:flex;gap:10px;flex-wrap:wrap}
+.ne-agenda-meta span,.ne-service-facts span{display:grid;gap:3px;min-width:95px;color:var(--muted);font-size:11px}
+.ne-agenda-meta strong,.ne-service-facts strong{color:var(--ink);font-size:13px}
+.ne-agenda-controls,.ne-service-actions{display:flex;flex-wrap:wrap;align-items:center;gap:9px}
+.ne-agenda-controls label{font-size:12px;color:var(--muted)}
+.ne-agenda-controls select{padding:10px;border:1px solid var(--line);border-radius:11px;color:var(--ink);background:#fff;font-size:12px}
+.ne-agenda-controls button,.ne-service-actions button{min-height:40px}
+.ne-empty-view{text-align:center;padding:30px 20px;display:grid;gap:6px}
+.ne-empty-view p{margin:0;color:var(--muted);font-size:12px}
+.ne-service-tools{margin-top:6px}
+.ne-hint{font-size:12px;color:var(--muted)}
+#serviceList .ne-service-card{margin:0;box-shadow:var(--shadow)}
+.ne-service-card summary{align-items:center;min-height:104px}
+.ne-service-symbol,.ne-technical-icon{width:38px;height:38px;flex:0 0 38px;background:var(--soft);color:var(--accent);border-radius:12px;display:grid;place-items:center;font-size:23px}
+.ne-service-title,.ne-technical-title{min-width:0;flex:1;display:grid;gap:6px}
+.ne-service-title small,.ne-technical-title small{font-size:11px;color:var(--accent)}
+.ne-service-title strong,.ne-technical-title strong{font-size:14px}
+.ne-service-title span,.ne-technical-title span{font-size:12px;color:var(--muted)}
+.ne-service-details{padding:15px}
+.ne-technical-card summary{min-height:100px}
+.ne-technical-body .technicalBlock{margin:0;overflow-wrap:anywhere}
+.ne-technical-body p{overflow-wrap:anywhere;line-height:1.5}
+#technicalRecordList{align-items:start}
+#technicalRecordList .ne-technical-card{box-shadow:var(--shadow)}
+@media(max-width:900px){.ne-work-toolbar{grid-template-columns:repeat(2,minmax(0,1fr))}.ne-action-card{min-height:106px}}
+@media(max-width:530px){.ne-action-card{padding:12px}.ne-agenda-card summary{gap:7px;padding:12px 10px;flex-wrap:wrap}.ne-agenda-time{min-width:60px}.ne-agenda-status{margin-left:auto}.ne-agenda-controls>*{flex:1 1 140px}.ne-agenda-controls label{flex:1 1 100%}.ne-filter-group button{padding:8px}.ne-service-card summary{min-height:95px}}
