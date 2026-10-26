@@ -117,7 +117,7 @@ function supplierPriceHistory(db,tenant){
   });
 }
 
-function plannedConsumption(db,tenant,items,submitted=[]){
+function plannedConsumption(db,tenant,items,submitted=[],{checkStock=true}={}){
   const rows=[];
   items.forEach((item,itemIndex)=>{
     const recipe=all(db,"select r.product_id,r.qty_standard,p.name product_name,p.unit,p.stock_qty,p.avg_cost_cents from service_recipes r join products p on p.id=r.product_id and p.tenant_id=r.tenant_id where r.tenant_id=? and r.service_id=?",[tenant,item.service_id]);
@@ -129,7 +129,7 @@ function plannedConsumption(db,tenant,items,submitted=[]){
   for(const line of allocated)totals.set(line.product_id,(totals.get(line.product_id)||0)+line.actual_qty);
   for(const [productId,total] of totals){
     const product=rows.find(x=>x.product_id===productId);
-    if(total>Number(product.stock_qty)+0.000001)
+    if(checkStock&&total>Number(product.stock_qty)+0.000001)
       throw Object.assign(new Error("insufficient_stock"),{status:409,product_id:productId,product_name:product.product_name});
   }
   return allocated;
@@ -194,7 +194,7 @@ function checkoutPrep(db,tenant,appointmentId){
   const a=one(db,"select a.*,c.name client_name,c.id client_id,s.name service_name,s.price_cents,p.name professional_name from appointments a join clients c on c.id=a.client_id and c.tenant_id=a.tenant_id join services s on s.id=a.service_id and s.tenant_id=a.tenant_id join professionals p on p.id=a.professional_id and p.tenant_id=a.tenant_id where a.id=? and a.tenant_id=?",[appointmentId,tenant]);
   if(!a)return null;
   const items=appointmentCheckoutItems(db,tenant,a),subtotal=items.reduce((sum,x)=>sum+Number(x.unit_price_cents||0)*Math.max(1,Number(x.qty||1)),0),packages=items.length===1?availablePackageCredits(db,tenant,a.client_id,items[0].service_id):[];
-  const planned=plannedConsumption(db,tenant,items);
+  const planned=plannedConsumption(db,tenant,items,[],{checkStock:false});
   const grouped=new Map();
   for(const row of planned){
     const existing=grouped.get(row.product_id)||{product_id:row.product_id,product_name:row.product_name,unit:row.unit,stock_qty:row.stock_qty,qty_standard:0,client_avg_qty:null,client_samples:0};
@@ -243,12 +243,71 @@ export async function handlePhase2Api(ctx){
   if(req.method==="GET"&&url.pathname==="/api/suppliers"){guard("suppliers.read");return send(res,200,suppliers(db,tenant))}
   if(req.method==="POST"&&url.pathname==="/api/suppliers"){guard("suppliers.write");const b=await parseBody(req),name=txt(b.name,120);if(!name)return send(res,400,{error:"name_required"});const sid=uid();run(db,"insert into suppliers(id,tenant_id,name,contact_name,phone,email,lead_days,payment_terms,notes,active,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,1,?,?)",[sid,tenant,name,txt(b.contact_name,120),txt(b.phone,40),txt(b.email,160),Math.max(0,Number(b.lead_days||0)),txt(b.payment_terms,200),txt(b.notes,500),now(),now()]);audit(db,user,"supplier.create","supplier",sid,{});return send(res,201,one(db,"select * from suppliers where id=?",[sid]))}
   if(req.method==="GET"&&url.pathname==="/api/products"){guard("inventory.read");return send(res,200,products(db,tenant))}
-  if(req.method==="POST"&&url.pathname==="/api/products"){guard("inventory.write");const b=await parseBody(req),name=txt(b.name,140);if(!name)return send(res,400,{error:"name_required"});const pid=uid();run(db,"insert into products(id,tenant_id,name,sku,unit,stock_qty,min_qty,ideal_qty,avg_cost_cents,sale_price_cents,sale_commission_pct,supplier_id,active,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",[pid,tenant,name,txt(b.sku,80),txt(b.unit||"ml",20),Number(b.stock_qty||0),Number(b.min_qty||0),Number(b.ideal_qty||0),money(b.avg_cost||0),money(b.sale_price||0),Math.max(0,Math.min(100,Number(b.sale_commission_pct||0))),txt(b.supplier_id,64)||null,now(),now()]);audit(db,user,"product.create","product",pid,{});return send(res,201,products(db,tenant).find(x=>x.id===pid))}
+  if(req.method==="POST"&&url.pathname==="/api/products"){
+    guard("inventory.write");
+    const b=await parseBody(req),name=txt(b.name,140),unit=txt(b.unit||"ml",20).toLowerCase();
+    if(!name)return send(res,400,{error:"name_required"});
+    if(!["g","kg","ml","l","un"].includes(unit))return send(res,400,{error:"invalid_unit"});
+    const supplierId=txt(b.supplier_id,64)||null;
+    if(supplierId&&!one(db,"select id from suppliers where id=? and tenant_id=?",[supplierId,tenant]))return send(res,400,{error:"invalid_supplier"});
+    let stock,min,ideal;
+    try{
+      stock=quantity(b.stock_qty??0,unit);
+      min=quantity(b.min_qty??0,unit);
+      ideal=quantity(b.ideal_qty??0,unit);
+    }catch(e){return send(res,e.status||400,{error:e.message})}
+    const pid=uid();
+    run(db,"insert into products(id,tenant_id,name,sku,unit,stock_qty,min_qty,ideal_qty,avg_cost_cents,sale_price_cents,sale_commission_pct,supplier_id,active,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
+      [pid,tenant,name,txt(b.sku,80),unit,stock,min,ideal,money(b.avg_cost||0),money(b.sale_price||0),Math.max(0,Math.min(100,Number(b.sale_commission_pct||0))),supplierId,now(),now()]);
+    audit(db,user,"product.create","product",pid,{unit,stock_qty:stock});
+    return send(res,201,products(db,tenant).find(x=>x.id===pid));
+  }
   if(req.method==="GET"&&url.pathname==="/api/stock/movements"){guard("inventory.read");const pid=txt(url.searchParams.get("product_id")||"",64);const rows=pid?all(db,"select m.*,p.name product_name,p.unit from stock_movements m join products p on p.id=m.product_id where m.tenant_id=? and m.product_id=? order by m.created_at desc limit 300",[tenant,pid]):all(db,"select m.*,p.name product_name,p.unit from stock_movements m join products p on p.id=m.product_id where m.tenant_id=? order by m.created_at desc limit 300",[tenant]);return send(res,200,rows.map(x=>({...x,unit_cost:Number(x.unit_cost_cents||0)/100})))}
-  if(req.method==="POST"&&url.pathname==="/api/stock/adjust"){guard("inventory.write");const b=await parseBody(req),pid=txt(b.product_id,64),p=one(db,"select * from products where id=? and tenant_id=?",[pid,tenant]),q=Number(b.qty||0);if(!p)return send(res,404,{error:"product_not_found"});if(!q)return send(res,400,{error:"qty_required"});const next=Number(p.stock_qty)+q;run(db,"update products set stock_qty=?,updated_at=? where id=?",[next,now(),pid]);run(db,"insert into stock_movements(id,tenant_id,product_id,type,qty,unit_cost_cents,reason,created_by,created_at) values(?,?,?,?,?,?,?,?,?)",[uid(),tenant,pid,q>0?"adjust_in":"adjust_out",q,Number(p.avg_cost_cents||0),txt(b.reason||"Ajuste manual",200),user.id,now()]);audit(db,user,"stock.adjust","product",pid,{qty:q,next});return send(res,200,{stock_qty:next})}
+  if(req.method==="POST"&&url.pathname==="/api/stock/adjust"){
+    guard("inventory.write");
+    const b=await parseBody(req),pid=txt(b.product_id,64);
+    const p=one(db,"select * from products where id=? and tenant_id=?",[pid,tenant]);
+    if(!p)return send(res,404,{error:"product_not_found"});
+    const reason=txt(b.reason,200);
+    if(!reason)return send(res,400,{error:"reason_required"});
+    let q;
+    try{q=quantity(b.qty,p.unit,{zero:false,signed:true})}
+    catch(e){return send(res,e.status||400,{error:e.message})}
+    const next=Math.round((Number(p.stock_qty)+q)*1000)/1000;
+    if(next<0)return send(res,409,{error:"insufficient_stock"});
+    transaction(db,()=>{
+      run(db,"update products set stock_qty=?,updated_at=? where id=? and tenant_id=?",[next,now(),pid,tenant]);
+      if(q<0)consumeLots(db,tenant,pid,-q);
+      run(db,"insert into stock_movements(id,tenant_id,product_id,type,qty,unit_cost_cents,reason,created_by,created_at) values(?,?,?,?,?,?,?,?,?)",
+        [uid(),tenant,pid,q>0?"adjust_in":"adjust_out",q,Number(p.avg_cost_cents||0),reason,user.id,now()]);
+    });
+    audit(db,user,"stock.adjust","product",pid,{qty:q,next,reason});
+    return send(res,200,{stock_qty:next});
+  }
   const recipe=url.pathname.match(/^\/api\/services\/([^/]+)\/recipe$/);
   if(recipe&&req.method==="GET"){guard("inventory.read");return send(res,200,all(db,"select r.*,p.name product_name,p.unit,p.avg_cost_cents from service_recipes r join products p on p.id=r.product_id where r.tenant_id=? and r.service_id=?",[tenant,decodeURIComponent(recipe[1])]))}
-  if(recipe&&req.method==="PUT"){guard("inventory.write");const sid=decodeURIComponent(recipe[1]),b=await parseBody(req),items=Array.isArray(b.items)?b.items:[];transaction(db,()=>{run(db,"delete from service_recipes where tenant_id=? and service_id=?",[tenant,sid]);for(const x of items){const p=one(db,"select id from products where id=? and tenant_id=?",[txt(x.product_id,64),tenant]),q=Number(x.qty_standard||0);if(p&&q>0)run(db,"insert into service_recipes(tenant_id,service_id,product_id,qty_standard) values(?,?,?,?)",[tenant,sid,p.id,q])}});audit(db,user,"service.recipe.update","service",sid,{items:items.length});return send(res,200,{ok:true})}
+  if(recipe&&req.method==="PUT"){
+    guard("inventory.write");
+    const sid=decodeURIComponent(recipe[1]),service=one(db,"select id from services where id=? and tenant_id=?",[sid,tenant]);
+    if(!service)return send(res,404,{error:"service_not_found"});
+    const b=await parseBody(req),items=b.items;
+    if(!Array.isArray(items)||items.length>50)return send(res,400,{error:"invalid_recipe"});
+    const chosen=new Set(),normalized=[];
+    try{
+      for(const x of items){
+        const pid=txt(x.product_id,64),product=one(db,"select id,unit from products where id=? and tenant_id=? and active=1",[pid,tenant]);
+        if(!product||chosen.has(pid))throw Object.assign(new Error("invalid_recipe_product"),{status:400});
+        chosen.add(pid);
+        normalized.push({product_id:pid,qty:quantity(x.qty_standard,product.unit,{zero:false})});
+      }
+    }catch(e){return send(res,e.status||400,{error:e.message})}
+    transaction(db,()=>{
+      run(db,"delete from service_recipes where tenant_id=? and service_id=?",[tenant,sid]);
+      for(const x of normalized)run(db,"insert into service_recipes(tenant_id,service_id,product_id,qty_standard) values(?,?,?,?)",[tenant,sid,x.product_id,x.qty]);
+    });
+    audit(db,user,"service.recipe.update","service",sid,{items:normalized.length});
+    return send(res,200,{ok:true,items:normalized.length});
+  }
   if(req.method==="GET"&&url.pathname==="/api/services/costs"){guard("finance.read");return send(res,200,serviceCosts(db,tenant))}
   if(req.method==="GET"&&url.pathname==="/api/commissions"){guard("commissions.read");return send(res,200,commissions(db,tenant))}
   if(req.method==="POST"&&url.pathname==="/api/commissions/pay"){
@@ -296,6 +355,6 @@ export async function handlePhase2Api(ctx){
 
   if(req.method==="GET"&&url.pathname==="/api/reports/dre"){guard("finance.read");return send(res,200,dre(db,tenant,txt(url.searchParams.get("month")||"",7)))}
 
-  if(req.method==="POST"&&url.pathname==="/api/checkout"){guard("checkout.write");const b=await parseBody(req);try{const out=checkout(db,tenant,user,b);audit(db,user,"checkout.create","appointment",out.appointment_id,{total:out.total});return send(res,201,out)}catch(e){return send(res,e.status||400,{error:e.message})}}
+  if(req.method==="POST"&&url.pathname==="/api/checkout"){guard("checkout.write");const b=await parseBody(req);try{const out=checkout(db,tenant,user,b);audit(db,user,"checkout.create","appointment",out.appointment_id,{total:out.total});return send(res,201,out)}catch(e){return send(res,e.status||400,{error:e.message,product_id:e.product_id||null,product_name:e.product_name||null})}}
   return false;
 }
