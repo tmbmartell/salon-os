@@ -76,6 +76,7 @@ export function makeOwnerEyeSnapshot(db,tenant,{now=new Date()}={}){
   const repeatBase=Number(repurchase.with_purchase||0),repeatClients=Number(repurchase.repeat_clients||0);
   const stock=all(db,`select id,name,unit,stock_qty,min_qty,ideal_qty from products
     where tenant_id=? and active=1 and stock_qty<=min_qty order by stock_qty-min_qty limit 30`,[tenant]);
+  const stockTotal=Number(one(db,"select count(*) n from products where tenant_id=? and active=1 and stock_qty<=min_qty",[tenant])?.n||0);
   const lateBills=one(db,`select count(*) count,coalesce(sum(amount_cents),0) total from financial_entries
     where tenant_id=? and kind='expense' and status='pending' and due_date is not null and due_date<>'' and due_date<?`,[tenant,today])||{};
   const lateFollowups=one(db,`select count(*) count from engagement_tasks
@@ -86,7 +87,7 @@ export function makeOwnerEyeSnapshot(db,tenant,{now=new Date()}={}){
   const noShows=ended.filter(x=>x.status==="no_show").length;
   const noShowPct=ended.length?round(noShows/ended.length*100):null;
   const alerts=[];
-  if(stock.length)alerts.push({id:"stock",severity:"critical",label:stock.length+" produtos em estoque crítico",
+  if(stockTotal)alerts.push({id:"stock",severity:"critical",label:stockTotal+" produtos em estoque crítico",
     detail:"A quantidade está no mínimo ou abaixo dele.",view:"inventory"});
   if(Number(lateBills.count)>0)alerts.push({id:"bills",severity:"warning",label:lateBills.count+" contas vencidas",
     detail:"Pendências financeiras anteriores a hoje.",view:"finance"});
@@ -102,7 +103,7 @@ export function makeOwnerEyeSnapshot(db,tenant,{now=new Date()}={}){
     operations:{completed_services:visits,checkout_volume:round(volumes/100),average_checkout:visits?round(volumes/visits/100):0,
       repeat_rate:repeatBase?round(repeatClients/repeatBase*100):null,repeat_clients:repeatClients,clients_with_checkout:repeatBase,
       no_show_rate:noShowPct,absence_count:noShows},
-    attention:{critical_stock:stock.length,overdue_bills:Number(lateBills.count||0),overdue_bills_total:round(Number(lateBills.total||0)/100),
+    attention:{critical_stock:stockTotal,overdue_bills:Number(lateBills.count||0),overdue_bills_total:round(Number(lateBills.total||0)/100),
       overdue_followups:Number(lateFollowups.count||0)},
     charts:{cashflow14:trend14},
     lists:{professionals:top(byProfessional),services:top(byService),stock:stock.map(x=>({id:x.id,name:x.name,unit:x.unit,
