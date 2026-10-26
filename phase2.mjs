@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import {quantity,allocateConsumption} from "./inventory-rules.mjs";
+import {cents,validPaymentMethod,cashCloseResult} from "./finance-rules.mjs";
 import { afterCheckoutRetention } from "./phase6.mjs";
 import { consumePackageCredit, availablePackageCredits } from "./phase8.mjs";
 
@@ -16,6 +17,8 @@ export function installPhase2(db){
   db.exec([
     "CREATE TABLE IF NOT EXISTS cash_sessions(id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,opened_by TEXT NOT NULL,opened_at TEXT NOT NULL,opening_cents INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL DEFAULT 'open',closed_by TEXT,closed_at TEXT,expected_cents INTEGER,actual_cents INTEGER,difference_cents INTEGER,notes TEXT NOT NULL DEFAULT '')",
     "CREATE INDEX IF NOT EXISTS idx_cash_open ON cash_sessions(tenant_id,status,opened_at)",
+    "CREATE TABLE IF NOT EXISTS cash_movements(id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,cash_session_id TEXT NOT NULL,kind TEXT NOT NULL,amount_cents INTEGER NOT NULL,reason TEXT NOT NULL,created_by TEXT NOT NULL,created_at TEXT NOT NULL)",
+    "CREATE INDEX IF NOT EXISTS idx_cash_movements_session ON cash_movements(tenant_id,cash_session_id,created_at)",
     "CREATE TABLE IF NOT EXISTS financial_entries(id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,kind TEXT NOT NULL,category TEXT NOT NULL,description TEXT NOT NULL,amount_cents INTEGER NOT NULL,payment_method TEXT,status TEXT NOT NULL DEFAULT 'paid',due_date TEXT,paid_at TEXT,cash_session_id TEXT,appointment_id TEXT,supplier_id TEXT,reference_type TEXT,reference_id TEXT,created_by TEXT,created_at TEXT NOT NULL,metadata TEXT NOT NULL DEFAULT '{}')",
     "CREATE INDEX IF NOT EXISTS idx_finance_date ON financial_entries(tenant_id,created_at)",
     "CREATE TABLE IF NOT EXISTS suppliers(id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,name TEXT NOT NULL,contact_name TEXT,phone TEXT,email TEXT,lead_days INTEGER NOT NULL DEFAULT 0,payment_terms TEXT NOT NULL DEFAULT '',notes TEXT NOT NULL DEFAULT '',active INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)",
@@ -52,12 +55,24 @@ export function installPhase2(db){
 function openCash(db,tenant){return one(db,"select * from cash_sessions where tenant_id=? and status='open' order by opened_at desc limit 1",[tenant])||null}
 function expectedCash(db,tenant,cashId){
   const c=one(db,"select opening_cents from cash_sessions where id=? and tenant_id=?",[cashId,tenant]);if(!c)return 0;
-  const f=one(db,"select coalesce(sum(case when kind='income' then amount_cents else -amount_cents end),0) n from financial_entries where tenant_id=? and cash_session_id=? and status='paid' and payment_method='cash'",[tenant,cashId]);
-  return Number(c.opening_cents||0)+Number(f?.n||0);
+  const entries=one(db,"select coalesce(sum(case when kind='income' then amount_cents else -amount_cents end),0) n from financial_entries where tenant_id=? and cash_session_id=? and status='paid' and payment_method='cash'",[tenant,cashId]);
+  const withdrawals=one(db,"select coalesce(sum(amount_cents),0) n from cash_movements where tenant_id=? and cash_session_id=? and kind='withdrawal'",[tenant,cashId]);
+  return Number(c.opening_cents||0)+Number(entries?.n||0)-Number(withdrawals?.n||0);
+}
+function cashOverview(db,tenant){
+  const session=openCash(db,tenant);
+  if(!session)return {status:"closed",session:null,expected:0,by_method:[],withdrawals:0,movements:[]};
+  const summary=all(db,"select payment_method,kind,count(*) count,sum(amount_cents) cents from financial_entries where tenant_id=? and cash_session_id=? and status='paid' group by payment_method,kind",[tenant,session.id]);
+  const movements=all(db,"select id,kind,amount_cents,reason,created_at from cash_movements where tenant_id=? and cash_session_id=? order by created_at desc limit 30",[tenant,session.id]);
+  const withdrawals=Number(one(db,"select coalesce(sum(amount_cents),0) n from cash_movements where tenant_id=? and cash_session_id=? and kind='withdrawal'",[tenant,session.id])?.n||0);
+  return {status:"open",session:{id:session.id,opened_at:session.opened_at,opening:Number(session.opening_cents)/100},
+    expected:expectedCash(db,tenant,session.id)/100,
+    by_method:summary.map(row=>({payment_method:row.payment_method||"other",kind:row.kind,count:row.count,total:Number(row.cents)/100})),
+    withdrawals:withdrawals/100,movements:movements.map(x=>({...x,amount:Number(x.amount_cents)/100}))};
 }
 function dashboard(db,tenant){
   const since=new Date();since.setHours(0,0,0,0);
-  const r=one(db,"select coalesce(sum(case when kind='income' and status='paid' then amount_cents else 0 end),0) income,coalesce(sum(case when kind='expense' and status='paid' then amount_cents else 0 end),0) expense from financial_entries where tenant_id=? and created_at>=?",[tenant,since.toISOString()])||{};
+  const r=one(db,"select coalesce(sum(case when kind='income' and status='paid' then amount_cents else 0 end),0) income,coalesce(sum(case when kind='expense' and status='paid' then amount_cents else 0 end),0) expense from financial_entries where tenant_id=? and status='paid' and paid_at>=?",[tenant,since.toISOString()])||{};
   const cp=one(db,"select coalesce(sum(amount_cents),0) n,count(*) c from commissions where tenant_id=? and status='pending'",[tenant])||{};
   let rp={n:0,c:0};try{rp=one(db,"select coalesce(sum(amount_cents),0) n,count(*) c from retail_commissions where tenant_id=? and status='pending'",[tenant])||rp}catch{}
   const low=one(db,"select count(*) c from products where tenant_id=? and active=1 and stock_qty<=min_qty",[tenant])||{};
@@ -237,11 +252,76 @@ function dre(db,tenant,month){
 export async function handlePhase2Api(ctx){
   const {req,res,url,db,user,tenant,send,parseBody,requirePermission,audit}=ctx,guard=p=>requirePermission(user,p);
   if(req.method==="GET"&&url.pathname==="/api/phase2/dashboard"){guard("finance.read");return send(res,200,dashboard(db,tenant))}
-  if(req.method==="GET"&&url.pathname==="/api/cash/current"){guard("cash.read");const c=openCash(db,tenant);return send(res,200,c?{...c,expected:expectedCash(db,tenant,c.id)/100}:null)}
-  if(req.method==="POST"&&url.pathname==="/api/cash/open"){guard("cash.write");if(openCash(db,tenant))return send(res,409,{error:"cash_already_open"});const b=await parseBody(req),cid=uid(),opening=money(b.opening||0);run(db,"insert into cash_sessions(id,tenant_id,opened_by,opened_at,opening_cents,status,notes) values(?,?,?,?,?,'open',?)",[cid,tenant,user.id,now(),opening,txt(b.notes,500)]);audit(db,user,"cash.open","cash_session",cid,{opening_cents:opening});return send(res,201,{id:cid,opening:opening/100,status:"open"})}
-  if(req.method==="POST"&&url.pathname==="/api/cash/close"){guard("cash.write");const c=openCash(db,tenant);if(!c)return send(res,409,{error:"cash_not_open"});const b=await parseBody(req),actual=money(b.actual||0),expected=expectedCash(db,tenant,c.id),difference=actual-expected;run(db,"update cash_sessions set status='closed',closed_by=?,closed_at=?,expected_cents=?,actual_cents=?,difference_cents=?,notes=? where id=?",[user.id,now(),expected,actual,difference,txt(b.notes||c.notes,500),c.id]);audit(db,user,"cash.close","cash_session",c.id,{expected,actual,difference});return send(res,200,{status:"closed",expected:expected/100,actual:actual/100,difference:difference/100})}
+  if(req.method==="GET"&&url.pathname==="/api/cash/current"){
+    guard("cash.read");const c=openCash(db,tenant);return send(res,200,c?{...c,expected:expectedCash(db,tenant,c.id)/100}:null);
+  }
+  if(req.method==="GET"&&url.pathname==="/api/cash/overview"){
+    guard("cash.read");return send(res,200,cashOverview(db,tenant));
+  }
+  if(req.method==="GET"&&url.pathname==="/api/cash/history"){
+    guard("cash.read");
+    const sessions=all(db,"select id,opened_at,closed_at,status,opening_cents,expected_cents,actual_cents,difference_cents,notes from cash_sessions where tenant_id=? order by opened_at desc limit 30",[tenant]);
+    return send(res,200,sessions.map(x=>({...x,opening:Number(x.opening_cents)/100,expected:x.expected_cents==null?null:Number(x.expected_cents)/100,actual:x.actual_cents==null?null:Number(x.actual_cents)/100,difference:x.difference_cents==null?null:Number(x.difference_cents)/100})));
+  }
+  if(req.method==="POST"&&url.pathname==="/api/cash/open"){
+    guard("cash.write");
+    const b=await parseBody(req);let opening;
+    try{opening=cents(b.opening??0,{allowZero:true})}catch(e){return send(res,e.status||400,{error:e.message})}
+    let cid;
+    try{transaction(db,()=>{
+      if(openCash(db,tenant))throw Object.assign(new Error("cash_already_open"),{status:409});
+      cid=uid();run(db,"insert into cash_sessions(id,tenant_id,opened_by,opened_at,opening_cents,status,notes) values(?,?,?,?,?,'open',?)",[cid,tenant,user.id,now(),opening,txt(b.notes,500)]);
+    })}catch(e){return send(res,e.status||400,{error:e.message})}
+    audit(db,user,"cash.open","cash_session",cid,{opening_cents:opening});
+    return send(res,201,{id:cid,opening:opening/100,status:"open"});
+  }
+  if(req.method==="POST"&&url.pathname==="/api/cash/withdraw"){
+    guard("cash.write");
+    const b=await parseBody(req),reason=txt(b.reason,500);if(reason.length<8)return send(res,400,{error:"withdrawal_reason_required"});
+    let amount;try{amount=cents(b.amount)}catch(e){return send(res,e.status||400,{error:e.message})}
+    let sessionId;
+    try{transaction(db,()=>{
+      const cash=openCash(db,tenant);if(!cash)throw Object.assign(new Error("cash_not_open"),{status:409});
+      if(amount>expectedCash(db,tenant,cash.id))throw Object.assign(new Error("insufficient_cash"),{status:409});
+      sessionId=cash.id;
+      run(db,"insert into cash_movements(id,tenant_id,cash_session_id,kind,amount_cents,reason,created_by,created_at) values(?,?,?,?,?,?,?,?)",[uid(),tenant,cash.id,"withdrawal",amount,reason,user.id,now()]);
+    })}catch(e){return send(res,e.status||400,{error:e.message})}
+    audit(db,user,"cash.withdraw","cash_session",sessionId,{amount_cents:amount,reason});
+    return send(res,201,{ok:true,amount:amount/100,expected:expectedCash(db,tenant,sessionId)/100});
+  }
+  if(req.method==="POST"&&url.pathname==="/api/cash/close"){
+    guard("cash.write");
+    const b=await parseBody(req);let output,id;
+    try{transaction(db,()=>{
+      const cash=openCash(db,tenant);if(!cash)throw Object.assign(new Error("cash_not_open"),{status:409});
+      id=cash.id;const expected=expectedCash(db,tenant,id);
+      output=cashCloseResult(expected,b.actual,b.notes);
+      const changed=run(db,"update cash_sessions set status='closed',closed_by=?,closed_at=?,expected_cents=?,actual_cents=?,difference_cents=?,notes=? where id=? and tenant_id=? and status='open'",
+        [user.id,now(),output.expected_cents,output.actual_cents,output.difference_cents,output.notes,id,tenant]);
+      if(!changed.changes)throw Object.assign(new Error("cash_already_closed"),{status:409});
+    })}catch(e){return send(res,e.status||400,{error:e.message})}
+    audit(db,user,"cash.close","cash_session",id,output);
+    return send(res,200,{status:"closed",expected:output.expected_cents/100,actual:output.actual_cents/100,difference:output.difference_cents/100});
+  }
   if(req.method==="GET"&&url.pathname==="/api/finance/entries"){guard("finance.read");return send(res,200,all(db,"select * from financial_entries where tenant_id=? order by created_at desc limit 300",[tenant]).map(x=>({...x,amount:Number(x.amount_cents)/100})))}
-  if(req.method==="POST"&&url.pathname==="/api/finance/entries"){guard("finance.write");const b=await parseBody(req),kind=txt(b.kind,20),status=txt(b.status||"paid",20),amount=money(b.amount);if(!["income","expense"].includes(kind)||!["paid","pending"].includes(status)||amount<=0)return send(res,400,{error:"invalid_finance_entry"});const cash=openCash(db,tenant),method=txt(b.payment_method||"",32);if(status==="paid"&&method==="cash"&&!cash)return send(res,409,{error:"cash_session_required"});const fid=uid();run(db,"insert into financial_entries(id,tenant_id,kind,category,description,amount_cents,payment_method,status,due_date,paid_at,cash_session_id,supplier_id,created_by,created_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",[fid,tenant,kind,txt(b.category||"other",80),txt(b.description,240),amount,method||null,status,txt(b.due_date,10)||null,status==="paid"?now():null,status==="paid"?cash?.id||null:null,txt(b.supplier_id,64)||null,user.id,now()]);audit(db,user,"finance.entry.create","financial_entry",fid,{kind,status,amount});return send(res,201,{id:fid,amount:amount/100,status})}
+  if(req.method==="POST"&&url.pathname==="/api/finance/entries"){
+    guard("finance.write");
+    const b=await parseBody(req),kind=txt(b.kind,20),status=txt(b.status||"paid",20),description=txt(b.description,240);
+    if(!["income","expense"].includes(kind)||!["paid","pending"].includes(status)||!description)return send(res,400,{error:"invalid_finance_entry"});
+    let amount,method;
+    try{amount=cents(b.amount);method=validPaymentMethod(b.payment_method,{allowEmpty:status==="pending"})}
+    catch(e){return send(res,e.status||400,{error:e.message})}
+    const supplierId=txt(b.supplier_id,64)||null;
+    if(supplierId&&!one(db,"select id from suppliers where id=? and tenant_id=?",[supplierId,tenant]))return send(res,400,{error:"invalid_supplier"});
+    const cash=openCash(db,tenant);
+    if(status==="paid"&&method==="cash"&&!cash)return send(res,409,{error:"cash_session_required"});
+    if(status==="paid"&&method==="cash"&&kind==="expense"&&amount>expectedCash(db,tenant,cash.id))return send(res,409,{error:"insufficient_cash"});
+    const fid=uid();
+    run(db,"insert into financial_entries(id,tenant_id,kind,category,description,amount_cents,payment_method,status,due_date,paid_at,cash_session_id,supplier_id,created_by,created_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+      [fid,tenant,kind,txt(b.category||"other",80),description,amount,method,status,txt(b.due_date,10)||null,status==="paid"?now():null,status==="paid"?(cash?.id||null):null,supplierId,user.id,now()]);
+    audit(db,user,"finance.entry.create","financial_entry",fid,{kind,status,amount_cents:amount,payment_method:method});
+    return send(res,201,{id:fid,amount:amount/100,status});
+  }
   if(req.method==="GET"&&url.pathname==="/api/suppliers"){guard("suppliers.read");return send(res,200,suppliers(db,tenant))}
   if(req.method==="POST"&&url.pathname==="/api/suppliers"){guard("suppliers.write");const b=await parseBody(req),name=txt(b.name,120);if(!name)return send(res,400,{error:"name_required"});const sid=uid();run(db,"insert into suppliers(id,tenant_id,name,contact_name,phone,email,lead_days,payment_terms,notes,active,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,1,?,?)",[sid,tenant,name,txt(b.contact_name,120),txt(b.phone,40),txt(b.email,160),Math.max(0,Number(b.lead_days||0)),txt(b.payment_terms,200),txt(b.notes,500),now(),now()]);audit(db,user,"supplier.create","supplier",sid,{});return send(res,201,one(db,"select * from suppliers where id=?",[sid]))}
   if(req.method==="GET"&&url.pathname==="/api/products"){guard("inventory.read");return send(res,200,products(db,tenant))}
@@ -323,25 +403,55 @@ export async function handlePhase2Api(ctx){
   if(req.method==="GET"&&url.pathname==="/api/services/costs"){guard("finance.read");return send(res,200,serviceCosts(db,tenant))}
   if(req.method==="GET"&&url.pathname==="/api/commissions"){guard("commissions.read");return send(res,200,commissions(db,tenant))}
   if(req.method==="POST"&&url.pathname==="/api/commissions/pay"){
-    guard("commissions.write");const b=await parseBody(req),ids=Array.isArray(b.ids)?b.ids.map(x=>txt(x,64)).filter(Boolean):[];if(!ids.length)return send(res,400,{error:"ids_required"});
+    guard("commissions.write");
+    const b=await parseBody(req),rawIds=Array.isArray(b.ids)?b.ids:[],ids=[...new Set(rawIds.map(x=>txt(x,64)).filter(Boolean))];
+    if(!ids.length||ids.length>100)return send(res,400,{error:"invalid_commission_selection"});
+    let method;try{method=validPaymentMethod(b.payment_method)}catch(e){return send(res,e.status||400,{error:e.message})}
     let count=0,total=0;
-    transaction(db,()=>{for(const cid of ids){
-      let c=one(db,"select * from commissions where id=? and tenant_id=? and status='pending'",[cid,tenant]),type="service";
-      if(!c){try{c=one(db,"select * from retail_commissions where id=? and tenant_id=? and status='pending'",[cid,tenant]);type="retail"}catch{}}
-      if(!c)continue;
-      if(type==="service")run(db,"update commissions set status='paid',paid_at=? where id=?",[now(),cid]);
-      else run(db,"update retail_commissions set status='paid',paid_at=? where id=?",[now(),cid]);
-      run(db,"insert into financial_entries(id,tenant_id,kind,category,description,amount_cents,status,paid_at,reference_type,reference_id,created_by,created_at) values(?,?,?,?,?,?,'paid',?,?,?,?,?)",[uid(),tenant,"expense","commissions",(type==="retail"?"Comissão revenda · ":"Comissão serviço · ")+cid,c.amount_cents,now(),type==="retail"?"retail_commission":"commission",cid,user.id,now()]);
-      count++;total+=Number(c.amount_cents);
-    }});
-    audit(db,user,"commissions.pay","commission",null,{count,total});return send(res,200,{count,total:total/100});
+    try{transaction(db,()=>{
+      const chosen=[];
+      for(const cid of ids){
+        let row=one(db,"select * from commissions where id=? and tenant_id=? and status='pending'",[cid,tenant]),type="service";
+        if(!row){try{row=one(db,"select * from retail_commissions where id=? and tenant_id=? and status='pending'",[cid,tenant]);type="retail"}catch{}}
+        if(!row)throw Object.assign(new Error("commission_not_pending"),{status:409});
+        chosen.push({row,type});total+=Number(row.amount_cents);
+      }
+      const cash=openCash(db,tenant);
+      if(method==="cash"&&!cash)throw Object.assign(new Error("cash_session_required"),{status:409});
+      if(method==="cash"&&total>expectedCash(db,tenant,cash.id))throw Object.assign(new Error("insufficient_cash"),{status:409});
+      for(const {row,type} of chosen){
+        if(type==="service")run(db,"update commissions set status='paid',paid_at=? where id=? and tenant_id=?",[now(),row.id,tenant]);
+        else run(db,"update retail_commissions set status='paid',paid_at=? where id=? and tenant_id=?",[now(),row.id,tenant]);
+        run(db,"insert into financial_entries(id,tenant_id,kind,category,description,amount_cents,payment_method,status,paid_at,cash_session_id,reference_type,reference_id,created_by,created_at) values(?,?,?,?,?,?,?,'paid',?,?,?,?,?,?)",
+          [uid(),tenant,"expense","commissions",(type==="retail"?"Comissão revenda · ":"Comissão serviço · ")+row.id,row.amount_cents,method,now(),cash?.id||null,type==="retail"?"retail_commission":"commission",row.id,user.id,now()]);
+        count++;
+      }
+    })}catch(e){return send(res,e.status||400,{error:e.message})}
+    audit(db,user,"commissions.pay","commission",null,{count,total,payment_method:method});
+    return send(res,200,{count,total:total/100,payment_method:method});
   }
 
   const pay=url.pathname.match(/^\/api\/finance\/entries\/([^/]+)\/pay$/);
   if(req.method==="POST"&&pay){
-    guard("finance.write");const fid=decodeURIComponent(pay[1]),entry=one(db,"select * from financial_entries where id=? and tenant_id=?",[fid,tenant]);if(!entry)return send(res,404,{error:"not_found"});if(entry.status==="paid")return send(res,409,{error:"already_paid"});
-    const b=await parseBody(req),method=txt(b.payment_method||entry.payment_method||"pix",32),cash=openCash(db,tenant);if(method==="cash"&&!cash)return send(res,409,{error:"cash_session_required"});
-    run(db,"update financial_entries set status='paid',payment_method=?,paid_at=?,cash_session_id=? where id=?",[method,now(),cash?.id||null,fid]);audit(db,user,"finance.entry.pay","financial_entry",fid,{payment_method:method});return send(res,200,{ok:true})
+    guard("finance.write");
+    const fid=decodeURIComponent(pay[1]),b=await parseBody(req);
+    let result,method;
+    try{method=validPaymentMethod(b.payment_method);
+      transaction(db,()=>{
+        const entry=one(db,"select * from financial_entries where id=? and tenant_id=?",[fid,tenant]);
+        if(!entry)throw Object.assign(new Error("not_found"),{status:404});
+        if(entry.status!=="pending")throw Object.assign(new Error("already_paid"),{status:409});
+        const cash=openCash(db,tenant);
+        if(method==="cash"&&!cash)throw Object.assign(new Error("cash_session_required"),{status:409});
+        if(method==="cash"&&entry.kind==="expense"&&Number(entry.amount_cents)>expectedCash(db,tenant,cash.id))throw Object.assign(new Error("insufficient_cash"),{status:409});
+        const changed=run(db,"update financial_entries set status='paid',payment_method=?,paid_at=?,cash_session_id=? where id=? and tenant_id=? and status='pending'",
+          [method,now(),cash?.id||null,fid,tenant]);
+        if(!changed.changes)throw Object.assign(new Error("already_paid"),{status:409});
+        result={ok:true,id:fid,payment_method:method,amount:Number(entry.amount_cents)/100};
+      });
+    }catch(e){return send(res,e.status||400,{error:e.message})}
+    audit(db,user,"finance.entry.pay","financial_entry",fid,{payment_method:method});
+    return send(res,200,result);
   }
 
   const prep=url.pathname.match(/^\/api\/checkout\/([^/]+)\/prep$/);

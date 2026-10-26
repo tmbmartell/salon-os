@@ -6,7 +6,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="/styles.css">
-<link rel="stylesheet" href="/beauty-ui.css?v=5">
+<link rel="stylesheet" href="/beauty-ui.css?v=6">
 </head>
 <body>
 <div id="authGate" class="authGate">
@@ -282,38 +282,49 @@
     </section>
 
     <section id="finance" class="view">
-      <div class="sectionTitle"><div><h2>Financeiro & Caixa</h2><p>Receitas, despesas, caixa e comissões em uma mesma leitura.</p></div><button class="primary" data-open="financeEntryModal">+ Lançamento</button></div>
-      <div class="metrics">
-        <article><span>Entradas hoje</span><strong id="fIncome">—</strong><small>recebido</small></article>
-        <article><span>Saídas hoje</span><strong id="fExpense">—</strong><small>pago</small></article>
-        <article><span>Resultado hoje</span><strong id="fNet">—</strong><small>entradas - saídas</small></article>
-        <article><span>Comissões pendentes</span><strong id="fCommission">—</strong><small id="fCommissionCount">0 lançamentos</small></article>
-        <article><span>Contas a pagar</span><strong id="fPayable">—</strong><small id="fPayableCount">0 pendências</small></article>
+      <div class="sectionTitle"><div><h2>Caixa e Financeiro</h2><p>Receba, confira e acompanhe em poucos cliques.</p></div><button class="secondary" data-open="financeEntryModal">+ Lançamento</button></div>
+      <div class="ne-finance-actions" role="group" aria-label="Ações financeiras">
+        <button type="button" class="ne-finance-action" data-ne-finance-action="income"><span aria-hidden="true">＋</span><strong>Registrar recebimento</strong><small>Entrada manual</small></button>
+        <button type="button" class="ne-finance-action" data-ne-finance-action="expense"><span aria-hidden="true">−</span><strong>Registrar despesa</strong><small>Saída e contas</small></button>
+        <button type="button" class="ne-finance-action is-active" data-ne-finance-tab="cash" aria-pressed="true"><span aria-hidden="true">▣</span><strong>Caixa do dia</strong><small>Abrir, conferir e fechar</small></button>
+        <button type="button" class="ne-finance-action" data-ne-finance-tab="entries" aria-pressed="false"><span aria-hidden="true">⇄</span><strong>Movimentações</strong><small>Pagas e pendentes</small></button>
+        <button type="button" class="ne-finance-action" data-ne-finance-tab="commissions" aria-pressed="false"><span aria-hidden="true">♙</span><strong>Comissões</strong><small>Equipe e pagamentos</small></button>
+        <button type="button" class="ne-finance-action" data-ne-finance-tab="results" aria-pressed="false"><span aria-hidden="true">▥</span><strong>Resultados</strong><small>DRE e custos</small></button>
       </div>
-      <div class="grid2">
+      <div class="metrics ne-finance-top-metrics">
+        <article><span>Entradas hoje</span><strong id="fIncome">—</strong><small>recebidas</small></article>
+        <article><span>Saídas hoje</span><strong id="fExpense">—</strong><small>pagas</small></article>
+        <article><span>Resultado hoje</span><strong id="fNet">—</strong><small>entradas − saídas</small></article>
+      </div>
+      <section data-ne-finance-panel="cash">
         <article class="panel">
-          <div class="panelhead"><div><h2>Caixa</h2><p id="cashStatusText">Verificando caixa…</p></div><span id="cashBadge" class="chip">—</span></div>
+          <div class="panelhead"><div><h2>Caixa do dia</h2><p id="cashStatusText">Verificando caixa…</p></div><span id="cashBadge" class="chip">—</span></div>
           <div id="cashBody" class="cashBody"></div>
+          <div id="neCashMethods" class="ne-cash-methods"></div>
+          <div class="ne-cash-actions"><button type="button" class="secondary" id="neCashWithdraw" data-open="cashWithdrawModal">Registrar retirada</button><button type="button" class="secondary" id="neCashHistoryToggle">Histórico de fechamentos</button></div>
+          <div id="neCashHistory" class="ne-cash-history hidden"></div>
         </article>
+      </section>
+      <section data-ne-finance-panel="entries" class="hidden">
+        <div class="metrics ne-finance-pendings">
+          <article><span>Contas a pagar</span><strong id="fPayable">—</strong><small id="fPayableCount">0 pendências</small></article>
+        </div>
         <article class="panel">
-          <div class="panelhead"><div><h2>Custo e margem dos serviços</h2><p>Produto + comissão, antes dos custos fixos.</p></div></div>
-          <div id="serviceCostList" class="stack"></div>
+          <div class="panelhead"><div><h2>Movimentações</h2><p>Abra esta área para conferir lançamentos e dar baixa em pagamentos.</p></div></div>
+          <div id="financeList" class="tableLike"></div>
         </article>
-      </div>
-      <article class="panel">
-        <div class="panelhead"><div><h2>Movimentações</h2><p>Receitas, despesas e compromissos.</p></div></div>
-        <div id="financeList" class="tableLike"></div>
-      </article>
-      <div class="grid2">
+      </section>
+      <section data-ne-finance-panel="commissions" class="hidden">
+        <div class="metrics ne-finance-pendings"><article><span>Comissões pendentes</span><strong id="fCommission">—</strong><small id="fCommissionCount">0 lançamentos</small></article></div>
         <article class="panel">
-          <div class="panelhead"><div><h2>Comissões</h2><p>Geradas automaticamente no fechamento do atendimento.</p></div><button id="payPendingCommissions" class="secondary">Pagar pendentes</button></div>
+          <div class="panelhead"><div><h2>Comissões da equipe</h2><p>Geradas pelos atendimentos. Confirme antes de pagar.</p></div><button id="payPendingCommissions" class="secondary">Pagar pendentes</button></div>
           <div id="commissionList" class="tableLike"></div>
         </article>
-        <article class="panel">
-          <div class="panelhead"><div><h2>DRE gerencial</h2><p>Visão simples de entradas, saídas e resultado do mês.</p></div><input id="dreMonth" type="month"></div>
-          <div id="dreBody" class="dreBody"></div>
-        </article>
-      </div>
+      </section>
+      <section data-ne-finance-panel="results" class="hidden">
+        <article class="panel"><div class="panelhead"><div><h2>Custos e margem dos serviços</h2><p>Produto e comissão, antes dos custos fixos.</p></div></div><div id="serviceCostList" class="stack"></div></article>
+        <article class="panel"><div class="panelhead"><div><h2>DRE gerencial</h2><p>Entradas, saídas e resultado por mês.</p></div><input id="dreMonth" type="month"></div><div id="dreBody" class="dreBody"></div></article>
+      </section>
     </section>
 
     <section id="inventory" class="view">
@@ -586,9 +597,31 @@
 
 <dialog id="cashCloseModal"><form id="cashCloseForm" class="modalForm">
   <div class="modalHead"><div><h3>Fechar caixa</h3><p>Conte o dinheiro físico; o sistema compara com o esperado.</p></div><button type="button" class="x" data-close>×</button></div>
-  <label>Valor contado (R$)<input name="actual" type="number" step="0.01" min="0" required></label>
-  <label>Observações<textarea name="notes"></textarea></label>
+  <p id="neCashCloseExpected" class="ne-finance-guidance">Confira o dinheiro físico antes de informar o valor.</p>
+  <label>Valor contado (R$)<input name="actual" type="number" step="0.01" min="0" required placeholder="Valor realmente contado"></label>
+  <p id="neCashDifferencePreview" class="ne-finance-guidance" role="status">A diferença aparecerá após a contagem.</p>
+  <label>Justificativa da diferença (obrigatória quando houver divergência)<textarea name="notes" placeholder="Conte o motivo da diferença, se houver"></textarea></label>
   <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Fechar caixa</button></div>
+</form></dialog>
+
+<dialog id="cashWithdrawModal"><form id="cashWithdrawForm" class="modalForm">
+  <div class="modalHead"><div><h3>Retirada de dinheiro (sangria)</h3><p>Transferência de dinheiro físico: não é uma despesa operacional.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Valor retirado (R$)<input name="amount" type="number" step="0.01" min="0.01" required></label>
+  <label>Motivo da retirada<input name="reason" minlength="8" maxlength="500" required placeholder="Ex.: recolhimento para o cofre"></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Confirmar retirada</button></div>
+</form></dialog>
+
+<dialog id="commissionPayModal"><form id="commissionPayForm" class="modalForm">
+  <div class="modalHead"><div><h3>Registrar pagamento das comissões</h3><p id="neCommissionPayDescription">Revise os valores antes de confirmar.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Forma utilizada para pagar<select name="payment_method" required><option value="">Escolha uma forma</option><option value="pix">Pix</option><option value="cash">Dinheiro</option><option value="debit_card">Cartão de débito</option><option value="credit_card">Cartão de crédito</option><option value="other">Outro</option></select></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Confirmar pagamentos realizados</button></div>
+</form></dialog>
+
+<dialog id="financePayModal"><form id="financePayForm" class="modalForm">
+  <div class="modalHead"><div><h3>Confirmar pagamento</h3><p id="neFinancePayDescription">Confira os detalhes antes de registrar.</p></div><button type="button" class="x" data-close>×</button></div>
+  <input type="hidden" name="entry_id">
+  <label>Forma de pagamento<select name="payment_method" required><option value="">Escolha a forma de pagamento</option><option value="pix">Pix</option><option value="cash">Dinheiro</option><option value="debit_card">Cartão de débito</option><option value="credit_card">Cartão de crédito</option><option value="voucher">Voucher</option><option value="other">Outro</option></select></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Confirmar baixa</button></div>
 </form></dialog>
 
 <dialog id="productModal"><form id="productForm" class="modalForm">
@@ -851,7 +884,7 @@
 </form></dialog>
 
 <div id="toast" class="toast"></div>
-<script src="/app.js?v=194" type="module"></script>
+<script src="/app.js?v=195" type="module"></script>
 <script src="/beauty-ui.js?v=2" defer></script>
 <script src="/security-center.js?v=1" defer></script>
 <script src="/whatsapp-onboarding.js?v=1" defer></script>
