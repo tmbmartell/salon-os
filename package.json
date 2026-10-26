@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check server.mjs && node --check auth.mjs && node --check public/beauty-ui.js && node --check public/security-center.js",
+    "check": "node --check server.mjs && node --check auth.mjs && node --check whatsapp.mjs && node --check public/app.js && node --check public/beauty-ui.js && node --check public/security-center.js && node --check public/whatsapp-onboarding.js",
     "test": "node --test tests/*.test.mjs"
   },
   "engines": {
