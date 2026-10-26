@@ -6,7 +6,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="/styles.css">
-<link rel="stylesheet" href="/beauty-ui.css?v=6">
+<link rel="stylesheet" href="/beauty-ui.css?v=7">
 </head>
 <body>
 <div id="authGate" class="authGate">
@@ -217,21 +217,34 @@
     </section>
 
     <section id="marketing" class="view">
-      <div class="sectionTitle"><div><h2>Marketing & Relacionamento</h2><p>Base de clientes, canais, campanhas e oportunidades de retorno.</p></div></div>
-      <div class="hubGrid">
-        <button class="hubCard" data-jump="clients"><span>♡</span><strong>Base de clientes</strong><small>Dados, Instagram, Facebook, aniversário, origem e referência.</small></button>
-        <button class="hubCard" data-jump="retention"><span>↻</span><strong>Relacionamento</strong><small>Aniversários, pós-atendimento, indicação e recuperação.</small></button>
-        <button class="hubCard" data-jump="inbox"><span>✉</span><strong>Mensageria WhatsApp</strong><small>Conversas, etiquetas, prioridade e atendimento por WAHA.</small></button>
-        <button class="hubCard" data-jump="reports"><span>▤</span><strong>Relatórios</strong><small>Meça retorno, frequência e valor movimentado.</small></button>
+      <div class="sectionTitle"><div><h2>Marketing e Relacionamento</h2><p>Campanhas, imagens, comunicados e retornos — tudo organizado em cards.</p></div></div>
+      <div class="ne-marketing-cards" role="group" aria-label="Áreas de marketing">
+        <button type="button" class="ne-marketing-card is-active" data-marketing-tab="campaigns" aria-pressed="true"><span aria-hidden="true">▧</span><strong>Campanhas</strong><small>Ofertas e novidades</small></button>
+        <button type="button" class="ne-marketing-card" data-marketing-tab="media" aria-pressed="false"><span aria-hidden="true">▣</span><strong>Biblioteca de mídias</strong><small>JPG, WebP, PNG e GIF</small></button>
+        <button type="button" class="ne-marketing-card" data-marketing-tab="followups" aria-pressed="false"><span aria-hidden="true">↻</span><strong>Pós-atendimento</strong><small>Regras e prazos por serviço</small></button>
+        <button type="button" class="ne-marketing-card" data-marketing-tab="communications" aria-pressed="false"><span aria-hidden="true">✉</span><strong>Comunicados</strong><small>Horários e informações</small></button>
       </div>
-      <article class="panel marketingActions">
-        <div class="panelhead"><div><h2>Ações rápidas</h2><p>Atalhos úteis para trabalhar campanhas e relacionamento.</p></div></div>
-        <div class="sectionActions">
-          <button id="marketingExportClients" class="secondary">Baixar base de clientes</button>
-          <button class="secondary" data-jump="retention">Ver aniversários e retornos</button>
-          <button class="primary" data-jump="inbox">Abrir WhatsApp</button>
-        </div>
-      </article>
+      <p class="ne-marketing-safe-note">Nenhuma campanha será enviada automaticamente. Mídias e mensagens permanecem privadas até serem utilizadas por uma pessoa autorizada.</p>
+      <section data-marketing-panel="campaigns">
+        <div class="ne-marketing-title"><h3>Campanhas do salão</h3><button type="button" class="primary" id="neNewCampaign">+ Nova campanha</button></div>
+        <div id="neCampaignList" class="ne-marketing-list"><p class="muted">Abra esta área para carregar as campanhas.</p></div>
+      </section>
+      <section data-marketing-panel="media" class="hidden">
+        <div class="ne-marketing-title"><h3>Biblioteca de mídias</h3><button type="button" class="primary" id="neNewMedia">+ Adicionar imagem</button></div>
+        <p class="ne-marketing-hint">Imagens privadas, até 3 MB. GIFs animados são preservados. Não há conversão automática nesta etapa.</p>
+        <div id="neMediaList" class="ne-marketing-list"></div>
+      </section>
+      <section data-marketing-panel="followups" class="hidden">
+        <div class="ne-marketing-title"><h3>Acompanhamento pós-serviço</h3><button type="button" class="primary" id="neNewFollowup">+ Nova regra</button></div>
+        <p class="ne-marketing-hint">A regra gera somente uma tarefa interna de relacionamento, com prazo e mensagem sugerida. A recepção decide quando entrar em contato.</p>
+        <div id="neFollowupList" class="ne-marketing-list"></div>
+        <button class="secondary" type="button" data-jump="retention">Abrir tarefas de relacionamento</button>
+      </section>
+      <section data-marketing-panel="communications" class="hidden">
+        <div class="ne-marketing-title"><h3>Comunicados e informações</h3><button type="button" class="primary" id="neNewAnnouncement">+ Novo comunicado</button></div>
+        <p class="ne-marketing-hint">Cadastre horários, feriados e avisos como comunicados. Eles não serão enviados sem uma ação posterior.</p>
+        <div id="neAnnouncementList" class="ne-marketing-list"></div>
+      </section>
     </section>
 
     <section id="technical" class="view">
@@ -883,8 +896,40 @@
   <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Registrar indicação</button></div>
 </form></dialog>
 
+<dialog id="neCampaignModal" class="ne-marketing-modal">
+  <form id="neCampaignForm" class="modalForm">
+    <div class="modalHead"><div><h3>Campanha ou comunicado</h3><p>Cadastre agora e utilize quando desejar.</p></div><button type="button" class="x" data-close>×</button></div>
+    <label>Título<input name="title" minlength="3" maxlength="140" required placeholder="Ex.: Semana da hidratação"></label>
+    <div class="split">
+      <label>Categoria<select name="category" required><option value="promotion">Promoção</option><option value="announcement">Comunicado</option><option value="hours">Horários</option><option value="holiday">Feriados</option><option value="portfolio">Portfólio</option><option value="other">Outros</option></select></label>
+      <label>Situação<select name="status"><option value="draft">Rascunho</option><option value="ready">Pronta para uso</option><option value="archived">Arquivada</option></select></label>
+    </div>
+    <label>Mensagem<textarea name="message" rows="5" maxlength="2000" placeholder="Texto que poderá ser reutilizado no atendimento"></textarea></label>
+    <label>Mídia da biblioteca<select name="media_id" id="neCampaignMedia"><option value="">Sem mídia</option></select></label>
+    <div class="split"><label>Data de início<input name="starts_at" type="date"></label><label>Data final<input name="ends_at" type="date"></label></div>
+    <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary" type="submit">Salvar campanha</button></div>
+  </form>
+</dialog>
+<dialog id="neMediaModal" class="ne-marketing-modal">
+  <form id="neMediaForm" class="modalForm">
+    <div class="modalHead"><div><h3>Adicionar imagem</h3><p>JPG, PNG, WebP ou GIF, com até 3 MB.</p></div><button type="button" class="x" data-close>×</button></div>
+    <label>Arquivo<input name="media" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required></label>
+    <p class="ne-marketing-hint">Este arquivo será armazenado de forma privada. Não é enviado para o WhatsApp.</p>
+    <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary" type="submit">Adicionar à biblioteca</button></div>
+  </form>
+</dialog>
+<dialog id="neFollowupModal" class="ne-marketing-modal">
+  <form id="neFollowupForm" class="modalForm">
+    <div class="modalHead"><div><h3>Regra de pós-atendimento</h3><p>Cria tarefa interna, sem disparar WhatsApp automaticamente.</p></div><button type="button" class="x" data-close>×</button></div>
+    <label>Serviço<select name="service_id" id="neFollowupService" required><option value="">Escolha o serviço</option></select></label>
+    <label>Prazo após conclusão, em horas<input name="delay_hours" type="number" step="1" min="1" max="2160" value="48" required></label>
+    <label>Mensagem sugerida<textarea name="template" rows="5" maxlength="1200" required>Oi, {nome}! Como você está depois do seu atendimento de {servico}? Ficou tudo bem?</textarea></label>
+    <label class="ne-followup-switch"><input name="enabled" type="checkbox"> Ativar esta regra para novos atendimentos finalizados</label>
+    <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary" type="submit">Salvar regra</button></div>
+  </form>
+</dialog>
 <div id="toast" class="toast"></div>
-<script src="/app.js?v=195" type="module"></script>
+<script src="/app.js?v=196" type="module"></script>\n<script src="/marketing-ui.js?v=1" defer></script>
 <script src="/beauty-ui.js?v=2" defer></script>
 <script src="/security-center.js?v=1" defer></script>
 <script src="/whatsapp-onboarding.js?v=1" defer></script>
