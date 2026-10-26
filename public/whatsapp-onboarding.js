@@ -112,6 +112,10 @@
   };
   qrImage.addEventListener("error", () => { releaseQr(); showMessage("Não foi possível exibir o QR Code.",true); });
   refreshButton.addEventListener("click", async () => { await check(); one("refreshInbox")?.click(); });
+  // Ao abrir Atendimento depois do login, atualizar as permissões e a conexão.
+  document.addEventListener("click", event => {
+    if (event.target.closest('[data-view="inbox"],[data-jump="inbox"]')) check();
+  });
   window.addEventListener("pagehide", releaseQr);
   check();
 })();
