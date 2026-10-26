@@ -1,74 +1,65 @@
-# Salon OS — Nova Gente
+# NOVAGENTE Estética — versão em desenvolvimento
 
-Sistema operacional para salões e negócios de beleza, criado pela **Nova Gente**.
+Plataforma de gestão integrada para salões e negócios de estética, criada pela **NOVAGENTE**.
 
-O Salon OS reúne operação, atendimento, agenda, CRM, WhatsApp, financeiro, estoque, pacotes, equipe, relatórios e agentes de IA em uma única aplicação.
+**Situação:** implementação progressiva sobre a base do Salon OS. Alterações em uma branch de revisão; não está homologada nem publicada em produção.
 
-## Principais módulos
+## Componentes existentes aproveitados do Salon OS
 
-- CRM de clientes e histórico
-- Agenda com múltiplos serviços e profissionais
-- Recursos físicos e prevenção de conflitos
-- Atendimento via WhatsApp / WAHA
-- Recepcionista com IA configurável
-- Caixa, financeiro e comissões
-- Produtos, estoque, fornecedores e PDV
-- Pacotes e créditos de serviços
-- Fidelização e relacionamento
-- Ficha técnica
-- Gestão de equipe e desempenho
-- Relatórios gerenciais
-- Estrutura multiempresa (`tenant_id`)
-- PWA responsivo
+- Clientes, CRM, histórico e WhatsApp via WAHA;
+- Agenda, serviços, fichas técnicas e recursos de trabalho;
+- Equipe, escalas, metas e comissões;
+- Caixa, financeiro, estoque, compras e fornecedores;
+- Pacotes, revenda, fidelização e relatórios;
+- PWA e estrutura inicial de agentes de IA.
 
-## Requisitos
+> Existir código para um recurso não é garantia de integração real, disponibilidade de WhatsApp ou homologação de segurança.
 
-- Node.js 22 ou superior
-- SQLite com suporte via `node:sqlite`
-- Variáveis de ambiente para integrações externas quando utilizadas
+## Etapa atual: identidade, interface e fundação de segurança
 
-## Executar
+- Identidade **NOVAGENTE Estética** no título, login, menu e PWA;
+- Logotipo NOVAGENTE otimizado e incorporado em `public/novagente-logo.svg`;
+- Menu agrupado, painéis recolhíveis e triagem visual de conversas;
+- Central de Segurança em cards dentro de Administração;
+- Acesso pessoal **Meus dispositivos** para visualizar e revogar sessões;
+- Sessões com expiração por inatividade de oito horas, além do vencimento absoluto;
+- Vínculo conferido entre usuário e empresa durante autenticação;
+- Operações HTTP com origem cruzada bloqueadas quando o navegador fornece evidência de origem;
+- Sessões WAHA sem compartilhamento implícito entre empresas; falta configurar sessões específicas para novas empresas;
+- Testes automatizados em `tests/` e validação no GitHub Actions.
 
-```bash
-PORT=9331 HOST=127.0.0.1 node server.mjs
-```
+## Rodar localmente
 
-Ou:
+Node.js 22 ou superior:
 
 ```bash
+npm run check
+npm test
 npm start
 ```
 
-## Configuração
+O aplicativo usa SQLite (`node:sqlite`). Para integrar WhatsApp é necessário configurar WAHA e suas credenciais no ambiente de execução.
 
-Credenciais e chaves **não fazem parte deste repositório**.
+## Antes de usar com clientes reais
 
-Integrações como WhatsApp/WAHA, LLM e JEV devem ser configuradas por variáveis de ambiente ou armazenamento seguro externo.
+- Validar toda a navegação e atendimento com WhatsApp conectado;
+- Configurar sessão WhatsApp individual por empresa e testar isolamentos;
+- Adicionar MFA, proteção anti-CSRF por token e políticas mais completas de sessão;
+- Revisar permissões de dados sensíveis e autorização por registro;
+- Homologar backups cifrados e **testar restauração**;
+- Revisar LGPD, retenção, consentimentos, incidentes e segurança de arquivos;
+- Realizar testes de ponta a ponta e revisão de segurança;
+- Somente depois disso considerar deploy ou merge na branch principal.
 
-## Segurança
+## Arquitetura de referência
 
-Não versione:
+- `server.mjs`: servidor, API e headers;
+- `auth.mjs`: autenticação, sessões, autorização e auditoria;
+- `whatsapp.mjs`: mensageria e isolamento de sessões WAHA;
+- `public/beauty-ui.js` e `public/beauty-ui.css`: camada visual progressiva da NOVAGENTE Estética (nomes de arquivos legados);
+- `public/security-center.js`: Central de Segurança e gerenciamento de dispositivos;
+- `public/novagente-logo.svg`: logo oficial otimizada;
+- `phase*.mjs`: funcionalidades herdadas;
+- `tests/`: testes automatizados.
 
-- arquivos `.env`
-- bancos SQLite
-- backups
-- chaves privadas
-- tokens de API
-- logs de produção
-
-O `.gitignore` deste projeto já cobre esses arquivos.
-
-## Estrutura
-
-- `server.mjs` — servidor principal e rotas
-- `auth.mjs` — autenticação e autorização
-- `whatsapp.mjs` — integração de mensageria
-- `llm_config.mjs` — configuração segura de LLM
-- `receptionist_brain.mjs` — camada de inteligência da recepcionista
-- `phase*.mjs` — módulos operacionais do produto
-- `public/` — interface web e PWA
-
-## Empresa
-
-**Nova Gente** — Inteligência Artificial aplicada em sua vida.
-
+A construção continuará por entregas: **WhatsApp+CRM → Agenda+Serviços → Estoque+Equipe → Caixa+Financeiro → Marketing+Automações → Relatórios → IA/RH premium**.
