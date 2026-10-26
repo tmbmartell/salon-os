@@ -13,7 +13,7 @@ function activate(view,{skipTechnicalLoad=false}={}){
   $("#pageTitle").textContent=cfg[0];$("#pageSub").textContent=cfg[1];if(view==="agenda"){loadAgendaPhase2();loadWaitlist()}if(view==="team")loadStaff();if(view==="clients")loadClients();if(view==="technical"&&!skipTechnicalLoad)loadTechnical();if(view==="intelligence")loadReceipts();if(view==="inbox")loadInbox();if(view==="finance")loadFinance();if(view==="inventory")loadInventory();if(view==="suppliers")loadSuppliers();if(view==="packages")loadPackages();if(view==="retail")loadRetail();if(view==="retention")loadRetention();if(view==="ownerEye")loadOwnerEye();if(view==="agents")loadAgents();if(view==="admin")loadAdmin();if(view==="reports")loadReports();if(view==="marketing")window.dispatchEvent(new CustomEvent("ne:marketing-open"));
 }
 $$("[data-view]").forEach(b=>b.onclick=()=>activate(b.dataset.view));$$("[data-jump]").forEach(b=>b.onclick=()=>activate(b.dataset.jump));$$("[data-open]").forEach(b=>b.onclick=()=>$("#"+b.dataset.open).showModal());$$("[data-close]").forEach(b=>b.onclick=()=>b.closest("dialog").close());$("#quickAppointment").onclick=()=>$("#appointmentModal").showModal();
-async function bootstrap(){const [boot,health]=await Promise.all([api("/api/bootstrap"),api("/api/health")]);state.health=health;state.user=boot.user;state.professionals=boot.professionals;state.services=boot.services;state.resources=boot.resources||[];state.dashboard=boot.dashboard;state.whatsapp=boot.whatsapp;$("#health").textContent=health.jev?"Sistema + JEV online":"Sistema online · JEV fallback";$("#jevState").textContent=health.jev?"JEV online":"fallback ativo";renderDashboard();renderTeam();renderServices();renderResources();await loadClients();fillSelects();updateWahaUi()}
+async function bootstrap(){const [boot,health]=await Promise.all([api("/api/bootstrap"),api("/api/health")]);state.health=health;state.user=boot.user;$(`[data-view="ownerEye"],[data-jump="ownerEye"]`).forEach(el=>{el.hidden=!["owner","manager"].includes(state.user?.role)});state.professionals=boot.professionals;state.services=boot.services;state.resources=boot.resources||[];state.dashboard=boot.dashboard;state.whatsapp=boot.whatsapp;$("#health").textContent=health.jev?"Sistema + JEV online":"Sistema online · JEV fallback";$("#jevState").textContent=health.jev?"JEV online":"fallback ativo";renderDashboard();renderTeam();renderServices();renderResources();await loadClients();fillSelects();updateWahaUi()}
 function renderDashboard(){const d=state.dashboard;$("#mAppointments").textContent=d.todayAppointments;$("#mForecast").textContent=fmt.format(d.forecast);$("#mClients").textContent=d.clientCount;$("#mPros").textContent=d.profCount;$("#todayList").innerHTML=d.appointments.length?d.appointments.map(a=>`<div class="row"><div class="who"><span class="avatar">${initials(a.client_name)}</span><div><strong>${a.client_name}</strong><small>${a.service_summary||a.service_name} · ${a.professional_summary||a.professional_name}</small></div></div><div><div class="time">${new Date(a.start_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div><span class="status ${a.status}">${statusLabel(a.status)}</span></div></div>`).join(""):`<div class="muted">Nenhum atendimento hoje.</div>`}
 async function loadClients(q=""){state.clients=await api("/api/clients"+(q?`?q=${encodeURIComponent(q)}`:""));$("#clientCount").textContent=`${state.clients.length} encontrados`;$("#clientList").innerHTML=state.clients.map(c=>{const socials=[c.instagram?`Instagram: ${esc(c.instagram)}`:"",c.facebook?`Facebook: ${esc(c.facebook)}`:""].filter(Boolean).join(" · ");const ref=c.referral_reference?`Referência: ${esc(c.referral_reference)}`:"";const birthday=c.birthday?`Aniversário: ${esc(c.birthday.split("-").reverse().join("/"))}`:"";return `<article><div class="who"><span class="avatar">${initials(c.name)}</span><div><h3>${esc(c.name)}</h3><p>${esc(c.phone||"Sem WhatsApp")}</p></div></div><div class="clientMeta">${birthday?`<small>${birthday}</small>`:""}${socials?`<small>${socials}</small>`:""}${ref?`<small>${ref}</small>`:""}</div>${c.notes?`<p>${esc(c.notes)}</p>`:""}<div class="tags">${(c.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div></article>`}).join("")||`<p class="muted">Nenhum cliente encontrado.</p>`;fillSelects();fillWaitlistSelects()}
 let searchTimer;$("#clientSearch").oninput=e=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadClients(e.target.value),220)};
@@ -581,21 +581,65 @@ function payFinanceEntry(id){
   $("#financePayModal").showModal();
 }
 
+function showOwnerTab(section){
+  const active=["attention","finance","services","team","clients"].includes(section)?section:"attention";
+  $$("[data-owner-panel]").forEach(el=>el.classList.toggle("hidden",el.dataset.ownerPanel!==active));
+  $$("[data-owner-tab]").forEach(btn=>{
+    const yes=btn.dataset.ownerTab===active;
+    btn.classList.toggle("is-active",yes);
+    if(btn.classList.contains("ne-owner-menu-item"))btn.setAttribute("aria-pressed",String(yes));
+  });
+}
+$$("[data-owner-tab]").forEach(btn=>btn.addEventListener("click",()=>showOwnerTab(btn.dataset.ownerTab)));
+function ownerEmpty(text){return '<p class="ne-owner-empty">'+esc(text)+'</p>'}
+function ownerRanking(items,valueLabel){
+  return items.length?items.map((item,i)=>'<div class="ne-owner-ranking-row"><span class="ne-owner-rank">'+(i+1)+'</span><div class="ne-owner-rank-name"><strong>'+esc(item.name)+'</strong><small>'+Number(item.count).toLocaleString("pt-BR")+' atendimentos</small></div><strong>'+moneyBR(item.volume)+'</strong></div>').join(""):ownerEmpty("Ainda não há atendimentos finalizados para este período.");
+}
 async function loadOwnerEye(){
+  const status=$("#neOwnerStatus");
+  if(!status)return;
+  status.textContent="Atualizando os indicadores do salão...";
   try{
-    const data=await Promise.all([
-      api("/api/intelligence/overview"),api("/api/intelligence/recovery"),api("/api/intelligence/alerts"),
-      api("/api/intelligence/professionals"),api("/api/intelligence/services"),api("/api/intelligence/stock-forecast")
-    ]);
-    const ov=data[0],recovery=data[1],alerts=data[2],pros=data[3],services=data[4],stock=data[5];
-    $("#oiRevenue").textContent=moneyBR(ov.revenue30);$("#oiTicket").textContent=moneyBR(ov.avgTicket);$("#oiRepeat").textContent=Number(ov.repeatRate||0).toFixed(1)+"%";$("#oiRecovery").textContent=moneyBR(ov.recoverableValue);
-    $("#intelligenceAlerts").innerHTML=alerts.map(x=>'<div class="alertItem '+x.severity+'"><div><strong>'+x.title+'</strong><p>'+x.body+'</p></div><span class="chip">'+x.severity+'</span></div>').join("")||'<p class="muted">Nenhum alerta crítico neste momento.</p>';
-    $("#recoveryList").innerHTML=recovery.slice(0,12).map(c=>'<div class="row"><div><strong>'+c.name+'</strong><small>'+(c.last_service||"Sem serviço recente")+' · '+(c.days_late==null?"sem previsão":c.days_late+" dias atrasada")+' · '+moneyBR(c.estimated_value)+'</small></div><button type="button" class="secondary smallBtn" data-recovery-client="'+c.id+'">Preparar contato</button></div>').join("")||'<p class="muted">Nenhuma cliente atrasada pela leitura atual.</p>';
-    $$("[data-recovery-client]").forEach(b=>b.onclick=async()=>{const c=recovery.find(x=>x.id===b.dataset.recoveryClient);try{await api("/api/intelligence/recovery/action",{method:"POST",body:JSON.stringify({client_id:c.id,message:c.suggested_message})});toast("Contato preparado para o Comercial IA");await loadOwnerEye()}catch{toast("Não foi possível preparar o contato")}});
-    $("#performanceList").innerHTML=pros.map(p=>'<div class="tableRow"><div><strong>'+p.name+'</strong><small>'+p.appointments+' atend. · '+Number(p.productive_hours).toFixed(1)+'h produtivas</small></div><div><strong>'+moneyBR(p.revenue)+'</strong><small>'+moneyBR(p.revenue_per_hour)+'/h</small></div><span class="status paid">'+moneyBR(p.avg_ticket)+' ticket</span></div>').join("")||'<p class="muted">Ainda sem atendimentos finalizados.</p>';
-    $("#serviceIntelList").innerHTML=services.slice(0,15).map(s=>'<div class="tableRow"><div><strong>'+s.name+'</strong><small>'+s.count+' vendas · receita '+moneyBR(s.revenue)+'</small></div><div><strong>'+moneyBR(s.direct_margin)+'</strong><small>'+Number(s.direct_margin_pct||0).toFixed(1)+'% margem</small></div><span class="status '+(s.direct_margin_pct<30?"pending":"paid")+'">'+moneyBR(s.product_cost)+' produto</span></div>').join("")||'<p class="muted">Ainda sem dados de serviços.</p>';
-    $("#stockForecastList").innerHTML=stock.slice(0,30).map(s=>'<div class="tableRow"><div><strong>'+s.product_name+'</strong><small>'+Number(s.stock_qty).toLocaleString("pt-BR")+' '+s.unit+' · '+(s.supplier_name||"sem fornecedor")+'</small></div><div><strong>'+(s.days_cover==null?"—":s.days_cover+" dias")+'</strong><small>'+(s.reorder_in_days==null?"sem histórico":"repor em ~"+s.reorder_in_days+" dias")+'</small></div><span class="status '+(s.risk==="critical"?"cancelled":s.risk==="warning"?"pending":"paid")+'">'+s.risk+'</span></div>').join("")||'<p class="muted">Cadastre consumo para gerar previsão.</p>';
-  }catch(err){if(err.status!==403&&err.status!==401)toast("Não foi possível atualizar o Olho do Dono")}
+    const snap=await api("/api/owner-eye/summary");
+    state.ownerEye=snap;
+    const date=day=>String(day||"").split("-").reverse().join("/");
+    status.textContent="Dados de "+date(snap.period.from)+" a "+date(snap.period.to)+" · Fuso "+snap.period.time_zone+" · Atualizado agora";
+    $("#oiRevenue").textContent=moneyBR(snap.money.income);
+    $("#neOwnerVisits").textContent=Number(snap.operations.completed_services).toLocaleString("pt-BR");
+    $("#oiTicket").textContent="ticket médio "+moneyBR(snap.operations.average_checkout);
+    $("#oiRepeat").textContent=snap.operations.repeat_rate==null?"Sem base":snap.operations.repeat_rate.toLocaleString("pt-BR")+"%";
+    $("#neOwnerRepeatCount").textContent=snap.operations.repeat_clients+" de "+snap.operations.clients_with_checkout+" clientes com checkout";
+    $("#neOwnerAlertsCount").textContent=String(snap.alerts.length);
+    $("#neOwnerStockBrief").textContent=snap.attention.critical_stock+" itens críticos no estoque";
+    $("#neOwnerRevenueChange").textContent=snap.money.income_change_pct==null?
+      "Sem período anterior comparável":(snap.money.income_change_pct>=0?"+":"")+snap.money.income_change_pct.toLocaleString("pt-BR")+"% ante os 30 dias anteriores";
+    $("#neOwnerIncome").textContent=moneyBR(snap.money.income);
+    $("#neOwnerExpenses").textContent=moneyBR(snap.money.expenses);
+    $("#neOwnerNet").textContent=moneyBR(snap.money.cash_net);
+    $("#neOwnerRepeated").textContent=String(snap.operations.repeat_clients);
+    $("#neOwnerBuyers").textContent=String(snap.operations.clients_with_checkout);
+    $("#neOwnerTasks").textContent=String(snap.attention.overdue_followups);
+    const allowed={stock:"inventory",bills:"finance",retention:"retention",attendance:"agenda"};
+    $("#intelligenceAlerts").innerHTML=snap.alerts.length?snap.alerts.map(al=>'<div class="ne-owner-alert '+esc(al.severity)+'"><div class="ne-owner-alert-content"><strong>'+esc(al.label)+'</strong><small>'+esc(al.detail)+'</small></div><button type="button" class="secondary smallBtn" data-owner-action="'+esc(al.id)+'">Resolver</button></div>').join(""):'<div class="ne-owner-calm"><strong>Nenhum alerta desta lista no momento.</strong><p>Continue acompanhando os indicadores e as tarefas da equipe.</p></div>';
+    $$("[data-owner-action]",$("#intelligenceAlerts")).forEach(btn=>btn.onclick=()=>{
+      const view=allowed[btn.dataset.ownerAction];
+      if(view)activate(view);
+    });
+    $("#serviceIntelList").innerHTML=ownerRanking(snap.lists.services);
+    $("#performanceList").innerHTML=ownerRanking(snap.lists.professionals);
+    const chart=snap.charts.cashflow14,max=Math.max(1,...chart.map(x=>Number(x.income||0)));
+    $("#neOwnerChart").innerHTML=chart.map(day=>{
+      const height=Math.round(Math.max(2,Number(day.income||0)/max*100));
+      const key=String(day.date).slice(5).split("-").reverse().join("/");
+      return '<div class="ne-owner-bar-column" title="'+esc(key)+" · "+esc(moneyBR(day.income))+'"><div class="ne-owner-bar" style="height:'+height+'%" aria-hidden="true"></div><small>'+esc(key)+'</small></div>';
+    }).join("");
+    $("#neOwnerChart").setAttribute("aria-label","Entradas recebidas nos últimos 14 dias: "+chart.map(x=>date(x.date)+" "+moneyBR(x.income)).join("; "));
+    const definitions=snap.definitions||{};
+    $("#neOwnerDefinitions").innerHTML=Object.entries(definitions).map(([key,text])=>'<p>'+esc(text)+'</p>').join("");
+  }catch(err){
+    status.textContent=err.status===403?"Esta visão é exclusiva da proprietária e da gerência.":"Não foi possível carregar o Olho do Dono. Nenhum indicador foi atualizado.";
+    if(err.status!==403&&err.status!==401)toast("Confira a conexão e atualize novamente");
+  }
 }
 $("#refreshIntelligence").onclick=loadOwnerEye;
 

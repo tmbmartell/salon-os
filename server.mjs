@@ -10,6 +10,7 @@ import { installAuth, authenticate, handleAuthApi, requirePermission, audit } fr
 import { installWhatsApp, wahaStatus, ensureWahaSession, wahaQr, verifyWebhook, listConversations, conversationMessages, markConversationRead, sendConversationMessage, ingestWahaEvent, sendText, registerTenantSession, sessionForTenant, tenantForWahaEvent, syncWahaHistory } from "./whatsapp.mjs";
 import { installPhase2, handlePhase2Api } from "./phase2.mjs";
 import { installPhase3, handlePhase3Api } from "./phase3.mjs";
+import { handleOwnerEyeApi } from "./owner-eye.mjs";
 import { installPhase4, ensureAgentProfiles, handlePhase4Api, getAgentConfig } from "./phase4.mjs";
 import { installPhase5, handlePhase5Api } from "./phase5.mjs";
 import { installPhase6, handlePhase6Api } from "./phase6.mjs";
@@ -538,6 +539,8 @@ async function api(req,res,url){
   }
   const phase2Result=await handlePhase2Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit});
   if(phase2Result!==false)return phase2Result;
+  const ownerResult=await handleOwnerEyeApi({req,res,url,db,user,tenant,send,requirePermission});
+  if(ownerResult!==false)return ownerResult;
   const phase3Result=await handlePhase3Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit});
   if(phase3Result!==false)return phase3Result;
   const phase4Result=await handlePhase4Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit,sendText:(phone,text)=>sendText(phone,text,sessionForTenant(db,tenant)),routeAmbiguous:jevDecision});

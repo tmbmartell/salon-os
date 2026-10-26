@@ -6,7 +6,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="/styles.css">
-<link rel="stylesheet" href="/beauty-ui.css?v=7">
+<link rel="stylesheet" href="/beauty-ui.css?v=8">
 </head>
 <body>
 <div id="authGate" class="authGate">
@@ -402,22 +402,72 @@
     </section>
 
     <section id="ownerEye" class="view">
-      <div class="sectionTitle"><div><h2>Olho do Dono</h2><p>Clientes, receita, margem, equipe e riscos traduzidos em decisão.</p></div><button id="refreshIntelligence" class="secondary">Atualizar leitura</button></div>
-      <div class="metrics">
-        <article><span>Receita 30 dias</span><strong id="oiRevenue">—</strong><small>realizado</small></article>
-        <article><span>Ticket médio</span><strong id="oiTicket">—</strong><small>por atendimento</small></article>
-        <article><span>Recorrência</span><strong id="oiRepeat">—</strong><small>clientes que voltaram</small></article>
-        <article><span>Recuperável</span><strong id="oiRecovery">—</strong><small>clientes atrasados</small></article>
+      <div class="sectionTitle"><div><h2>Olho do Dono</h2><p>O que está acontecendo, o que precisa de atenção e onde agir — sem excesso de números.</p></div><button id="refreshIntelligence" class="secondary" type="button">Atualizar</button></div>
+      <div id="neOwnerStatus" class="ne-owner-status" role="status">Carregando indicadores do salão...</div>
+      <div class="ne-owner-kpis">
+        <button type="button" class="ne-owner-kpi" data-owner-tab="finance" aria-label="Consultar entradas e saídas">
+          <span class="ne-owner-kpi-icon" aria-hidden="true">↗</span><small>Entradas recebidas · 30 dias</small><strong id="oiRevenue">—</strong><span id="neOwnerRevenueChange">comparação anterior</span>
+        </button>
+        <button type="button" class="ne-owner-kpi" data-owner-tab="services" aria-label="Consultar serviços concluídos">
+          <span class="ne-owner-kpi-icon" aria-hidden="true">▦</span><small>Atendimentos com checkout · 30 dias</small><strong id="neOwnerVisits">—</strong><span id="oiTicket">ticket médio —</span>
+        </button>
+        <button type="button" class="ne-owner-kpi" data-owner-tab="clients" aria-label="Consultar clientes recorrentes">
+          <span class="ne-owner-kpi-icon" aria-hidden="true">♡</span><small>Clientes que já voltaram</small><strong id="oiRepeat">—</strong><span id="neOwnerRepeatCount">histórico de checkouts</span>
+        </button>
+        <button type="button" class="ne-owner-kpi" data-owner-tab="attention" aria-label="Consultar alertas do negócio">
+          <span class="ne-owner-kpi-icon" aria-hidden="true">!</span><small>Pontos de atenção</small><strong id="neOwnerAlertsCount">—</strong><span id="neOwnerStockBrief">estoque, contas e relacionamento</span>
+        </button>
       </div>
-      <div class="grid2">
-        <article class="panel"><div class="panelhead"><div><h2>Alertas de gestão</h2><p>O que merece atenção agora.</p></div></div><div id="intelligenceAlerts" class="stack"></div></article>
-        <article class="panel"><div class="panelhead"><div><h2>Clientes para recuperar</h2><p>Quem deveria ter voltado e ainda não voltou.</p></div></div><div id="recoveryList" class="stack"></div></article>
+      <div class="ne-owner-menu" role="group" aria-label="Abrir detalhes dos indicadores">
+        <button type="button" class="ne-owner-menu-item is-active" data-owner-tab="attention" aria-pressed="true"><span aria-hidden="true">!</span> Atenção</button>
+        <button type="button" class="ne-owner-menu-item" data-owner-tab="finance" aria-pressed="false"><span aria-hidden="true">▥</span> Dinheiro</button>
+        <button type="button" class="ne-owner-menu-item" data-owner-tab="services" aria-pressed="false"><span aria-hidden="true">✦</span> Serviços</button>
+        <button type="button" class="ne-owner-menu-item" data-owner-tab="team" aria-pressed="false"><span aria-hidden="true">♙</span> Equipe</button>
+        <button type="button" class="ne-owner-menu-item" data-owner-tab="clients" aria-pressed="false"><span aria-hidden="true">♡</span> Clientes</button>
       </div>
-      <div class="grid2">
-        <article class="panel"><div class="panelhead"><div><h2>Equipe</h2><p>Receita, ticket e produtividade por profissional.</p></div></div><div id="performanceList" class="tableLike"></div></article>
-        <article class="panel"><div class="panelhead"><div><h2>Serviços</h2><p>Receita e margem direta.</p></div></div><div id="serviceIntelList" class="tableLike"></div></article>
-      </div>
-      <article class="panel"><div class="panelhead"><div><h2>Previsão de estoque</h2><p>Dias de cobertura e momento provável de reposição.</p></div></div><div id="stockForecastList" class="tableLike"></div></article>
+      <section data-owner-panel="attention">
+        <div class="ne-owner-panel-title"><div><h3>O que merece sua atenção</h3><p>Alertas operacionais com um caminho direto para agir.</p></div></div>
+        <div id="intelligenceAlerts" class="ne-owner-alerts"></div>
+        <div class="ne-owner-quick-actions">
+          <button type="button" class="secondary" data-jump="agenda">Abrir agenda</button>
+          <button type="button" class="secondary" data-jump="inventory">Ver estoque</button>
+          <button type="button" class="secondary" data-jump="finance">Ver financeiro</button>
+        </div>
+      </section>
+      <section data-owner-panel="finance" class="hidden">
+        <div class="ne-owner-panel-title"><div><h3>Dinheiro recebido e pago</h3><p>Últimos 30 dias, pela data do pagamento. A diferença não equivale ao lucro contábil.</p></div></div>
+        <div class="ne-owner-small-metrics">
+          <div><small>Recebido</small><strong id="neOwnerIncome">—</strong></div>
+          <div><small>Pago em despesas</small><strong id="neOwnerExpenses">—</strong></div>
+          <div><small>Saldo das movimentações</small><strong id="neOwnerNet">—</strong></div>
+        </div>
+        <div class="ne-owner-panel-title"><div><h3>Últimos 14 dias</h3><p>Entradas recebidas por dia, conforme os lançamentos financeiros.</p></div></div>
+        <div id="neOwnerChart" class="ne-owner-chart" role="img" aria-label="Entradas financeiras dos últimos 14 dias"></div>
+        <button type="button" class="secondary" data-jump="finance">Abrir Caixa e Financeiro</button>
+      </section>
+      <section data-owner-panel="services" class="hidden">
+        <div class="ne-owner-panel-title"><div><h3>Serviços mais realizados</h3><p>Atendimentos com checkout nos últimos 30 dias, pelo serviço principal agendado.</p></div></div>
+        <div id="serviceIntelList" class="ne-owner-list"></div>
+        <button type="button" class="secondary" data-jump="services">Abrir catálogo de serviços</button>
+      </section>
+      <section data-owner-panel="team" class="hidden">
+        <div class="ne-owner-panel-title"><div><h3>Produção por profissional</h3><p>Quantidade de atendimentos e valores nominais dos checkouts; não é folha de pagamento.</p></div></div>
+        <div id="performanceList" class="ne-owner-list"></div>
+        <button type="button" class="secondary" data-jump="team">Abrir equipe</button>
+      </section>
+      <section data-owner-panel="clients" class="hidden">
+        <div class="ne-owner-panel-title"><div><h3>Clientes e relacionamento</h3><p>Recorrência histórica: clientes com duas ou mais compras concluídas.</p></div></div>
+        <div class="ne-owner-small-metrics">
+          <div><small>Clientes que já voltaram</small><strong id="neOwnerRepeated">—</strong></div>
+          <div><small>Clientes com checkout</small><strong id="neOwnerBuyers">—</strong></div>
+          <div><small>Tarefas de retorno atrasadas</small><strong id="neOwnerTasks">—</strong></div>
+        </div>
+        <div class="ne-owner-quick-actions">
+          <button type="button" class="secondary" data-jump="clients">Ver clientes</button>
+          <button type="button" class="secondary" data-jump="retention">Ver tarefas de relacionamento</button>
+        </div>
+      </section>
+      <details class="ne-owner-definitions"><summary>Como esses indicadores são calculados?</summary><div id="neOwnerDefinitions" class="ne-owner-definitions-body"></div></details>
     </section>
 
     <section id="agents" class="view">
@@ -929,7 +979,7 @@
   </form>
 </dialog>
 <div id="toast" class="toast"></div>
-<script src="/app.js?v=196" type="module"></script>\n<script src="/marketing-ui.js?v=1" defer></script>
+<script src="/app.js?v=197" type="module"></script>\n<script src="/marketing-ui.js?v=1" defer></script>
 <script src="/beauty-ui.js?v=2" defer></script>
 <script src="/security-center.js?v=1" defer></script>
 <script src="/whatsapp-onboarding.js?v=1" defer></script>
