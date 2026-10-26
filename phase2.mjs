@@ -308,6 +308,16 @@ export async function handlePhase2Api(ctx){
     audit(db,user,"service.recipe.update","service",sid,{items:normalized.length});
     return send(res,200,{ok:true,items:normalized.length});
   }
+  if(req.method==="GET"&&url.pathname==="/api/stock/recipes-overview"){
+    guard("inventory.read");
+    const rows=all(db,`select s.id service_id,s.name service_name,count(r.product_id) product_count,
+      coalesce(sum(r.qty_standard*p.avg_cost_cents),0) cost_cents
+      from services s left join service_recipes r on r.service_id=s.id and r.tenant_id=s.tenant_id
+      left join products p on p.id=r.product_id and p.tenant_id=s.tenant_id
+      where s.tenant_id=? and s.active=1 group by s.id order by s.category,s.name`,[tenant]);
+    return send(res,200,rows.map(x=>({service_id:x.service_id,service_name:x.service_name,
+      product_count:Number(x.product_count||0),product_cost:Number(x.cost_cents||0)/100})));
+  }
   if(req.method==="GET"&&url.pathname==="/api/services/costs"){guard("finance.read");return send(res,200,serviceCosts(db,tenant))}
   if(req.method==="GET"&&url.pathname==="/api/commissions"){guard("commissions.read");return send(res,200,commissions(db,tenant))}
   if(req.method==="POST"&&url.pathname==="/api/commissions/pay"){
