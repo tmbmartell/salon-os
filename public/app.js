@@ -19,7 +19,36 @@ async function loadClients(q=""){state.clients=await api("/api/clients"+(q?`?q=$
 let searchTimer;$("#clientSearch").oninput=e=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadClients(e.target.value),220)};
 function downloadClientBase(){const a=document.createElement("a");a.href="/api/clients/export";a.download="";document.body.appendChild(a);a.click();a.remove()}$("#exportClients").onclick=downloadClientBase;$("#marketingExportClients").onclick=downloadClientBase;
 function renderTeam(){$("#teamList").innerHTML=state.professionals.map(p=>`<article><span class="avatar">${initials(p.name)}</span><h3>${p.name}</h3><p>${p.role}</p><p>${p.work_start}–${p.work_end}</p><div class="tags">${(p.specialties||[]).map(x=>`<span class="tag">${x}</span>`).join("")}</div></article>`).join("")}
-function renderServices(){$("#serviceList").innerHTML=state.services.map(s=>`<article><span class="chip">${s.category||"Geral"}</span><h3>${s.name}</h3><p>${s.duration_min} min · comissão ${Number(s.commission_pct||0)}%</p><strong>${fmt.format(s.price)}</strong></article>`).join("")}
+function renderServices(){
+  const list=$("#serviceList"),filters=$("#neServiceFilters"),counter=$("#neServiceCount");
+  if(!list)return;
+  const categories=[...new Set(state.services.map(s=>s.category||"Geral"))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  if(!["Todos",...categories].includes(state.serviceCategory))state.serviceCategory="Todos";
+  const current=state.serviceCategory||"Todos";
+  if(filters){
+    filters.innerHTML=["Todos",...categories].map(cat=>'<button type="button" data-ne-category="'+encodeURIComponent(cat)+'" aria-pressed="'+String(cat===current)+'" class="'+(cat===current?"active":"")+'">'+esc(cat)+'</button>').join("");
+    $("[data-ne-category]",filters).forEach(btn=>btn.onclick=()=>{state.serviceCategory=decodeURIComponent(btn.dataset.neCategory);renderServices()});
+  }
+  const visible=state.services.filter(s=>current==="Todos"||(s.category||"Geral")===current);
+  if(counter)counter.textContent=visible.length+" "+(visible.length===1?"serviço":"serviços");
+  const showCommission=["owner","manager"].includes(state.user?.role);
+  list.innerHTML=visible.map(s=>{
+    const name=esc(s.name),id=esc(s.id),category=esc(s.category||"Geral");
+    return '<details class="ne-service-card"><summary><span class="ne-service-symbol" aria-hidden="true">✦</span><span class="ne-service-title"><small>'+category+'</small><strong>'+name+'</strong><span>'+Number(s.duration_min||0)+' min · '+fmt.format(s.price)+'</span></span><span class="ne-service-arrow" aria-hidden="true">⌄</span></summary>'+
+      '<div class="ne-service-details"><div class="ne-service-facts"><span>Duração <strong>'+Number(s.duration_min||0)+' min</strong></span><span>Valor <strong>'+fmt.format(s.price)+'</strong></span>'+
+      (showCommission?'<span>Comissão <strong>'+Number(s.commission_pct||0).toLocaleString("pt-BR")+'%</strong></span>':"")+'</div>'+
+      '<div class="ne-service-actions"><button type="button" class="primary" data-ne-book-service="'+id+'">Agendar serviço</button><button type="button" class="secondary" data-ne-service-tech="'+id+'">Fichas técnicas</button></div></div></details>';
+  }).join("")||'<p class="muted">Nenhum serviço nesta categoria.</p>';
+  $("[data-ne-book-service]",list).forEach(btn=>btn.onclick=()=>{
+    $("#apService").value=btn.dataset.neBookService;
+    appointmentUi.refreshSuggestions();
+    appointmentUi.refreshSummary();
+    $("#appointmentModal").showModal();
+  });
+  $("[data-ne-service-tech]",list).forEach(btn=>btn.onclick=()=>{
+    activate("technical");
+  });
+}
 function renderResources(){$("#resourceList").innerHTML=state.resources.map(r=>`<article><span class="chip">${({chair:"Cadeira",washbasin:"Lavatório",room:"Sala",equipment:"Equipamento",other:"Outro"})[r.type]||r.type}</span><h3>${r.name}</h3><p>Entra no cálculo de disponibilidade da agenda.</p></article>`).join("")||`<p class="muted">Nenhum recurso cadastrado.</p>`}
 function fillSelects(){const c=$("#apClient"),p=$("#apProfessional"),s=$("#apService"),r=$("#apResource");if(!c||!p||!s||!r)return;c.innerHTML='<option value="">Selecione…</option>'+state.clients.map(x=>`<option value="${x.id}">${x.name}</option>`).join("");p.innerHTML='<option value="">Selecione…</option>'+state.professionals.map(x=>`<option value="${x.id}">${x.name}</option>`).join("");s.innerHTML='<option value="">Selecione…</option>'+state.services.map(x=>`<option value="${x.id}">${x.name} · ${fmt.format(x.price)}</option>`).join("");r.innerHTML='<option value="">Sem recurso específico</option>'+state.resources.map(x=>`<option value="${x.id}">${x.name}</option>`).join("")}
 const appointmentUi=setupAppointmentUi({getState:()=>state,api,esc,fmt,$,$$});
