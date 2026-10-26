@@ -206,3 +206,30 @@ body{background:var(--bg);color:var(--ink)}
 #recipeServiceList .ne-stock-recipe{align-self:start}
 @media(max-width:880px){.ne-stock-action-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:420px){.ne-stock-action{padding:12px;min-height:113px}.ne-stock-action strong{font-size:12px}.ne-stock-product summary{gap:8px;padding:12px}.inventoryMetrics strong{font-size:20px}}
+
+/* Etapa 5 — Caixa e Financeiro: poucas opções de primeira impressão. */
+.ne-finance-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 17px}
+.ne-finance-action{min-width:0;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:var(--shadow);cursor:pointer;padding:17px;display:grid;justify-items:start;text-align:left;align-content:start;gap:7px;min-height:124px;color:var(--ink)}
+.ne-finance-action:hover,.ne-finance-action:focus-visible{border-color:var(--accent);outline-offset:2px}
+.ne-finance-action.is-active{border-color:var(--accent);background:#f0f6fd}
+.ne-finance-action>span{display:grid;place-items:center;width:36px;height:36px;border-radius:12px;background:var(--soft);font-size:23px;color:var(--accent)}
+.ne-finance-action strong{font-size:14px}.ne-finance-action small{font-size:11px;color:var(--muted)}
+.ne-finance-top-metrics{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:18px}
+.ne-finance-pendings{grid-template-columns:minmax(180px,340px);margin-bottom:14px}
+[data-ne-finance-panel]>.panel{margin-bottom:16px}
+.ne-cash-methods{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:15px}
+.ne-cash-method{border:1px solid var(--line);border-radius:13px;background:var(--soft);padding:13px;display:grid;gap:5px;min-width:0}
+.ne-cash-method small{color:var(--muted);font-size:11px}
+.ne-cash-method strong{font-size:16px}
+.ne-cash-method span{color:var(--muted);font-size:10px}
+.ne-cash-actions{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 0}
+.ne-cash-actions button{min-height:40px}
+.ne-cash-history{display:grid;gap:8px;margin-top:14px}
+.ne-cash-history-row{display:flex;justify-content:space-between;gap:16px;padding:12px;border:1px solid var(--line);border-radius:11px}
+.ne-cash-history-row>div{display:grid;gap:4px}
+.ne-cash-history-row strong{font-size:12px}
+.ne-cash-history-row small{font-size:11px;color:var(--muted)}
+.ne-finance-guidance{color:var(--muted);font-size:12px;line-height:1.45}
+#cashCloseModal .ne-finance-guidance{background:var(--soft);padding:10px 12px;border-radius:10px}
+@media(max-width:900px){.ne-finance-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.ne-cash-methods{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:550px){.ne-finance-action{padding:13px;min-height:116px}.ne-finance-action strong{font-size:12px}.ne-finance-top-metrics{grid-template-columns:1fr 1fr;gap:8px}.ne-finance-top-metrics>article:last-child{grid-column:1/-1}.ne-cash-methods{grid-template-columns:1fr 1fr}}
