@@ -126,7 +126,7 @@
           <div id="chatActive" class="hidden">
             <div class="chatHead">
               <div><strong id="chatClient">Cliente</strong><small id="chatPhone"></small></div>
-              <div class="chatHeadActions"><button id="chatModeButton" class="secondary" type="button">Humano</button><button id="openClientFromChat" class="link">Ver cliente</button></div>
+              <div class="chatHeadActions"><button id="chatModeButton" class="secondary" type="button">Humano</button><button id="openClientFromChat" class="link">Ver cliente</button><button id="scheduleFromChat" class="secondary" type="button">Agendar</button></div>
             </div>
             <div id="messageList" class="messageList"></div>
             <form id="messageForm" class="messageComposer"><textarea id="messageText" placeholder="Escreva uma mensagem…"></textarea><button class="primary">Enviar</button></form>
@@ -147,15 +147,21 @@
             <button id="saveConversationMeta" class="primary wide">Salvar classificação</button>
             <div class="detailInfo">
               <strong>Cliente</strong>
-              <p id="detailClientInfo" class="muted"></p>
+              <p id="detailClientInfo" class="muted"></p><div id="neClientContext" class="ne-client-context" aria-live="polite"></div>
             </div>
           </div>
         </aside>
       </div>
-      <article class="panel waSetup">
-        <div><h2>Conexão WhatsApp</h2><p id="waSetupText">Verificando o provedor WAHA local…</p></div>
-        <div class="waActions"><button id="prepareWaha" class="secondary">Preparar sessão</button><button id="showQr" class="primary">Mostrar QR</button></div>
-        <img id="waQrImage" class="qrImage hidden" alt="QR Code do WhatsApp">
+      <article class="panel ne-wa-connection">
+        <div class="panelhead"><div><h2>Conexão WhatsApp</h2><p id="waSetupText">Verificando o provedor WAHA local…</p></div><span id="neWhatsAppConnectionStatus" class="chip" role="status">Verificando</span></div>
+        <p class="ne-wa-help">A conexão é exclusiva deste salão. A IA permanece desativada nesta etapa.</p>
+        <form id="neWhatsappSessionForm" class="ne-wa-session-form hidden">
+          <label>Identificador exclusivo da conexão<input id="neWhatsappSessionName" name="session" pattern="[A-Za-z0-9_-]{3,60}" minlength="3" maxlength="60" placeholder="ex.: novagente-estetica-01" required autocomplete="off"></label>
+          <button class="secondary" type="submit">Salvar identificação</button>
+        </form>
+        <div class="waActions"><button id="prepareWaha" class="secondary" type="button">Preparar conexão</button><button id="showQr" class="primary" type="button">Mostrar QR Code</button><button id="neWhatsappRefresh" class="secondary" type="button">Verificar conexão</button></div>
+        <p id="neWhatsappMessage" role="status" class="ne-wa-message">Vincule e prepare a sessão antes de escanear o QR Code.</p>
+        <img id="waQrImage" class="qrImage hidden" alt="QR Code para vincular o WhatsApp do salão">
       </article>
     </section>
 
@@ -837,4 +843,5 @@
 <script src="/app.js?v=191" type="module"></script>
 <script src="/beauty-ui.js?v=2" defer></script>
 <script src="/security-center.js?v=1" defer></script>
+<script src="/whatsapp-onboarding.js?v=1" defer></script>
 </body></html>
