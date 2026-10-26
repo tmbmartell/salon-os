@@ -299,6 +299,17 @@ async function loadFinance(){
     await loadDre();
   }catch(err){if(err.status!==403&&err.status!==401)toast("Não foi possível carregar o financeiro")}
 }
+function showStockTab(type,id){
+  const prefix=type==="inventory"?"stock":"purchase",other=prefix==="stock"?"products":"suppliers";
+  const active=id||other;
+  $("[data-ne-"+prefix+"-tab]").forEach(button=>{
+    const yes=button.dataset["ne"+prefix[0].toUpperCase()+prefix.slice(1)+"Tab"]===active;
+    button.classList.toggle("is-active",yes);button.setAttribute("aria-pressed",String(yes));
+  });
+  $("[data-ne-"+prefix+"-panel]").forEach(panel=>panel.classList.toggle("hidden",panel.dataset["ne"+prefix[0].toUpperCase()+prefix.slice(1)+"Panel"]!==active));
+}
+$("[data-ne-stock-tab]").forEach(button=>button.addEventListener("click",()=>showStockTab("inventory",button.dataset.neStockTab)));
+$("[data-ne-purchase-tab]").forEach(button=>button.addEventListener("click",()=>showStockTab("purchase",button.dataset.nePurchaseTab)));
 async function loadInventory(){
   try{
     const data=await Promise.all([api("/api/products"),api("/api/stock/recipes-overview"),api("/api/suppliers"),api("/api/stock/movements"),api("/api/stock/lots")]);state.products=data[0];state.suppliers=data[2];const costs=data[1],movements=data[3],lots=data[4];
@@ -356,7 +367,25 @@ function decorateAgendaCheckout(){
   });
 }
 async function loadAgendaPhase2(){await loadAgenda();decorateAgendaCheckout()}
-$("#checkoutForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));b.consumption=collectCheckoutConsumption();try{const out=await api("/api/checkout",{method:"POST",body:JSON.stringify(b)});$("#checkoutModal").close();e.target.reset();$("#checkoutConsumption").innerHTML="";await loadAgendaPhase2();state.dashboard=await api("/api/dashboard");renderDashboard();toast("Atendimento finalizado · "+moneyBR(out.total))}catch(err){const code=err.data?.error;toast(code==="cash_session_required"?"Abra o caixa antes de receber em dinheiro":code==="appointment_already_checked_out"?"Esse atendimento já foi finalizado":code==="package_credit_required"?"Esta cliente não possui crédito válido deste serviço":"Não foi possível finalizar")}};
+$("#checkoutForm").onsubmit=async e=>{
+  e.preventDefault();
+  const b=Object.fromEntries(new FormData(e.target));
+  try{
+    b.consumption=collectCheckoutConsumption();
+    const out=await api("/api/checkout",{method:"POST",body:JSON.stringify(b)});
+    $("#checkoutModal").close();e.target.reset();$("#checkoutConsumption").innerHTML="";
+    await loadAgendaPhase2();state.dashboard=await api("/api/dashboard");renderDashboard();
+    toast("Atendimento finalizado · "+moneyBR(out.total));
+  }catch(err){
+    const code=err.data?.error;
+    toast(code==="cash_session_required"?"Abra o caixa antes de receber em dinheiro":
+      code==="appointment_already_checked_out"?"Esse atendimento já foi finalizado":
+      code==="package_credit_required"?"Esta cliente não possui crédito válido deste serviço":
+      code==="insufficient_stock"?"Estoque insuficiente: "+(err.data?.product_name||"corrija o saldo do produto"):
+      code==="invalid_stock_quantity"||code==="invalid_consumption_product"?"Verifique o consumo informado e sua unidade":
+      code==="invalid_consumption_form"?"Informe quantidades válidas antes de finalizar":"Não foi possível finalizar");
+  }
+};
 
 async function loadDre(){
   const month=$("#dreMonth").value||new Date().toISOString().slice(0,7);$("#dreMonth").value=month;
@@ -388,16 +417,28 @@ async function openCheckout(appointmentId){
     $("#checkoutForm").elements.appointment_id.value=appointmentId;
     $("#checkoutLabel").textContent=prep.client_name+" · "+prep.service_name+" · "+moneyBR(prep.price);
     state.checkoutPackages=prep.packages||[];const cp=$("#checkoutPackage");cp.innerHTML='<option value="">Selecione…</option>'+state.checkoutPackages.map(p=>'<option value="'+p.client_package_id+'">'+p.package_name+' · '+p.remaining+' crédito(s) · até '+String(p.expires_at).slice(0,10)+' · valor '+moneyBR(p.allocated_unit)+'</option>').join("");$("#checkoutPaymentMethod").value="pix";updateCheckoutPaymentMode();
+    const shortages=[];
     $("#checkoutConsumption").innerHTML=prep.recipe.length?prep.recipe.map(r=>{
-      const suggested=r.client_avg_qty!=null?r.client_avg_qty:r.qty_standard;
+      const unit=String(r.unit||"ml"),stock=Number(r.stock_qty||0),standard=Number(r.qty_standard||0);
+      const avg=Number(r.client_avg_qty),suggested=r.client_avg_qty!=null&&Number.isFinite(avg)?avg:standard;
       const hint=r.client_avg_qty!=null?"média desta cliente ("+r.client_samples+" atend.)":"padrão do serviço";
-      return '<div class="consumptionRow" data-consumption-product="'+r.product_id+'"><div><strong>'+r.product_name+'</strong><small>'+hint+' · padrão '+Number(r.qty_standard).toLocaleString("pt-BR")+' '+r.unit+'</small></div><input type="number" step="0.01" min="0" value="'+Number(suggested).toFixed(2)+'"><span>'+r.unit+'</span></div>';
+      if(suggested>stock)shortages.push(r.product_name);
+      const step=["un","unidade","und"].includes(unit)?"1":"0.001";
+      return '<div class="consumptionRow" data-consumption-product="'+esc(r.product_id)+'" data-unit="'+esc(unit)+'"><div><strong>'+esc(r.product_name)+'</strong><small>'+hint+' · previsto '+standard.toLocaleString("pt-BR")+' '+esc(unit)+' · saldo '+stock.toLocaleString("pt-BR")+' '+esc(unit)+'</small></div><input type="number" step="'+step+'" min="0" max="'+stock+'" required value="'+Number(suggested.toFixed(3))+'"><span>'+esc(unit)+'</span></div>';
     }).join(""):'<p class="muted">Este serviço ainda não tem produtos configurados. O financeiro e a comissão serão registrados normalmente.</p>';
+    $("#neCheckoutStockHint").textContent=shortages.length?"Atenção: saldo insuficiente para "+shortages.join(", ")+". Corrija o estoque antes de finalizar.":"Confira as quantidades. É permitido registrar zero quando um produto não foi usado.";
     $("#checkoutModal").showModal();
   }catch{toast("Não foi possível preparar o fechamento")}
 }
 function collectCheckoutConsumption(){
-  return $$("#checkoutConsumption [data-consumption-product]").map(r=>({product_id:r.dataset.consumptionProduct,actual_qty:Number($("input",r).value||0)})).filter(x=>x.product_id&&x.actual_qty>=0);
+  return $("#checkoutConsumption [data-consumption-product]").map(row=>{
+    const input=$("input",row),number=Number(input.value),unit=row.dataset.unit;
+    if(input.value.trim()===""||!input.checkValidity()||!Number.isFinite(number)||number<0||number>1000000||
+      ["un","unidade","und"].includes(unit)&&!Number.isInteger(number)){
+      input.focus();throw Object.assign(new Error("invalid_consumption_form"),{data:{error:"invalid_consumption_form"}});
+    }
+    return {product_id:row.dataset.consumptionProduct,actual_qty:number};
+  });
 }
 async function payFinanceEntry(id){
   try{await api("/api/finance/entries/"+id+"/pay",{method:"POST",body:JSON.stringify({payment_method:"pix"})});await loadFinance();toast("Lançamento marcado como pago")}catch(err){toast(err.data?.error==="already_paid"?"Esse lançamento já está pago":"Não foi possível pagar o lançamento")}
