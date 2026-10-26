@@ -1,8 +1,14 @@
 {
-  "name": "nova-gente-salon-os",
+  "name": "novagente-estetica",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": {"start": "node server.mjs", "check": "node --check server.mjs"},
-  "engines": {"node": ">=22"}
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check server.mjs && node --check auth.mjs && node --check public/beauty-ui.js && node --check public/security-center.js",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
 }
