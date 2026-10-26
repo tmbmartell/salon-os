@@ -18,6 +18,7 @@ import { installPhase8, handlePhase8Api } from "./phase8.mjs";
 import { installPhase9, handlePhase9Api, staffWindowForDate } from "./phase9.mjs";
 import { installPhase10, handlePhase10Api } from "./phase10.mjs";
 import { installPhase11, handlePhase11Api } from "./phase11.mjs";
+import { checkManualStatusTransition } from "./appointment-status.mjs";
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||9331);
@@ -670,7 +671,7 @@ async function api(req,res,url){
   if(req.method==="GET"&&url.pathname==="/api/appointments"){
     guard("appointments.read");
     const from=url.searchParams.get("from")||new Date(Date.now()-86400000).toISOString(),to=url.searchParams.get("to")||new Date(Date.now()+14*86400000).toISOString();
-    const sql="select a.*,c.name client_name,c.phone client_phone,p.name professional_name,s.name service_name,s.duration_min,s.price_cents,r.name resource_name from appointments a join clients c on c.id=a.client_id join professionals p on p.id=a.professional_id join services s on s.id=a.service_id left join resources r on r.id=a.resource_id where a.tenant_id=? and a.start_at>=? and a.start_at<=? order by a.start_at";
+    const sql="select a.*,c.name client_name,c.phone client_phone,p.name professional_name,s.name service_name,s.duration_min,s.price_cents,r.name resource_name from appointments a join clients c on c.id=a.client_id and c.tenant_id=a.tenant_id join professionals p on p.id=a.professional_id and p.tenant_id=a.tenant_id join services s on s.id=a.service_id and s.tenant_id=a.tenant_id left join resources r on r.id=a.resource_id and r.tenant_id=a.tenant_id where a.tenant_id=? and a.start_at>=? and a.start_at<=? order by a.start_at";
     const rows=all(sql,[tenant,from,to]);
     return send(res,200,rows.map(appointmentApiView));
   }
@@ -683,11 +684,15 @@ async function api(req,res,url){
   const ap=routeMatch(url.pathname,"/api/appointments/:id/status");
   if(req.method==="PATCH"&&ap){
     guard("appointments.write");
-    const b=await parseBody(req),allowed=["scheduled","confirmed","arrived","in_service","completed","cancelled","no_show"],status=safeText(b.status,32);
-    if(!allowed.includes(status))return send(res,400,{error:"invalid_status"});
-    const info=run("update appointments set status=?,updated_at=? where id=? and tenant_id=?",[status,now(),ap.id,tenant]);
-    if(!info.changes)return send(res,404,{error:"not_found"});
-    audit(db,user,"appointment.status","appointment",ap.id,{status});
+    const b=await parseBody(req),status=safeText(b.status,32);
+    const current=one("select status from appointments where id=? and tenant_id=?",[ap.id,tenant]);
+    if(!current)return send(res,404,{error:"not_found"});
+    const transition=checkManualStatusTransition(current.status,status);
+    if(!transition.ok)return send(res,transition.code==="invalid_status"?400:409,{error:transition.code,current_status:current.status});
+    if(transition.unchanged)return send(res,200,{ok:true,status,unchanged:true});
+    const info=run("update appointments set status=?,updated_at=? where id=? and tenant_id=? and status=?",[status,now(),ap.id,tenant,current.status]);
+    if(!info.changes)return send(res,409,{error:"status_changed_reload"});
+    audit(db,user,"appointment.status","appointment",ap.id,{from:current.status,to:status});
     return send(res,200,{ok:true,status});
   }
 
