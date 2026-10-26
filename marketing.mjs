@@ -86,7 +86,7 @@ export async function handleMarketingApi({req,res,url,db,user,tenant,send,parseB
   }
   if(req.method==="POST"&&url.pathname==="/api/marketing/assets"){
     write();
-    const name=text(req.headers["x-media-name"]||"Imagem da campanha",140);
+    let name="Imagem da campanha";try{name=text(decodeURIComponent(req.headers["x-media-name"]||"Imagem da campanha"),140)}catch{return send(res,400,{error:"invalid_media_name"})}
     const claimed=String(req.headers["content-type"]||"").split(";")[0].trim().toLowerCase();
     if(!imageMimes[claimed])return send(res,415,{error:"unsupported_media_type"});
     let blob;try{blob=await readImage(req)}catch(e){return send(res,e.status||400,{error:e.message})}
