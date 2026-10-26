@@ -692,6 +692,20 @@ async function api(req,res,url){
   }
 
   if(req.method==="GET"&&url.pathname==="/api/conversations"){guard("conversations.read");return send(res,200,listConversations(db,tenant))}
+  const clientContextRoute=routeMatch(url.pathname,"/api/conversations/:id/client-context");
+  if(req.method==="GET"&&clientContextRoute){
+    guard("conversations.read");guard("clients.read");
+    const co=one("select id,client_id from conversations where id=? and tenant_id=?",[clientContextRoute.id,tenant]);
+    if(!co)return send(res,404,{error:"conversation_not_found"});
+    if(!co.client_id)return send(res,200,{client:null,appointments:[]});
+    const client=one("select id,name,phone,tags,source from clients where id=? and tenant_id=?",[co.client_id,tenant]);
+    if(!client)return send(res,200,{client:null,appointments:[]});
+    const visits=all(`select a.id,a.start_at,a.status,s.name service_name,p.name professional_name
+      from appointments a left join services s on s.id=a.service_id and s.tenant_id=a.tenant_id
+      left join professionals p on p.id=a.professional_id and p.tenant_id=a.tenant_id
+      where a.tenant_id=? and a.client_id=? order by a.start_at desc limit 5`,[tenant,co.client_id]);
+    return send(res,200,{client:{...client,tags:jparse(client.tags,[])},appointments:visits});
+  }
   if(req.method==="GET"&&url.pathname==="/api/conversations/options"){
     guard("conversations.read");
     const users=all("select id,name,role from users where tenant_id=? and active=1 order by name",[tenant]);
