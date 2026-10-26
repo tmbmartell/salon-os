@@ -22,8 +22,16 @@
       const logo = one(".logo", el);
       const name = one("strong", el);
       const caption = one("small", el);
-      if (logo) { logo.textContent = "NG"; logo.title = "Espaço reservado para a logo oficial da NOVAGENTE"; }
-      if (name) name.textContent = "NOVAGENTE Estética";
+      if (logo) {
+        const img = document.createElement("img");
+        img.src = "/novagente-logo.svg";
+        img.alt = "NOVAGENTE";
+        img.width = 198;
+        img.height = 25;
+        logo.replaceChildren(img);
+        logo.title = "Marca oficial NOVAGENTE";
+      }
+      if (name) name.textContent = "Estética";
       if (caption) caption.textContent = "Sistema integrado";
     });
     const eyebrow = one(".topbar .eyebrow");
