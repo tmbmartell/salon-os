@@ -66,7 +66,88 @@ async function loadWaitlist(){
 }
 $("#waitlistForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/waitlist",{method:"POST",body:JSON.stringify(b)});$("#waitlistModal").close();e.target.reset();await loadWaitlist();toast("Cliente adicionado à lista de espera")}catch{toast("Não foi possível adicionar à lista de espera")}};
 
-async function loadAgenda(){const data=await api("/api/appointments"),by={};data.forEach(a=>{const k=new Date(a.start_at).toISOString().slice(0,10);(by[k]??=[]).push(a)});$("#agendaList").innerHTML=Object.entries(by).map(([k,items])=>`<div class="agendaDay">${dayFmt.format(new Date(k+"T12:00:00"))}</div>${items.map(a=>`<div class="agendaItem"><div class="time">${new Date(a.start_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div><div><h3>${a.client_name} · ${a.service_summary||a.service_name}</h3><p>${a.professional_summary||a.professional_name} · ${fmt.format(a.price)}</p></div><select data-status="${a.id}">${["scheduled","confirmed","arrived","in_service","completed","cancelled","no_show"].map(s=>`<option value="${s}" ${s===a.status?"selected":""}>${statusLabel(s)}</option>`).join("")}</select></div>`).join("")}`).join("")||`<p class="muted">Sem agendamentos nos próximos dias.</p>`;$$("[data-status]").forEach(sel=>sel.onchange=async()=>{try{await api(`/api/appointments/${sel.dataset.status}/status`,{method:"PATCH",body:JSON.stringify({status:sel.value})});toast("Status atualizado");state.dashboard=await api("/api/dashboard");renderDashboard()}catch{toast("Não foi possível atualizar")}})}
+const neAgendaStatusOptions={
+  scheduled:["confirmed","arrived","in_service","cancelled","no_show"],
+  confirmed:["arrived","in_service","cancelled","no_show"],
+  arrived:["in_service","cancelled"],
+  in_service:[],completed:[],cancelled:[],no_show:[]
+};
+const neAgendaQuickActions={
+  scheduled:{status:"confirmed",label:"Confirmar horário"},
+  confirmed:{status:"arrived",label:"Cliente chegou"},
+  arrived:{status:"in_service",label:"Iniciar atendimento"}
+};
+function renderAgendaCards(){
+  const all=Array.isArray(state.agendaAppointments)?state.agendaAppointments:[];
+  const select=$("#neAgendaProfessional"),profId=state.neAgendaProfessional||"";
+  if(select){
+    const selected=profId;
+    select.innerHTML='<option value="">Todos os profissionais</option>'+state.professionals.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join("");
+    select.value=selected;
+  }
+  const filter=state.neAgendaFilter||"today";
+  const day=new Date(),dayStart=new Date(day.getFullYear(),day.getMonth(),day.getDate()).getTime();
+  const tomorrow=dayStart+24*60*60*1000;
+  const closed=new Set(["completed","cancelled","no_show"]);
+  const visible=all.filter(a=>{
+    const start=new Date(a.start_at).getTime();
+    if(!Number.isFinite(start))return false;
+    if(profId&&a.professional_id!==profId)return false;
+    if(filter==="today")return start>=dayStart&&start<tomorrow;
+    if(filter==="upcoming")return start>=tomorrow&&!closed.has(a.status);
+    if(filter==="closed")return closed.has(a.status);
+    return true;
+  });
+  $$("[data-ne-agenda-filter]").forEach(b=>{
+    const active=b.dataset.neAgendaFilter===filter;
+    b.classList.toggle("active",active);
+    b.setAttribute("aria-pressed",String(active));
+  });
+  const count=$("#neAgendaCount");if(count)count.textContent=visible.length+" "+(visible.length===1?"compromisso":"compromissos")+" nesta visão";
+  $("#agendaList").innerHTML=visible.map(a=>{
+    const d=new Date(a.start_at),time=d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+    const date=d.toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"2-digit"});
+    const opts=[a.status,...(neAgendaStatusOptions[a.status]||[])];
+    const controls=opts.map(status=>'<option value="'+esc(status)+'" '+(a.status===status?'selected':'')+'>'+esc(statusLabel(status))+'</option>').join("");
+    const action=neAgendaQuickActions[a.status];
+    const fast=action?'<button type="button" class="primary" data-ne-agenda-next="'+esc(a.id)+'" data-next-status="'+action.status+'">'+action.label+'</button>':"";
+    return '<details class="ne-agenda-card"><summary><span class="ne-agenda-time">'+time+'<small>'+esc(date)+'</small></span><span class="ne-agenda-summary"><strong>'+esc(a.client_name||"Cliente")+'</strong><small>'+esc(a.service_summary||a.service_name||"Serviço")+' · '+esc(a.professional_summary||a.professional_name||"Profissional")+'</small></span><span class="ne-agenda-status">'+esc(statusLabel(a.status))+'</span><span class="ne-agenda-chevron" aria-hidden="true">⌄</span></summary>'+
+      '<div class="ne-agenda-details"><div class="ne-agenda-meta"><span>Serviço <strong>'+esc(a.service_summary||a.service_name||"—")+'</strong></span><span>Valor <strong>'+fmt.format(a.price)+'</strong></span>'+(a.resource_name?'<span>Recurso <strong>'+esc(a.resource_name)+'</strong></span>':"")+'</div>'+
+      '<div class="ne-agenda-controls"><label for="ne-ag-status-'+esc(a.id)+'">Situação</label><select id="ne-ag-status-'+esc(a.id)+'" data-status="'+esc(a.id)+'" '+(opts.length===1?'disabled':'')+'>'+controls+'</select>'+fast+
+      '<button type="button" class="secondary" data-ne-technical="'+esc(a.id)+'">Ficha técnica</button></div></div></details>';
+  }).join("")||'<div class="ne-empty-view"><strong>Nenhum atendimento nesta visão.</strong><p>Escolha outro filtro ou abra um novo agendamento.</p></div>';
+  $$("[data-status]",$("#agendaList")).forEach(sel=>sel.onchange=()=>changeAgendaStatus(sel.dataset.status,sel.value));
+  $$("[data-ne-agenda-next]",$("#agendaList")).forEach(btn=>btn.onclick=()=>changeAgendaStatus(btn.dataset.neAgendaNext,btn.dataset.nextStatus));
+  $$("[data-ne-technical]",$("#agendaList")).forEach(btn=>btn.onclick=async()=>{
+    const a=state.agendaAppointments?.find(x=>x.id===btn.dataset.neTechnical);
+    if(!a)return;
+    activate("technical");
+    await loadTechnical(a.client_id);
+    const hidden=$("#neTechnicalAppointmentId");if(hidden)hidden.value=a.id;
+    const client=$("#technicalFormClient"),service=$("#technicalService"),pro=$("#technicalProfessional");
+    if(client)client.value=a.client_id;
+    if(service)service.value=a.service_id;
+    if(pro)pro.value=a.professional_id;
+  });
+}
+async function changeAgendaStatus(id,status){
+  try{
+    await api("/api/appointments/"+encodeURIComponent(id)+"/status",{method:"PATCH",body:JSON.stringify({status})});
+    toast("Atendimento atualizado");
+    await loadAgendaPhase2();
+    state.dashboard=await api("/api/dashboard");renderDashboard();
+  }catch(err){
+    toast(err.data?.error==="checkout_required"?"Finalize e receba pelo caixa":err.status===409?"A situação mudou. Recarregando agenda.":"Não foi possível atualizar o atendimento");
+    await loadAgendaPhase2().catch(()=>{});
+  }
+}
+async function loadAgenda(){
+  state.agendaAppointments=await api("/api/appointments");
+  renderAgendaCards();
+}
+$$("[data-ne-agenda-filter]").forEach(btn=>btn.onclick=()=>{state.neAgendaFilter=btn.dataset.neAgendaFilter;renderAgendaCards();decorateAgendaCheckout()});
+$("#neAgendaProfessional").onchange=e=>{state.neAgendaProfessional=e.target.value;renderAgendaCards();decorateAgendaCheckout()};
+$("[data-ne-show-waitlist]").onclick=()=>$("#agenda .ne-waitlist-panel")?.scrollIntoView({behavior:"smooth",block:"start"});
 async function loadReceipts(){const rows=await api("/api/jev/receipts");$("#receiptList").innerHTML=rows.map(r=>`<div class="row"><div><strong>${r.local_route}</strong><small>${r.input_excerpt}</small></div><div style="text-align:right"><span class="status">${r.jev_trace_id?"JEV":"local"}</span><small>${r.latency_ms?`${r.latency_ms} ms`:"sem chamada JEV"}</small></div></div>`).join("")||`<p class="muted">Ainda não há decisões.</p>`}
 $("#commandForm").onsubmit=async e=>{e.preventDefault();const text=$("#commandText").value.trim();if(!text)return;$("#commandResult").textContent="Analisando…";try{const r=await api("/api/assistant/interpret",{method:"POST",body:JSON.stringify({text})}),used=r.route==="ambiguous"&&r.jev;let html="<strong>Rota:</strong> "+r.route+"<br><strong>Fonte:</strong> "+(used?"JEV ("+Math.round((r.jev.probability||0)*100)+"%)":"regra local · zero chamada JEV");if(r.booking){if(r.booking.service)html+="<br><strong>Serviço:</strong> "+r.booking.service.name;if(r.booking.professional)html+=" · "+r.booking.professional.name;if(r.booking.date)html+="<br><strong>Data:</strong> "+r.booking.date;if(r.booking.slots?.length)html+="<div class=\"slotList\">"+r.booking.slots.map(s=>"<button type=\"button\" class=\"slotChip\" data-slot=\""+s.start_at+"\" data-prof=\""+s.professional_id+"\" data-service=\""+s.service_id+"\">"+s.local_time+" · "+s.professional_name+"</button>").join("")+"</div>";else if(r.booking.missing?.length)html+="<br><small>Falta informar: "+r.booking.missing.join(", ")+"</small>";else html+="<br><small>Nenhum horário livre encontrado.</small>"}$("#commandResult").innerHTML=html;$$("[data-slot]").forEach(b=>b.onclick=()=>{$("#apProfessional").value=b.dataset.prof;$("#apService").value=b.dataset.service;const d=new Date(b.dataset.slot);const local=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);$("#appointmentForm").elements.start_at.value=local;appointmentUi.refreshSuggestions();appointmentUi.refreshSummary();$("#appointmentModal").showModal()})}catch{$("#commandResult").textContent="Falha ao interpretar."}};
 $("#clientForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/clients",{method:"POST",body:JSON.stringify(b)});e.target.reset();$("#clientModal").close();await loadClients();state.dashboard=await api("/api/dashboard");renderDashboard();toast("Cliente cadastrado")}catch(err){toast(err.data?.error==="phone_already_exists"?"Esse WhatsApp já está cadastrado":"Erro ao cadastrar")}};
