@@ -315,6 +315,7 @@ export async function handlePhase2Api(ctx){
     if(supplierId&&!one(db,"select id from suppliers where id=? and tenant_id=?",[supplierId,tenant]))return send(res,400,{error:"invalid_supplier"});
     const cash=openCash(db,tenant);
     if(status==="paid"&&method==="cash"&&!cash)return send(res,409,{error:"cash_session_required"});
+    if(status==="paid"&&method==="cash"&&kind==="expense"&&amount>expectedCash(db,tenant,cash.id))return send(res,409,{error:"insufficient_cash"});
     const fid=uid();
     run(db,"insert into financial_entries(id,tenant_id,kind,category,description,amount_cents,payment_method,status,due_date,paid_at,cash_session_id,supplier_id,created_by,created_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
       [fid,tenant,kind,txt(b.category||"other",80),description,amount,method,status,txt(b.due_date,10)||null,status==="paid"?now():null,status==="paid"?(cash?.id||null):null,supplierId,user.id,now()]);
@@ -402,18 +403,32 @@ export async function handlePhase2Api(ctx){
   if(req.method==="GET"&&url.pathname==="/api/services/costs"){guard("finance.read");return send(res,200,serviceCosts(db,tenant))}
   if(req.method==="GET"&&url.pathname==="/api/commissions"){guard("commissions.read");return send(res,200,commissions(db,tenant))}
   if(req.method==="POST"&&url.pathname==="/api/commissions/pay"){
-    guard("commissions.write");const b=await parseBody(req),ids=Array.isArray(b.ids)?b.ids.map(x=>txt(x,64)).filter(Boolean):[];if(!ids.length)return send(res,400,{error:"ids_required"});
+    guard("commissions.write");
+    const b=await parseBody(req),rawIds=Array.isArray(b.ids)?b.ids:[],ids=[...new Set(rawIds.map(x=>txt(x,64)).filter(Boolean))];
+    if(!ids.length||ids.length>100)return send(res,400,{error:"invalid_commission_selection"});
+    let method;try{method=validPaymentMethod(b.payment_method)}catch(e){return send(res,e.status||400,{error:e.message})}
     let count=0,total=0;
-    transaction(db,()=>{for(const cid of ids){
-      let c=one(db,"select * from commissions where id=? and tenant_id=? and status='pending'",[cid,tenant]),type="service";
-      if(!c){try{c=one(db,"select * from retail_commissions where id=? and tenant_id=? and status='pending'",[cid,tenant]);type="retail"}catch{}}
-      if(!c)continue;
-      if(type==="service")run(db,"update commissions set status='paid',paid_at=? where id=?",[now(),cid]);
-      else run(db,"update retail_commissions set status='paid',paid_at=? where id=?",[now(),cid]);
-      run(db,"insert into financial_entries(id,tenant_id,kind,category,description,amount_cents,status,paid_at,reference_type,reference_id,created_by,created_at) values(?,?,?,?,?,?,'paid',?,?,?,?,?)",[uid(),tenant,"expense","commissions",(type==="retail"?"Comissão revenda · ":"Comissão serviço · ")+cid,c.amount_cents,now(),type==="retail"?"retail_commission":"commission",cid,user.id,now()]);
-      count++;total+=Number(c.amount_cents);
-    }});
-    audit(db,user,"commissions.pay","commission",null,{count,total});return send(res,200,{count,total:total/100});
+    try{transaction(db,()=>{
+      const chosen=[];
+      for(const cid of ids){
+        let row=one(db,"select * from commissions where id=? and tenant_id=? and status='pending'",[cid,tenant]),type="service";
+        if(!row){try{row=one(db,"select * from retail_commissions where id=? and tenant_id=? and status='pending'",[cid,tenant]);type="retail"}catch{}}
+        if(!row)throw Object.assign(new Error("commission_not_pending"),{status:409});
+        chosen.push({row,type});total+=Number(row.amount_cents);
+      }
+      const cash=openCash(db,tenant);
+      if(method==="cash"&&!cash)throw Object.assign(new Error("cash_session_required"),{status:409});
+      if(method==="cash"&&total>expectedCash(db,tenant,cash.id))throw Object.assign(new Error("insufficient_cash"),{status:409});
+      for(const {row,type} of chosen){
+        if(type==="service")run(db,"update commissions set status='paid',paid_at=? where id=? and tenant_id=?",[now(),row.id,tenant]);
+        else run(db,"update retail_commissions set status='paid',paid_at=? where id=? and tenant_id=?",[now(),row.id,tenant]);
+        run(db,"insert into financial_entries(id,tenant_id,kind,category,description,amount_cents,payment_method,status,paid_at,cash_session_id,reference_type,reference_id,created_by,created_at) values(?,?,?,?,?,?,?,'paid',?,?,?,?,?,?)",
+          [uid(),tenant,"expense","commissions",(type==="retail"?"Comissão revenda · ":"Comissão serviço · ")+row.id,row.amount_cents,method,now(),cash?.id||null,type==="retail"?"retail_commission":"commission",row.id,user.id,now()]);
+        count++;
+      }
+    })}catch(e){return send(res,e.status||400,{error:e.message})}
+    audit(db,user,"commissions.pay","commission",null,{count,total,payment_method:method});
+    return send(res,200,{count,total:total/100,payment_method:method});
   }
 
   const pay=url.pathname.match(/^\/api\/finance\/entries\/([^/]+)\/pay$/);
@@ -428,6 +443,7 @@ export async function handlePhase2Api(ctx){
         if(entry.status!=="pending")throw Object.assign(new Error("already_paid"),{status:409});
         const cash=openCash(db,tenant);
         if(method==="cash"&&!cash)throw Object.assign(new Error("cash_session_required"),{status:409});
+        if(method==="cash"&&entry.kind==="expense"&&Number(entry.amount_cents)>expectedCash(db,tenant,cash.id))throw Object.assign(new Error("insufficient_cash"),{status:409});
         const changed=run(db,"update financial_entries set status='paid',payment_method=?,paid_at=?,cash_session_id=? where id=? and tenant_id=? and status='pending'",
           [method,now(),cash?.id||null,fid,tenant]);
         if(!changed.changes)throw Object.assign(new Error("already_paid"),{status:409});
