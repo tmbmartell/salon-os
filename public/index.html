@@ -611,6 +611,12 @@
   <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Confirmar retirada</button></div>
 </form></dialog>
 
+<dialog id="commissionPayModal"><form id="commissionPayForm" class="modalForm">
+  <div class="modalHead"><div><h3>Registrar pagamento das comissões</h3><p id="neCommissionPayDescription">Revise os valores antes de confirmar.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Forma utilizada para pagar<select name="payment_method" required><option value="">Escolha uma forma</option><option value="pix">Pix</option><option value="cash">Dinheiro</option><option value="debit_card">Cartão de débito</option><option value="credit_card">Cartão de crédito</option><option value="other">Outro</option></select></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Confirmar pagamentos realizados</button></div>
+</form></dialog>
+
 <dialog id="financePayModal"><form id="financePayForm" class="modalForm">
   <div class="modalHead"><div><h3>Confirmar pagamento</h3><p id="neFinancePayDescription">Confira os detalhes antes de registrar.</p></div><button type="button" class="x" data-close>×</button></div>
   <input type="hidden" name="entry_id">
