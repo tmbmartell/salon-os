@@ -350,7 +350,7 @@ async function loadFinance(){
     $("#fPayableCount").textContent=dash.accountsPayableCount+" pendências";
   }
   const cash=cashInfo?.status==="open"?cashInfo:null;
-  $("#cashBadge").textContent=cash?"ABERTO":"FECHADO";
+  $("#cashBadge").textContent=cash?"ABERTO":cashInfo?"FECHADO":"SEM ACESSO";
   $("#cashBadge").classList.toggle("ok",!!cash);
   $("#cashStatusText").textContent=cash?"Aberto desde "+dateTimeBR(cash.session.opened_at):cashInfo?"Nenhum caixa aberto.":"Acesso ao caixa indisponível.";
   $("#cashBody").innerHTML=cash?'<div class="cashNumber"><span>Esperado em dinheiro</span><strong>'+moneyBR(cash.expected)+'</strong></div><button class="primary" id="closeCashBtn">Fechar caixa</button>':
@@ -439,7 +439,7 @@ $("#financeEntryForm").onsubmit=async e=>{
   try{
     await api("/api/finance/entries",{method:"POST",body:JSON.stringify(b)});
     form.reset();$("#financeEntryModal").close();setFinanceTab("entries");await loadFinance();toast("Lançamento registrado");
-  }catch(err){toast(err.data?.error==="cash_session_required"?"Abra o caixa antes de movimentar dinheiro":err.data?.error==="invalid_amount"?"Informe um valor positivo com até duas casas decimais":err.data?.error==="invalid_payment_method"?"Escolha uma forma de pagamento válida":"Não foi possível salvar o lançamento")}
+  }catch(err){toast(err.data?.error==="cash_session_required"?"Abra o caixa antes de movimentar dinheiro":err.data?.error==="invalid_amount"?"Informe um valor positivo com até duas casas decimais":err.data?.error==="insufficient_cash"?"Dinheiro insuficiente no caixa":err.data?.error==="invalid_payment_method"?"Escolha uma forma de pagamento válida":"Não foi possível salvar o lançamento")}
 };
 $("#cashOpenForm").onsubmit=async e=>{
   e.preventDefault();const b=Object.fromEntries(new FormData(e.target));
@@ -469,7 +469,7 @@ $("#financePayForm").onsubmit=async e=>{
   e.preventDefault();const form=e.target,b=Object.fromEntries(new FormData(form));
   try{await api("/api/finance/entries/"+encodeURIComponent(b.entry_id)+"/pay",{method:"POST",body:JSON.stringify({payment_method:b.payment_method})});
     form.reset();$("#financePayModal").close();await loadFinance();toast("Pagamento confirmado");
-  }catch(err){toast(err.data?.error==="already_paid"?"Esse lançamento já foi pago":err.data?.error==="cash_session_required"?"Abra o caixa para pagar em dinheiro":"Não foi possível registrar o pagamento")}
+  }catch(err){toast(err.data?.error==="already_paid"?"Esse lançamento já foi pago":err.data?.error==="cash_session_required"?"Abra o caixa para pagar em dinheiro":err.data?.error==="insufficient_cash"?"Saldo físico insuficiente para esse pagamento":"Não foi possível registrar o pagamento")}
 };
 function decorateAgendaCheckout(){
   $$("[data-status]").forEach(sel=>{
@@ -504,7 +504,27 @@ async function loadDre(){
   try{const d=await api("/api/reports/dre?month="+encodeURIComponent(month));$("#dreBody").innerHTML='<div class="dreHero"><div><span>Entradas</span><strong>'+moneyBR(d.income)+'</strong></div><div><span>Saídas</span><strong>'+moneyBR(d.expense)+'</strong></div><div><span>Resultado</span><strong>'+moneyBR(d.result)+'</strong></div></div><div class="stack">'+d.categories.map(c=>'<div class="row"><div><strong>'+c.category+'</strong><small>'+(c.kind==="income"?"receita":"despesa")+'</small></div><div class="money '+c.kind+'">'+moneyBR(c.total)+'</div></div>').join("")+'</div>'}catch{$("#dreBody").innerHTML='<p class="muted">Não foi possível calcular o DRE.</p>'}
 }
 $("#dreMonth").onchange=loadDre;
-$("#payPendingCommissions").onclick=async e=>{const ids=String(e.currentTarget.dataset.ids||"").split(",").filter(Boolean);if(!ids.length)return;const total=Number(e.currentTarget.dataset.total||0);if(!window.confirm("Confirmar pagamento de "+ids.length+" comissões no total de "+moneyBR(total)+"?"))return;try{const out=await api("/api/commissions/pay",{method:"POST",body:JSON.stringify({ids})});await loadFinance();toast(out.count+" comissões pagas · "+moneyBR(out.total))}catch{toast("Não foi possível pagar as comissões")}};
+$("#payPendingCommissions").onclick=e=>{
+  const ids=String(e.currentTarget.dataset.ids||"").split(",").filter(Boolean);
+  if(!ids.length)return;
+  state.neCommissionIds=ids;
+  $("#commissionPayForm").reset();
+  $("#neCommissionPayDescription").textContent=ids.length+" comissões pendentes · total "+moneyBR(e.currentTarget.dataset.total||0)+". Confirme o método efetivamente utilizado.";
+  $("#commissionPayModal").showModal();
+};
+$("#commissionPayForm").onsubmit=async e=>{
+  e.preventDefault();
+  const form=e.target,method=form.elements.payment_method.value;
+  if(!state.neCommissionIds?.length){toast("Não há comissões selecionadas");return}
+  if(!window.confirm("Registrar essas "+state.neCommissionIds.length+" comissões como pagas?"))return;
+  try{
+    const out=await api("/api/commissions/pay",{method:"POST",body:JSON.stringify({ids:state.neCommissionIds,payment_method:method})});
+    state.neCommissionIds=[];form.reset();$("#commissionPayModal").close();await loadFinance();
+    toast(out.count+" comissões registradas · "+moneyBR(out.total));
+  }catch(err){toast(err.data?.error==="cash_session_required"?"Abra o caixa para pagar comissões em dinheiro":
+    err.data?.error==="insufficient_cash"?"O caixa não tem dinheiro suficiente para essas comissões":
+    err.data?.error==="commission_not_pending"?"Alguma comissão já foi paga. Atualize a lista.":"Não foi possível registrar as comissões")}
+};
 function purchaseRow(selected="",qty="",cost="",lot="",expiry=""){
   return '<div class="purchaseRow"><select class="purchaseProduct"><option value="">Produto…</option>'+state.products.map(p=>'<option value="'+p.id+'" '+(p.id===selected?'selected':'')+'>'+p.name+' ('+p.unit+')</option>').join("")+'</select><input class="purchaseQty" type="number" step="0.01" min="0.01" value="'+qty+'" placeholder="Qtd."><input class="purchaseCost" type="number" step="0.0001" min="0" value="'+cost+'" placeholder="R$/un"><input class="purchaseLot" value="'+lot+'" placeholder="Lote"><input class="purchaseExpiry" type="date" value="'+expiry+'"><button type="button" class="x purchaseRemove">×</button></div>';
 }
