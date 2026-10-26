@@ -15,9 +15,9 @@ function setup(){
   installPhase7(db);
   for(const [id,tenant,name] of [["ca","a","Ana"],["cb","a","Beatriz"],["cc","b","Outra empresa"]])
     db.prepare("insert into clients(id,tenant_id,name,allergies) values(?,?,?,?)").run(id,tenant,name,"");
-  db.prepare("insert into professionals(id,tenant_id,name) values('pa','a','Cabeleireira'),('pb','b','Profissional externo')");
-  db.prepare("insert into services(id,tenant_id,name) values('sa','a','Coloração'),('s2','a','Corte'),('sb','b','Serviço externo')");
-  db.prepare("insert into appointments(id,tenant_id,client_id,professional_id,service_id) values('aa','a','ca','pa','sa')");
+  db.prepare("insert into professionals(id,tenant_id,name) values('pa','a','Cabeleireira'),('pb','b','Profissional externo')").run();
+  db.prepare("insert into services(id,tenant_id,name) values('sa','a','Coloração'),('s2','a','Corte'),('sb','b','Serviço externo')").run();
+  db.prepare("insert into appointments(id,tenant_id,client_id,professional_id,service_id) values('aa','a','ca','pa','sa')").run();
   return db;
 }
 async function call(db,method,path,body={}){
