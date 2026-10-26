@@ -497,7 +497,7 @@ async function api(req,res,url){
     const targetTenant=tenantForWahaEvent(db,body);if(!targetTenant)return send(res,200,{ok:true,accepted:false,reason:"unmapped_session"});
     const receptionProfile=one("select enabled from agent_profiles where tenant_id=? and agent_key='receptionist'",[targetTenant]),receptionConfig=getAgentConfig(db,targetTenant,"receptionist");
     const defaultHandlingMode=WAHA_AGENT_ENABLED&&Number(receptionProfile?.enabled)!==0&&receptionConfig.service?.auto_activate_new_conversations!==false?"ai":"human";
-    const out=await ingestWahaEvent({db,tenantId:targetTenant,event:body,interpret,autoReply:WAHA_AGENT_ENABLED?receptionistAgentReply:null,defaultHandlingMode});
+    const out=await ingestWahaEvent({db,tenantId:targetTenant,event:body,interpret,autoReply:WAHA_AGENT_ENABLED?receptionistAgentReply:null,allowAi:WAHA_AGENT_ENABLED,defaultHandlingMode});
     return send(res,200,{ok:true,...out});
   }
 
