@@ -64,7 +64,7 @@ function cashOverview(db,tenant){
   if(!session)return {status:"closed",session:null,expected:0,by_method:[],withdrawals:0,movements:[]};
   const summary=all(db,"select payment_method,kind,count(*) count,sum(amount_cents) cents from financial_entries where tenant_id=? and cash_session_id=? and status='paid' group by payment_method,kind",[tenant,session.id]);
   const movements=all(db,"select id,kind,amount_cents,reason,created_at from cash_movements where tenant_id=? and cash_session_id=? order by created_at desc limit 30",[tenant,session.id]);
-  const withdrawals=movements.reduce((sum,m)=>sum+(m.kind==="withdrawal"?Number(m.amount_cents):0),0);
+  const withdrawals=Number(one(db,"select coalesce(sum(amount_cents),0) n from cash_movements where tenant_id=? and cash_session_id=? and kind='withdrawal'",[tenant,session.id])?.n||0);
   return {status:"open",session:{id:session.id,opened_at:session.opened_at,opening:Number(session.opening_cents)/100},
     expected:expectedCash(db,tenant,session.id)/100,
     by_method:summary.map(row=>({payment_method:row.payment_method||"other",kind:row.kind,count:row.count,total:Number(row.cents)/100})),
