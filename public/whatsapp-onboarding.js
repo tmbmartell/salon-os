@@ -47,6 +47,8 @@
         ? "Número vinculado. Envie e receba mensagens pela Central de Atendimento."
         : w.status === "UNASSIGNED"
         ? "A proprietária precisa cadastrar um identificador exclusivo para esta conexão."
+        : w.status === "UNAVAILABLE"
+        ? "O servidor WAHA não respondeu. Verifique conectividade, credenciais e logs do serviço."
         : !configured
         ? "O servidor WAHA ou suas credenciais ainda precisam ser configurados pelo administrador técnico."
         : "Prepare a sessão e escaneie o QR Code com o WhatsApp do salão.");
