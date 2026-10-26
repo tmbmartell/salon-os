@@ -6,7 +6,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="/styles.css">
-<link rel="stylesheet" href="/beauty-ui.css?v=4">
+<link rel="stylesheet" href="/beauty-ui.css?v=5">
 </head>
 <body>
 <div id="authGate" class="authGate">
@@ -317,43 +317,37 @@
     </section>
 
     <section id="inventory" class="view">
-      <div class="sectionTitle"><div><h2>Estoque & Consumo</h2><p>Quantidade real, mínimo, custo médio e consumo por serviço.</p></div><button class="primary" data-open="productModal">+ Produto</button></div>
-      <div class="metrics inventoryMetrics">
-        <article><span>Produtos</span><strong id="iProducts">—</strong><small>ativos</small></article>
-        <article><span>Estoque baixo</span><strong id="iLow">—</strong><small>pedem atenção</small></article>
-        <article><span>Consumo automático</span><strong>ON</strong><small>no fechamento</small></article>
-        <article><span>Receitas de serviço</span><strong id="iRecipes">—</strong><small>serviços configurados</small></article>
+      <div class="sectionTitle"><div><h2>Estoque Inteligente</h2><p>Consulta rápida. Abra apenas a área que precisa.</p></div><button class="primary" data-open="productModal">+ Produto</button></div>
+      <div class="ne-stock-action-grid" role="group" aria-label="Áreas do estoque">
+        <button type="button" class="ne-stock-action is-active" data-ne-stock-tab="products" aria-pressed="true"><span aria-hidden="true">▦</span><strong>Produtos</strong><small>Saldos e ajustes</small></button>
+        <button type="button" class="ne-stock-action" data-ne-stock-tab="recipes" aria-pressed="false"><span aria-hidden="true">◈</span><strong>Consumo por serviço</strong><small>Receitas e quantidades</small></button>
+        <button type="button" class="ne-stock-action" data-ne-stock-tab="movements" aria-pressed="false"><span aria-hidden="true">⇄</span><strong>Movimentações</strong><small>Entradas e saídas</small></button>
+        <button type="button" class="ne-stock-action" data-ne-stock-tab="lots" aria-pressed="false"><span aria-hidden="true">▤</span><strong>Lotes</strong><small>Validade e rastreio</small></button>
       </div>
-      <div id="productList" class="cards cols3"></div>
-      <article class="panel">
-        <div class="panelhead"><div><h2>Consumo padrão por serviço</h2><p>Defina quanto cada serviço deveria consumir.</p></div></div>
-        <div id="recipeServiceList" class="cards"></div>
-      </article>
-      <article class="panel">
-        <div class="panelhead"><div><h2>Extrato de estoque</h2><p>Compras, consumo em atendimento e ajustes manuais.</p></div></div>
-        <div id="stockMovementList" class="tableLike"></div>
-      </article>
-      <article class="panel">
-        <div class="panelhead"><div><h2>Lotes & validade</h2><p>O consumo prioriza automaticamente o lote que vence primeiro.</p></div></div>
-        <div id="lotList" class="tableLike"></div>
-      </article>
+      <div class="metrics inventoryMetrics">
+        <article><span>Produtos</span><strong id="iProducts">—</strong><small>cadastrados</small></article>
+        <article><span>Estoque baixo</span><strong id="iLow">—</strong><small>pedem reposição</small></article>
+        <article><span>Consumo na finalização</span><strong>✓</strong><small>conforme receita cadastrada</small></article>
+        <article><span>Serviços com receita</span><strong id="iRecipes">—</strong><small>com consumo previsto</small></article>
+      </div>
+      <section data-ne-stock-panel="products"><div class="ne-stock-section-title"><h3>Produtos e quantidades</h3><p>Abra um produto para consultar custo, unidade e registrar ajuste.</p></div><div id="productList" class="cards cols3"></div></section>
+      <section data-ne-stock-panel="recipes" class="hidden"><div class="ne-stock-section-title"><h3>Consumo padrão por serviço</h3><p>Configure quantidades em g, ml ou unidade. A quantidade real será confirmada no atendimento.</p></div><div id="recipeServiceList" class="cards"></div></section>
+      <section data-ne-stock-panel="movements" class="hidden"><article class="panel"><div class="panelhead"><div><h2>Extrato de estoque</h2><p>Compras, consumo e ajustes.</p></div></div><div id="stockMovementList" class="tableLike"></div></article></section>
+      <section data-ne-stock-panel="lots" class="hidden"><article class="panel"><div class="panelhead"><div><h2>Lotes e validade</h2><p>O controle usa primeiro os lotes com vencimento mais próximo, quando disponíveis.</p></div></div><div id="lotList" class="tableLike"></div></article></section>
     </section>
 
     <section id="suppliers" class="view">
-      <div class="sectionTitle"><div><h2>Fornecedores & Compras</h2><p>Contato, reposição, pedidos e recebimento de mercadoria.</p></div><div class="sectionActions"><button class="secondary" data-open="supplierModal">+ Fornecedor</button><button class="primary" data-open="purchaseModal">+ Pedido</button></div></div>
-      <div id="supplierList" class="cards cols3"></div>
-      <article class="panel">
-        <div class="panelhead"><div><h2>Reposição sugerida</h2><p>Produtos abaixo do mínimo e quantidade para voltar ao estoque ideal.</p></div></div>
-        <div id="purchaseSuggestionList" class="tableLike"></div>
-      </article>
-      <article class="panel">
-        <div class="panelhead"><div><h2>Pedidos de compra</h2><p>Do pedido até a entrada automática no estoque.</p></div></div>
-        <div id="purchaseList" class="tableLike"></div>
-      </article>
-      <article class="panel">
-        <div class="panelhead"><div><h2>Histórico de preços</h2><p>Quanto cada fornecedor cobrou pelo mesmo produto ao longo do tempo.</p></div></div>
-        <div id="supplierPriceList" class="tableLike"></div>
-      </article>
+      <div class="sectionTitle"><div><h2>Fornecedores e Compras</h2><p>Cadastre, reponha e acompanhe por cards.</p></div><div class="sectionActions"><button class="secondary" data-open="supplierModal">+ Fornecedor</button><button class="primary" data-open="purchaseModal">+ Pedido</button></div></div>
+      <div class="ne-stock-action-grid ne-buy-actions" role="group" aria-label="Áreas de compras">
+        <button type="button" class="ne-stock-action is-active" data-ne-purchase-tab="suppliers" aria-pressed="true"><span aria-hidden="true">♧</span><strong>Fornecedores</strong><small>Contatos e condições</small></button>
+        <button type="button" class="ne-stock-action" data-ne-purchase-tab="suggestions" aria-pressed="false"><span aria-hidden="true">!</span><strong>Reposição</strong><small>Estoque abaixo do mínimo</small></button>
+        <button type="button" class="ne-stock-action" data-ne-purchase-tab="orders" aria-pressed="false"><span aria-hidden="true">▣</span><strong>Pedidos</strong><small>Compras e recebimentos</small></button>
+        <button type="button" class="ne-stock-action" data-ne-purchase-tab="prices" aria-pressed="false"><span aria-hidden="true">↗</span><strong>Histórico de preços</strong><small>Comparar fornecedores</small></button>
+      </div>
+      <section data-ne-purchase-panel="suppliers"><div id="supplierList" class="cards cols3"></div></section>
+      <section data-ne-purchase-panel="suggestions" class="hidden"><article class="panel"><div class="panelhead"><div><h2>Reposição sugerida</h2><p>Quantidade necessária para recuperar o estoque ideal.</p></div></div><div id="purchaseSuggestionList" class="tableLike"></div></article></section>
+      <section data-ne-purchase-panel="orders" class="hidden"><article class="panel"><div class="panelhead"><div><h2>Pedidos de compra</h2><p>Pedido criado, recebido e incorporado ao estoque.</p></div></div><div id="purchaseList" class="tableLike"></div></article></section>
+      <section data-ne-purchase-panel="prices" class="hidden"><article class="panel"><div class="panelhead"><div><h2>Histórico de preços</h2><p>Comparação dos valores praticados por fornecedor.</p></div></div><div id="supplierPriceList" class="tableLike"></div></article></section>
     </section>
 
     <section id="packages" class="view">
@@ -600,7 +594,7 @@
 <dialog id="productModal"><form id="productForm" class="modalForm">
   <div class="modalHead"><div><h3>Novo produto</h3><p>Produto de consumo ou revenda.</p></div><button type="button" class="x" data-close>×</button></div>
   <label>Nome<input name="name" required></label><label>SKU / código<input name="sku"></label>
-  <div class="split"><label>Unidade<select name="unit"><option value="ml">ml</option><option value="g">g</option><option value="un">unidade</option><option value="dose">dose</option></select></label><label>Fornecedor<select name="supplier_id" id="productSupplier"><option value="">Sem fornecedor</option></select></label></div>
+  <div class="split"><label>Unidade<select name="unit"><option value="ml">ml</option><option value="g">g</option><option value="un">unidade (un)</option><option value="kg">quilograma (kg)</option><option value="l">litro (L)</option></select></label><label>Fornecedor<select name="supplier_id" id="productSupplier"><option value="">Sem fornecedor</option></select></label></div>
   <div class="split"><label>Estoque atual<input name="stock_qty" type="number" step="0.01" value="0"></label><label>Estoque mínimo<input name="min_qty" type="number" step="0.01" value="0"></label></div>
   <div class="split"><label>Estoque ideal<input name="ideal_qty" type="number" step="0.01" value="0"></label><label>Custo por unidade (R$)<input name="avg_cost" type="number" step="0.0001" value="0"></label></div>
   <div class="split"><label>Preço de revenda (R$)<input name="sale_price" type="number" step="0.01" min="0" value="0"></label><label>Comissão na revenda (%)<input name="sale_commission_pct" type="number" step="0.1" min="0" max="100" value="0"></label></div>
@@ -630,7 +624,7 @@
 <dialog id="stockAdjustModal"><form id="stockAdjustForm" class="modalForm">
   <div class="modalHead"><div><h3>Ajustar estoque</h3><p id="stockAdjustProduct">Produto</p></div><button type="button" class="x" data-close>×</button></div>
   <input name="product_id" type="hidden">
-  <label>Quantidade (+ entrada / - saída)<input name="qty" type="number" step="0.01" required></label>
+  <label id="neStockAdjustQtyLabel">Quantidade (+ entrada / − saída)<input name="qty" type="number" step="0.001" required></label>
   <label>Motivo<input name="reason" required placeholder="Ex.: contagem, perda, uso não registrado"></label>
   <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Aplicar ajuste</button></div>
 </form></dialog>
@@ -649,7 +643,7 @@
   <label>Forma de pagamento<select name="payment_method" id="checkoutPaymentMethod" required><option value="pix">Pix</option><option value="credit_card">Cartão de crédito</option><option value="debit_card">Cartão de débito</option><option value="cash">Dinheiro</option><option value="voucher">Voucher</option><option value="package">Pacote</option><option value="other">Outro</option></select></label>
   <label id="checkoutPackageWrap" class="hidden">Crédito do pacote<select name="client_package_id" id="checkoutPackage"><option value="">Selecione…</option></select><small id="checkoutPackageHint" class="muted"></small></label>
   <label>Desconto (R$)<input name="discount" id="checkoutDiscount" type="number" step="0.01" min="0" value="0"></label>
-  <div class="consumptionBox"><div class="panelhead"><div><strong>Consumo deste atendimento</strong><p>Use a média da cliente como referência e ajuste o que foi usado hoje.</p></div></div><div id="checkoutConsumption"></div></div>
+  <div class="consumptionBox"><div class="panelhead"><div><strong>Consumo deste atendimento</strong><p>Confirme ou corrija a quantidade real usada. A unidade segue o cadastro do produto.</p></div></div><div id="checkoutConsumption"></div><p id="neCheckoutStockHint" class="ne-stock-hint" role="status"></p></div>
   <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Finalizar e receber</button></div>
 </form></dialog>
 
@@ -857,7 +851,7 @@
 </form></dialog>
 
 <div id="toast" class="toast"></div>
-<script src="/app.js?v=193" type="module"></script>
+<script src="/app.js?v=194" type="module"></script>
 <script src="/beauty-ui.js?v=2" defer></script>
 <script src="/security-center.js?v=1" defer></script>
 <script src="/whatsapp-onboarding.js?v=1" defer></script>
