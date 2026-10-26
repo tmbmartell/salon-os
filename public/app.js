@@ -7,10 +7,10 @@ function toast(text){const t=$("#toast");t.textContent=text;t.classList.add("sho
 function esc(v=""){return String(v??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 function initials(n=""){return n.split(/\s+/).slice(0,2).map(x=>x[0]).join("").toUpperCase()}
 function statusLabel(s){return ({scheduled:"Agendado",confirmed:"Confirmado",arrived:"Chegou",in_service:"Em atendimento",completed:"Finalizado",cancelled:"Cancelado",no_show:"Não compareceu"})[s]||s}
-function activate(view){
+function activate(view,{skipTechnicalLoad=false}={}){
   $$(".view").forEach(v=>v.classList.toggle("active",v.id===view));$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
   const cfg={dashboard:["Visão geral","O que precisa da sua atenção hoje."],inbox:["Atendimento","WhatsApp, cliente e próxima ação no mesmo lugar."],agenda:["Agenda","O fluxo de atendimento sem conflito de pessoa ou recurso."],clients:["Clientes","Relacionamento e histórico em um só lugar."],people:["Gente","Clientes, equipe, relacionamento e agentes em um só lugar."],productsHub:["Produtos","Venda, estoque, serviços, pacotes e compras conectados."],marketing:["Marketing & Relacionamento","Captação, canais, campanhas e oportunidades de retorno."],technical:["Ficha Técnica","Fórmulas, procedimento e memória clínica da cliente."],team:["Equipe","Quem atende, quando e em quê."],services:["Serviços","Preço, tempo e comissão organizados."],packages:["Pacotes","Venda antecipada com créditos e validade."],retail:["PDV · Produtos","Venda de produtos integrada ao estoque e financeiro."],resources:["Recursos","Cadeiras, salas e equipamentos disponíveis."],finance:["Financeiro & Caixa","Dinheiro entrando e saindo, sem depender de planilha."],inventory:["Estoque & Consumo","Produto real, custo real e alerta antes de faltar."],suppliers:["Fornecedores","Quem vende, quanto demora e como comprar melhor."],retention:["Fidelização & Relacionamento","Pontos, indicações, aniversários e pós-atendimento."],ownerEye:["Olho do Dono","Inteligência prática para decidir antes do problema aparecer."],agents:["Funcionários Artificiais","Recepção, vendas, gestão, financeiro, compras e análise."],admin:["Administração","Backup, segurança, usuários e auditoria."],reports:["Relatórios & Exportação","Período, resultado e arquivos prontos para análise."],intelligence:["JEV · Inteligência","Decisões rápidas com custo controlado."]}[view]||["Salon OS",""];
-  $("#pageTitle").textContent=cfg[0];$("#pageSub").textContent=cfg[1];if(view==="agenda"){loadAgendaPhase2();loadWaitlist()}if(view==="team")loadStaff();if(view==="clients")loadClients();if(view==="technical")loadTechnical();if(view==="intelligence")loadReceipts();if(view==="inbox")loadInbox();if(view==="finance")loadFinance();if(view==="inventory")loadInventory();if(view==="suppliers")loadSuppliers();if(view==="packages")loadPackages();if(view==="retail")loadRetail();if(view==="retention")loadRetention();if(view==="ownerEye")loadOwnerEye();if(view==="agents")loadAgents();if(view==="admin")loadAdmin();if(view==="reports")loadReports();
+  $("#pageTitle").textContent=cfg[0];$("#pageSub").textContent=cfg[1];if(view==="agenda"){loadAgendaPhase2();loadWaitlist()}if(view==="team")loadStaff();if(view==="clients")loadClients();if(view==="technical"&&!skipTechnicalLoad)loadTechnical();if(view==="intelligence")loadReceipts();if(view==="inbox")loadInbox();if(view==="finance")loadFinance();if(view==="inventory")loadInventory();if(view==="suppliers")loadSuppliers();if(view==="packages")loadPackages();if(view==="retail")loadRetail();if(view==="retention")loadRetention();if(view==="ownerEye")loadOwnerEye();if(view==="agents")loadAgents();if(view==="admin")loadAdmin();if(view==="reports")loadReports();
 }
 $$("[data-view]").forEach(b=>b.onclick=()=>activate(b.dataset.view));$$("[data-jump]").forEach(b=>b.onclick=()=>activate(b.dataset.jump));$$("[data-open]").forEach(b=>b.onclick=()=>$("#"+b.dataset.open).showModal());$$("[data-close]").forEach(b=>b.onclick=()=>b.closest("dialog").close());$("#quickAppointment").onclick=()=>$("#appointmentModal").showModal();
 async function bootstrap(){const [boot,health]=await Promise.all([api("/api/bootstrap"),api("/api/health")]);state.health=health;state.user=boot.user;state.professionals=boot.professionals;state.services=boot.services;state.resources=boot.resources||[];state.dashboard=boot.dashboard;state.whatsapp=boot.whatsapp;$("#health").textContent=health.jev?"Sistema + JEV online":"Sistema online · JEV fallback";$("#jevState").textContent=health.jev?"JEV online":"fallback ativo";renderDashboard();renderTeam();renderServices();renderResources();await loadClients();fillSelects();updateWahaUi()}
@@ -121,7 +121,7 @@ function renderAgendaCards(){
   $$("[data-ne-technical]",$("#agendaList")).forEach(btn=>btn.onclick=async()=>{
     const a=state.agendaAppointments?.find(x=>x.id===btn.dataset.neTechnical);
     if(!a)return;
-    activate("technical");
+    activate("technical",{skipTechnicalLoad:true});
     await loadTechnical(a.client_id);
     const hidden=$("#neTechnicalAppointmentId");if(hidden)hidden.value=a.id;
     const client=$("#technicalFormClient"),service=$("#technicalService"),pro=$("#technicalProfessional");
@@ -142,7 +142,8 @@ async function changeAgendaStatus(id,status){
   }
 }
 async function loadAgenda(){
-  state.agendaAppointments=await api("/api/appointments");
+  const from=new Date(Date.now()-30*86400000).toISOString(),to=new Date(Date.now()+30*86400000).toISOString();
+  state.agendaAppointments=await api("/api/appointments?from="+encodeURIComponent(from)+"&to="+encodeURIComponent(to));
   renderAgendaCards();
 }
 $$("[data-ne-agenda-filter]").forEach(btn=>btn.onclick=()=>{state.neAgendaFilter=btn.dataset.neAgendaFilter;renderAgendaCards();decorateAgendaCheckout()});
@@ -635,8 +636,8 @@ async function loadTechnical(clientId=null){
       const service=esc(r.service_name||"Registro"),title=esc(r.title||"Ficha técnica");
       return '<details class="ne-technical-card"><summary><span class="ne-technical-icon" aria-hidden="true">▤</span><span class="ne-technical-title"><small>'+service+'</small><strong>'+title+'</strong><span>'+dateTimeBR(r.created_at)+'</span></span><span class="ne-service-arrow" aria-hidden="true">⌄</span></summary>'+
         '<div class="ne-technical-body">'+(r.professional_name?'<p><strong>Profissional:</strong> '+esc(r.professional_name)+'</p>':"")+
-        (r.formula?'<div class="technicalBlock"><strong>Fórmula</strong><p>'+esc(r.formula).replace(/\\n/g,"<br>")+'</p></div>':"")+
-        (r.observations?'<div class="technicalBlock"><strong>Observações</strong><p>'+esc(r.observations).replace(/\\n/g,"<br>")+'</p></div>':"")+
+        (r.formula?'<div class="technicalBlock"><strong>Fórmula</strong><p>'+esc(r.formula).replace(/\n/g,"<br>")+'</p></div>':"")+
+        (r.observations?'<div class="technicalBlock"><strong>Observações</strong><p>'+esc(r.observations).replace(/\n/g,"<br>")+'</p></div>':"")+
         (r.allergies_snapshot?'<p class="technicalAlert"><strong>Alergias/restrições registradas:</strong> '+esc(r.allergies_snapshot)+'</p>':"")+'</div></details>';
     }).join("")||'<article class="panel"><p class="muted">Ainda não há registro técnico para esta cliente.</p></article>';
     const add=$("#technical .sectionTitle [data-open]");if(add)add.style.display=state.user?.role==="reception"?"none":"";
