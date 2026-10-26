@@ -281,23 +281,101 @@ initAuth().catch(e=>{console.error(e);$("#health").textContent="Falha ao carrega
 
 function moneyBR(v){return fmt.format(Number(v||0))}
 function dateTimeBR(v){if(!v)return "—";return new Date(v).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}
-async function loadFinance(){
+const neFinanceIcons={pix:"Pix",cash:"Dinheiro",credit_card:"Crédito",debit_card:"Débito",voucher:"Voucher",other:"Outro"};
+function setFinanceTab(tab){
+  const allowed=["cash","entries","commissions","results"],active=allowed.includes(tab)?tab:"cash";
+  $$("[data-ne-finance-tab]").forEach(b=>{const yes=b.dataset.neFinanceTab===active;b.classList.toggle("is-active",yes);b.setAttribute("aria-pressed",String(yes))});
+  $$("[data-ne-finance-panel]").forEach(panel=>panel.classList.toggle("hidden",panel.dataset.neFinancePanel!==active));
+  if(active==="results")loadDre().catch(()=>{});
+}
+$$("[data-ne-finance-tab]").forEach(b=>b.addEventListener("click",()=>setFinanceTab(b.dataset.neFinanceTab)));
+$$("[data-ne-finance-action]").forEach(b=>b.addEventListener("click",()=>{
+  const kind=b.dataset.neFinanceAction;
+  const form=$("#financeEntryForm");
+  form.reset();form.elements.kind.value=kind;
+  form.elements.status.value="paid";
+  $("#financeEntryModal").showModal();
+}));
+function cashMethodCards(data){
+  const grouped=new Map();
+  for(const row of data.by_method||[]){
+    const key=row.payment_method||"other",record=grouped.get(key)||{in:0,out:0};
+    if(row.kind==="income")record.in+=Number(row.total||0);
+    else record.out+=Number(row.total||0);
+    grouped.set(key,record);
+  }
+  $("#neCashMethods").innerHTML=grouped.size?
+    [...grouped.entries()].map(([method,amount])=>'<div class="ne-cash-method"><small>'+esc(neFinanceIcons[method]||method)+'</small><strong>'+moneyBR(amount.in-amount.out)+'</strong><span>'+moneyBR(amount.in)+' entradas · '+moneyBR(amount.out)+' saídas</span></div>').join(""):
+    '<p class="muted">Nenhum recebimento ou pagamento associado a este caixa.</p>';
+}
+function showCashClose(cash){
+  state.neCashExpected=Number(cash?.expected||0);
+  $("#neCashCloseExpected").textContent="Saldo esperado em dinheiro: "+moneyBR(state.neCashExpected)+". Conte o dinheiro físico.";
+  const form=$("#cashCloseForm");form.reset();form.elements.actual.value="";
+  $("#neCashDifferencePreview").textContent="Informe o dinheiro contado para conferir a diferença.";
+  $("#cashCloseModal").showModal();
+}
+$("#cashCloseForm").elements.actual.addEventListener("input",e=>{
+  const v=e.target.value;
+  $("#neCashDifferencePreview").textContent=v.trim()===""?"Informe o valor realmente contado.":
+    "Diferença em relação ao esperado: "+moneyBR(Math.round((Number(v)-Number(state.neCashExpected||0))*100)/100)+
+    (Math.round((Number(v)-Number(state.neCashExpected||0))*100)!==0?" · justificativa obrigatória":" · valores conferem");
+});
+async function showCashHistory(){
+  const target=$("#neCashHistory");
+  if(!target.classList.contains("hidden")){target.classList.add("hidden");return}
+  target.classList.remove("hidden");
+  target.textContent="Consultando histórico...";
   try{
-    const data=await Promise.all([api("/api/phase2/dashboard"),api("/api/finance/entries"),api("/api/commissions"),api("/api/services/costs")]);
-    const d=data[0],entries=data[1],comm=data[2],costs=data[3];state.phase2=d;
-    $("#fIncome").textContent=moneyBR(d.todayIncome);$("#fExpense").textContent=moneyBR(d.todayExpense);$("#fNet").textContent=moneyBR(d.todayNet);$("#fCommission").textContent=moneyBR(d.pendingCommissions);$("#fCommissionCount").textContent=d.pendingCommissionsCount+" lançamentos";$("#fPayable").textContent=moneyBR(d.accountsPayable);$("#fPayableCount").textContent=d.accountsPayableCount+" pendências";
-    const cash=d.cash;$("#cashBadge").textContent=cash?"ABERTO":"FECHADO";$("#cashBadge").classList.toggle("ok",!!cash);
-    $("#cashStatusText").textContent=cash?"Aberto desde "+dateTimeBR(cash.opened_at):"Nenhum caixa aberto.";
-    $("#cashBody").innerHTML=cash?'<div class="cashNumber"><span>Esperado em dinheiro</span><strong>'+moneyBR(cash.expected)+'</strong></div><button class="primary" id="closeCashBtn">Fechar caixa</button>':'<p class="muted">Abra o caixa antes de receber pagamentos em dinheiro.</p><button class="primary" id="openCashBtn">Abrir caixa</button>';
-    if($("#openCashBtn"))$("#openCashBtn").onclick=()=>$("#cashOpenModal").showModal();
-    if($("#closeCashBtn"))$("#closeCashBtn").onclick=()=>{$("#cashCloseForm").elements.actual.value=Number(cash.expected||0).toFixed(2);$("#cashCloseModal").showModal()};
-    $("#financeList").innerHTML=entries.slice(0,30).map(x=>'<div class="tableRow"><div><strong>'+x.description+'</strong><small>'+x.category+' · '+(x.payment_method||"sem forma")+' · '+dateTimeBR(x.created_at)+'</small></div><div class="money '+x.kind+'">'+(x.kind==="expense"?"− ":"+ ")+moneyBR(x.amount)+'</div>'+(x.status==="paid"?'<span class="status paid">pago</span>':'<button type="button" class="secondary smallBtn" data-pay-entry="'+x.id+'">Pagar</button>')+'</div>').join("")||'<p class="muted">Sem movimentações ainda.</p>';
-    $$("[data-pay-entry]").forEach(b=>b.onclick=()=>payFinanceEntry(b.dataset.payEntry));
-    $("#commissionList").innerHTML=comm.slice(0,30).map(x=>'<div class="tableRow"><div><strong>'+x.professional_name+'</strong><small>'+x.client_name+' · '+x.service_name+'</small></div><div class="money">'+moneyBR(x.amount)+'</div><span class="status '+x.status+'">'+(x.status==="pending"?"pendente":"paga")+'</span></div>').join("")||'<p class="muted">Nenhuma comissão gerada ainda.</p>';
-    $("#payPendingCommissions").disabled=!comm.some(x=>x.status==="pending");$("#payPendingCommissions").dataset.ids=comm.filter(x=>x.status==="pending").map(x=>x.id).join(",");
-    $("#serviceCostList").innerHTML=costs.slice(0,8).map(x=>'<div class="row"><div><strong>'+x.service_name+'</strong><small>produto '+moneyBR(x.product_cost)+' · comissão '+moneyBR(x.commission)+'</small></div><div style="text-align:right"><strong>'+moneyBR(x.gross_margin)+'</strong><small>'+Number(x.gross_margin_pct||0).toFixed(1)+'% margem direta</small></div></div>').join("")||'<p class="muted">Configure produtos para calcular custo real.</p>';
-    await loadDre();
-  }catch(err){if(err.status!==403&&err.status!==401)toast("Não foi possível carregar o financeiro")}
+    const rows=await api("/api/cash/history");
+    target.innerHTML=rows.length?rows.map(x=>'<div class="ne-cash-history-row"><div><strong>'+esc(x.status==="open"?"Caixa aberto":"Fechamento")+'</strong><small>'+esc(dateTimeBR(x.opened_at))+' · '+(x.closed_at?esc(dateTimeBR(x.closed_at)):"em operação")+'</small></div><div><strong>'+(x.actual==null?"—":moneyBR(x.actual))+'</strong><small>'+(x.difference==null?"sem conferência":"diferença "+moneyBR(x.difference))+'</small></div></div>').join(""):'<p>Sem sessões registradas.</p>';
+  }catch{target.textContent="Não foi possível consultar o histórico."}
+}
+$("#neCashHistoryToggle").onclick=showCashHistory;
+async function loadFinance(){
+  const [dash,entries,comm,costs,cashInfo]=await Promise.all([
+    api("/api/phase2/dashboard").catch(()=>null),api("/api/finance/entries").catch(()=>null),
+    api("/api/commissions").catch(()=>null),api("/api/services/costs").catch(()=>null),
+    api("/api/cash/overview").catch(()=>null)
+  ]);
+  state.financeEntries=Array.isArray(entries)?entries:[];
+  state.phase2=dash;
+  if(dash){
+    $("#fIncome").textContent=moneyBR(dash.todayIncome);
+    $("#fExpense").textContent=moneyBR(dash.todayExpense);
+    $("#fNet").textContent=moneyBR(dash.todayNet);
+    $("#fCommission").textContent=moneyBR(dash.pendingCommissions);
+    $("#fCommissionCount").textContent=dash.pendingCommissionsCount+" lançamentos";
+    $("#fPayable").textContent=moneyBR(dash.accountsPayable);
+    $("#fPayableCount").textContent=dash.accountsPayableCount+" pendências";
+  }
+  const cash=cashInfo?.status==="open"?cashInfo:null;
+  $("#cashBadge").textContent=cash?"ABERTO":"FECHADO";
+  $("#cashBadge").classList.toggle("ok",!!cash);
+  $("#cashStatusText").textContent=cash?"Aberto desde "+dateTimeBR(cash.session.opened_at):cashInfo?"Nenhum caixa aberto.":"Acesso ao caixa indisponível.";
+  $("#cashBody").innerHTML=cash?'<div class="cashNumber"><span>Esperado em dinheiro</span><strong>'+moneyBR(cash.expected)+'</strong></div><button class="primary" id="closeCashBtn">Fechar caixa</button>':
+    '<p class="muted">Abra o caixa para registrar dinheiro físico.</p><button class="primary" id="openCashBtn" '+(cashInfo?"":"disabled")+'>Abrir caixa</button>';
+  if($("#openCashBtn"))$("#openCashBtn").onclick=()=>{$("#cashOpenForm").reset();$("#cashOpenModal").showModal()};
+  if($("#closeCashBtn"))$("#closeCashBtn").onclick=()=>showCashClose(cash);
+  $("#neCashWithdraw").disabled=!cash;
+  cashMethodCards(cash||{by_method:[]});
+  if(Array.isArray(entries)){
+    $("#financeList").innerHTML=entries.slice(0,45).map(x=>'<div class="tableRow"><div><strong>'+esc(x.description)+'</strong><small>'+esc(x.category||"outras")+' · '+esc(neFinanceIcons[x.payment_method]||"sem forma")+' · '+esc(dateTimeBR(x.created_at))+'</small></div><div class="money '+(x.kind==="expense"?"expense":"income")+'">'+(x.kind==="expense"?"− ":"+ ")+moneyBR(x.amount)+'</div>'+(x.status==="paid"?'<span class="status paid">pago</span>':'<button type="button" class="secondary smallBtn" data-pay-entry="'+esc(x.id)+'">Dar baixa</button>')+'</div>').join("")||'<p class="muted">Sem movimentações ainda.</p>';
+    $$("[data-pay-entry]",$("#financeList")).forEach(b=>b.onclick=()=>payFinanceEntry(b.dataset.payEntry));
+  }else $("#financeList").textContent="Sem permissão para consultar movimentações.";
+  if(Array.isArray(comm)){
+    $("#commissionList").innerHTML=comm.slice(0,40).map(x=>'<div class="tableRow"><div><strong>'+esc(x.professional_name||"Profissional")+'</strong><small>'+esc(x.client_name||"Cliente")+' · '+esc(x.service_name||"Serviço")+'</small></div><div class="money">'+moneyBR(x.amount)+'</div><span class="status '+(x.status==="pending"?"pending":"paid")+'">'+(x.status==="pending"?"pendente":"paga")+'</span></div>').join("")||'<p class="muted">Nenhuma comissão gerada.</p>';
+    const pending=comm.filter(x=>x.status==="pending");
+    $("#payPendingCommissions").disabled=!pending.length;
+    $("#payPendingCommissions").dataset.ids=pending.map(x=>x.id).join(",");
+    $("#payPendingCommissions").dataset.total=pending.reduce((a,x)=>a+Number(x.amount||0),0).toFixed(2);
+  }else{
+    $("#commissionList").textContent="Sem permissão para consultar comissões.";
+    $("#payPendingCommissions").disabled=true;
+  }
+  if(Array.isArray(costs)){
+    $("#serviceCostList").innerHTML=costs.slice(0,15).map(x=>'<div class="row"><div><strong>'+esc(x.service_name)+'</strong><small>Produto '+moneyBR(x.product_cost)+' · comissão '+moneyBR(x.commission)+'</small></div><div style="text-align:right"><strong>'+moneyBR(x.gross_margin)+'</strong><small>'+Number(x.gross_margin_pct||0).toFixed(1)+'% margem direta</small></div></div>').join("")||'<p class="muted">Configure produtos para calcular custo real.</p>';
+  }else $("#serviceCostList").textContent="Sem acesso aos custos financeiros.";
 }
 function showStockTab(type,id){
   const prefix=type==="inventory"?"stock":"purchase",other=prefix==="stock"?"products":"suppliers";
