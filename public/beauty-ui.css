@@ -265,3 +265,49 @@ body{background:var(--bg);color:var(--ink)}
 .ne-marketing-modal .modalForm{max-width:min(610px,100%)}
 @media(max-width:900px){.ne-marketing-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.ne-marketing-card{padding:12px;min-height:122px}.ne-marketing-entry summary img{width:64px;height:64px;flex-basis:64px}.ne-marketing-entry summary{min-height:84px}}
+
+/* Etapa 7 — Olho do Dono: visão inicial limpa com aprofundamento sob clique. */
+.ne-owner-status{font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5}
+.ne-owner-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin-bottom:20px}
+.ne-owner-kpi{min-width:0;min-height:158px;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:17px;padding:17px;display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-align:left;cursor:pointer;box-shadow:var(--shadow)}
+.ne-owner-kpi:hover,.ne-owner-kpi:focus-visible,.ne-owner-kpi.is-active{border-color:var(--accent);outline-offset:2px}
+.ne-owner-kpi.is-active{background:#eff6fe}
+.ne-owner-kpi-icon{display:grid;place-items:center;border-radius:11px;height:33px;width:33px;background:var(--soft);color:var(--accent);font-size:21px}
+.ne-owner-kpi small{font-size:11px;color:var(--muted);line-height:1.35}
+.ne-owner-kpi strong{font-size:24px;line-height:1.1;letter-spacing:-.04em;font-weight:790}
+.ne-owner-kpi>span:last-child{font-size:11px;color:var(--muted);line-height:1.45}
+.ne-owner-menu{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px}
+.ne-owner-menu-item{padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:13px;font-weight:650;cursor:pointer}
+.ne-owner-menu-item.is-active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ne-owner-menu-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[data-owner-panel]{background:#fff;border:1px solid var(--line);border-radius:17px;padding:18px;margin-bottom:14px}
+.ne-owner-panel-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+.ne-owner-panel-title h3{font-size:16px;margin:0 0 5px}
+.ne-owner-panel-title p{font-size:12px;line-height:1.5;color:var(--muted);margin:0}
+.ne-owner-alerts,.ne-owner-list{display:grid;gap:10px;margin-bottom:15px}
+.ne-owner-alert{display:flex;align-items:center;justify-content:space-between;gap:13px;background:var(--soft);padding:14px;border-radius:12px;border-left:3px solid var(--accent)}
+.ne-owner-alert.critical{border-left-color:#b54436}.ne-owner-alert.warning{border-left-color:#be7b12}
+.ne-owner-alert-content{display:grid;gap:4px;min-width:0}
+.ne-owner-alert-content strong{font-size:13px}.ne-owner-alert-content small{font-size:11px;color:var(--muted);line-height:1.4}
+.ne-owner-quick-actions{display:flex;gap:8px;flex-wrap:wrap}
+.ne-owner-calm{display:grid;gap:5px;padding:18px;background:var(--soft);border-radius:12px}
+.ne-owner-calm strong{font-size:13px}.ne-owner-calm p{font-size:12px;color:var(--muted);margin:0}
+.ne-owner-small-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:20px}
+.ne-owner-small-metrics>div{padding:14px;border:1px solid var(--line);background:#f8fbff;border-radius:13px;display:grid;gap:8px}
+.ne-owner-small-metrics small{font-size:11px;color:var(--muted)}.ne-owner-small-metrics strong{font-size:19px}
+.ne-owner-ranking-row{display:flex;gap:12px;align-items:center;padding:12px 13px;border:1px solid var(--line);border-radius:12px}
+.ne-owner-rank{height:28px;width:28px;display:grid;place-items:center;color:var(--accent);font-weight:750;background:var(--soft);border-radius:9px}
+.ne-owner-rank-name{display:grid;gap:3px;min-width:0;flex:1}
+.ne-owner-rank-name strong{font-size:13px;overflow-wrap:anywhere}
+.ne-owner-rank-name small{font-size:11px;color:var(--muted)}.ne-owner-ranking-row>strong{font-size:13px;text-align:right}
+.ne-owner-chart{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:6px;align-items:end;border-radius:13px;background:#f7faff;padding:20px 12px;height:210px;margin:0 0 18px}
+.ne-owner-bar-column{height:100%;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px}
+.ne-owner-bar{background:var(--accent);border-radius:6px 6px 2px 2px;min-height:3px;width:70%;max-width:40px}
+.ne-owner-bar-column small{font-size:9px;color:var(--muted);transform:rotate(-45deg);transform-origin:center;white-space:nowrap;margin-top:6px}
+.ne-owner-empty{font-size:12px;color:var(--muted);padding:16px;text-align:center}
+.ne-owner-definitions{border:1px solid var(--line);border-radius:13px;background:#fff;margin:12px 0 20px}
+.ne-owner-definitions summary{cursor:pointer;padding:15px;font-size:12px;font-weight:650}
+.ne-owner-definitions-body{padding:0 15px 15px}
+.ne-owner-definitions-body p{font-size:12px;line-height:1.55;color:var(--muted);margin:0 0 8px}
+@media(max-width:1080px){.ne-owner-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.ne-owner-kpis{gap:9px}.ne-owner-kpi{min-height:146px;padding:12px}.ne-owner-kpi strong{font-size:20px}[data-owner-panel]{padding:13px}.ne-owner-small-metrics{grid-template-columns:1fr}.ne-owner-alert{flex-direction:column;align-items:stretch}.ne-owner-chart{gap:2px;padding:14px 5px}.ne-owner-bar-column small{font-size:8px}.ne-owner-menu-item{flex:1 1 auto}}
