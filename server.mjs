@@ -13,6 +13,7 @@ import { installPhase3, handlePhase3Api } from "./phase3.mjs";
 import { installPhase4, ensureAgentProfiles, handlePhase4Api, getAgentConfig } from "./phase4.mjs";
 import { installPhase5, handlePhase5Api } from "./phase5.mjs";
 import { installPhase6, handlePhase6Api } from "./phase6.mjs";
+import { installMarketing, handleMarketingApi } from "./marketing.mjs";
 import { installPhase7, handlePhase7Api } from "./phase7.mjs";
 import { installPhase8, handlePhase8Api } from "./phase8.mjs";
 import { installPhase9, handlePhase9Api, staffWindowForDate } from "./phase9.mjs";
@@ -189,6 +190,7 @@ installPhase3(db);
 installPhase4(db);
 installPhase5(db);
 installPhase6(db);
+installMarketing(db);
 installPhase7(db);
 installPhase8(db);
 installPhase9(db);
@@ -544,6 +546,14 @@ async function api(req,res,url){
   if(phase5Result!==false)return phase5Result;
   const phase6Result=await handlePhase6Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit});
   if(phase6Result!==false)return phase6Result;
+  const marketingResult=await handleMarketingApi({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit,
+    storageDir:path.join(path.dirname(DB_PATH),"marketing-assets"),
+    sendImage:(response,buffer,mime)=>{
+      response.writeHead(200,{...baseSecurityHeaders(),"content-type":mime,"content-length":buffer.length,
+        "content-disposition":"inline","cache-control":"private, no-store"});
+      response.end(buffer);
+    }});
+  if(marketingResult!==false)return marketingResult;
   const phase7Result=await handlePhase7Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit});
   if(phase7Result!==false)return phase7Result;
   const phase8Result=await handlePhase8Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit});

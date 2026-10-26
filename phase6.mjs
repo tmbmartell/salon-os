@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { scheduleServicePostcare } from "./marketing.mjs";
 
 const uid=()=>crypto.randomUUID();
 const now=()=>new Date().toISOString();
@@ -42,8 +43,14 @@ export function afterCheckoutRetention(db,tenant,appointment,userId,checkout){
   if(checkoutId)addPoints(db,tenant,appointment.client_id,points,"Atendimento concluído","checkout",checkoutId,userId);
   const client=one(db,"select name from clients where id=? and tenant_id=?",[appointment.client_id,tenant]);
   const first=String(client?.name||"").split(/\s+/)[0]||"";
-  const due=new Date(Date.now()+24*3600000).toISOString();
-  addEngagement(db,tenant,{clientId:appointment.client_id,appointmentId:appointment.id,kind:"postcare",title:"Pós-atendimento de "+(client?.name||"cliente"),message:"Oi, "+first+"! Passando para saber como você está depois do atendimento de ontem. Ficou tudo bem? 💛",dueAt:due,dedupeKey:"postcare-"+appointment.id,userId});
+  // Uma regra ativa do serviço substitui o lembrete genérico, nunca envia mensagem.
+  const customRuleApplied=scheduleServicePostcare(db,tenant,appointment,userId);
+  if(!customRuleApplied){
+    const due=new Date(Date.now()+24*3600000).toISOString();
+    addEngagement(db,tenant,{clientId:appointment.client_id,appointmentId:appointment.id,kind:"postcare",title:"Pós-atendimento de "+(client?.name||"cliente"),
+      message:"Oi, "+first+"! Passando para saber como você está depois do atendimento de ontem. Ficou tudo bem? 💛",
+      dueAt:due,dedupeKey:"postcare-"+appointment.id,userId});
+  }
   const referral=one(db,"select * from referrals where tenant_id=? and referred_client_id=? and status='pending'",[tenant,appointment.client_id]);
   if(referral){
     const previous=Number(one(db,"select count(*) n from checkout_records cr join appointments a on a.id=cr.appointment_id where cr.tenant_id=? and a.client_id=? and cr.id<>?",[tenant,appointment.client_id,checkoutId])?.n||0);
