@@ -87,3 +87,31 @@ test("pendência só recebe baixa com forma escolhida, sem duplicidade",async()=
     assert.equal(db.prepare("select count(*) n from financial_entries where status='paid'").get().n,1);
   }finally{db.close()}
 });
+
+test("comissões são registradas com método correto, sem caixa negativo ou dupla baixa",async()=>{
+  const db=fixture();
+  try{
+    assert.equal((await call(db,"POST","/api/cash/open",{opening:80})).status,201);
+    const sql="insert into commissions(id,tenant_id,appointment_id,professional_id,service_id,gross_cents,pct,amount_cents,status,created_at) values(?,?,?,?,?,?,?,?,?,?)";
+    for(const [id,value] of [["com1",6000],["com2",3000]]){
+      db.prepare(sql).run(id,"a","ap1","prof1","serv1",20000,30,value,"pending",new Date().toISOString());
+    }
+    const invalid=await call(db,"POST","/api/commissions/pay",{ids:["com1"],payment_method:""});
+    assert.equal(invalid.status,400);
+    const tooMuch=await call(db,"POST","/api/commissions/pay",{ids:["com1","com2"],payment_method:"cash"});
+    assert.equal(tooMuch.status,409);
+    assert.equal(db.prepare("select count(*) n from commissions where status='paid'").get().n,0);
+    const first=await call(db,"POST","/api/commissions/pay",{ids:["com1"],payment_method:"cash"});
+    assert.equal(first.status,200);
+    assert.equal(first.data.total,60);
+    assert.equal((await call(db,"GET","/api/cash/overview")).data.expected,20);
+    assert.equal((await call(db,"POST","/api/commissions/pay",{ids:["com2"],payment_method:"cash"})).status,409);
+    const second=await call(db,"POST","/api/commissions/pay",{ids:["com2"],payment_method:"pix"});
+    assert.equal(second.status,200);
+    assert.equal((await call(db,"GET","/api/cash/overview")).data.expected,20);
+    assert.equal((await call(db,"POST","/api/commissions/pay",{ids:["com1"],payment_method:"pix"})).status,409);
+    assert.equal((await call(db,"POST","/api/commissions/pay",{ids:["com1"],payment_method:"pix"},"b")).status,409);
+    assert.equal(db.prepare("select count(*) n from financial_entries where category='commissions'").get().n,2);
+    assert.equal(db.prepare("select coalesce(sum(amount_cents),0) n from financial_entries where category='commissions' and payment_method='cash'").get().n,6000);
+  }finally{db.close()}
+});
