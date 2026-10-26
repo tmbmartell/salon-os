@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check server.mjs && node --check auth.mjs && node --check whatsapp.mjs && node --check phase7.mjs && node --check appointment-status.mjs && node --check public/app.js && node --check public/appointment-ui.js && node --check public/beauty-ui.js && node --check public/security-center.js && node --check public/whatsapp-onboarding.js",
+    "check": "node --check server.mjs && node --check auth.mjs && node --check whatsapp.mjs && node --check phase7.mjs && node --check appointment-status.mjs && node --check inventory-rules.mjs && node --check public/app.js && node --check public/appointment-ui.js && node --check public/beauty-ui.js && node --check public/security-center.js && node --check public/whatsapp-onboarding.js",
     "test": "node --test tests/*.test.mjs"
   },
   "engines": {
