@@ -35,11 +35,17 @@ export function installWhatsApp(db){
 }
 export function normalizePhone(v=""){return String(v).replace(/\D/g,"").replace(/^0+/,"")}
 export function registerTenantSession(db,tenantId,session=SESSION){
+  if(!/^[a-zA-Z0-9_-]{3,60}$/.test(session))throw Object.assign(new Error("invalid_whatsapp_session_name"),{status:400});
   const ts=new Date().toISOString();
-  const owner=db.prepare("select tenant_id from whatsapp_tenant_sessions where session=? limit 1").get(session);
-  if(owner&&owner.tenant_id!==tenantId)throw Object.assign(new Error("whatsapp_session_belongs_to_another_tenant"),{status:409});
-  db.prepare("insert into whatsapp_tenant_sessions(tenant_id,session,active,created_at,updated_at) values(?,?,1,?,?) on conflict(session) do update set active=1,updated_at=excluded.updated_at where whatsapp_tenant_sessions.tenant_id=excluded.tenant_id").run(tenantId,session,ts,ts);
-  return session;
+  db.exec("BEGIN IMMEDIATE");
+  try{
+    const owner=db.prepare("select tenant_id from whatsapp_tenant_sessions where session=? limit 1").get(session);
+    if(owner&&owner.tenant_id!==tenantId)throw Object.assign(new Error("whatsapp_session_belongs_to_another_tenant"),{status:409});
+    db.prepare("update whatsapp_tenant_sessions set active=0,updated_at=? where tenant_id=? and session<>?").run(ts,tenantId,session);
+    db.prepare("insert into whatsapp_tenant_sessions(tenant_id,session,active,created_at,updated_at) values(?,?,1,?,?) on conflict(session) do update set active=1,updated_at=excluded.updated_at where whatsapp_tenant_sessions.tenant_id=excluded.tenant_id").run(tenantId,session,ts,ts);
+    db.exec("COMMIT");
+    return session;
+  }catch(e){db.exec("ROLLBACK");throw e}
 }
 export function sessionForTenant(db,tenantId){
   return db.prepare("select session from whatsapp_tenant_sessions where tenant_id=? and active=1 order by updated_at desc limit 1").get(tenantId)?.session||"";
