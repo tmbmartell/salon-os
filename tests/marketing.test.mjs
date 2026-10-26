@@ -63,7 +63,7 @@ test("campanhas por salão têm estados e não geram disparos",async()=>{
       body:{title:"Semana da cor",category:"promotion",message:"Oferta do salão",status:"ready"}});
     assert.equal(campaign.status,201);
     assert.equal(campaign.data.status,"ready");
-    assert.equal((await route(db,{tenant:"b",storageDir:dir})).length,0);
+    assert.equal((await route(db,{tenant:"b",storageDir:dir})).data.length,0);
     const foreign=await route(db,{method:"PATCH",url:"/api/marketing/campaigns/"+campaign.data.id,
       tenant:"b",storageDir:dir,body:{status:"archived"}});
     assert.equal(foreign.status,404);
