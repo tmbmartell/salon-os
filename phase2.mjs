@@ -31,6 +31,8 @@ export function installPhase2(db){
     "CREATE TABLE IF NOT EXISTS purchase_items(id TEXT PRIMARY KEY,purchase_id TEXT NOT NULL,product_id TEXT NOT NULL,qty REAL NOT NULL,unit_cost_cents REAL NOT NULL,total_cents INTEGER NOT NULL)",
     "CREATE INDEX IF NOT EXISTS idx_purchases_tenant ON purchases(tenant_id,status,created_at)"
   ].join(";"));
+  const productCols=db.prepare("pragma table_info(products)").all().map(x=>x.name);
+  if(!productCols.includes("sale_commission_pct"))db.exec("alter table products add column sale_commission_pct REAL NOT NULL DEFAULT 0");
   const purchaseCols=db.prepare("pragma table_info(purchase_items)").all().map(x=>x.name);
   if(!purchaseCols.includes("lot_code"))db.exec("alter table purchase_items add column lot_code TEXT");
   if(!purchaseCols.includes("expiry_date"))db.exec("alter table purchase_items add column expiry_date TEXT");
