@@ -36,11 +36,13 @@ export function installWhatsApp(db){
 export function normalizePhone(v=""){return String(v).replace(/\D/g,"").replace(/^0+/,"")}
 export function registerTenantSession(db,tenantId,session=SESSION){
   const ts=new Date().toISOString();
-  db.prepare("insert into whatsapp_tenant_sessions(tenant_id,session,active,created_at,updated_at) values(?,?,1,?,?) on conflict(session) do update set tenant_id=excluded.tenant_id,active=1,updated_at=excluded.updated_at").run(tenantId,session,ts,ts);
+  const owner=db.prepare("select tenant_id from whatsapp_tenant_sessions where session=? limit 1").get(session);
+  if(owner&&owner.tenant_id!==tenantId)throw Object.assign(new Error("whatsapp_session_belongs_to_another_tenant"),{status:409});
+  db.prepare("insert into whatsapp_tenant_sessions(tenant_id,session,active,created_at,updated_at) values(?,?,1,?,?) on conflict(session) do update set active=1,updated_at=excluded.updated_at where whatsapp_tenant_sessions.tenant_id=excluded.tenant_id").run(tenantId,session,ts,ts);
   return session;
 }
 export function sessionForTenant(db,tenantId){
-  return db.prepare("select session from whatsapp_tenant_sessions where tenant_id=? and active=1 order by updated_at desc limit 1").get(tenantId)?.session||SESSION;
+  return db.prepare("select session from whatsapp_tenant_sessions where tenant_id=? and active=1 order by updated_at desc limit 1").get(tenantId)?.session||"";
 }
 export function tenantForWahaEvent(db,event){
   const session=String(event?.session||"");
@@ -62,6 +64,7 @@ async function request(path,init={},allow404=false){
   return r;
 }
 export async function wahaStatus(session=SESSION){
+  if(!session)return {...wahaConfigStatus(),session:"",configured:false,connected:false,status:"UNASSIGNED"};
   const config={...wahaConfigStatus(),session};
   if(!config.configured)return {...config,connected:false,status:"NOT_CONFIGURED"};
   try{
@@ -76,6 +79,7 @@ function sessionPayload(session=SESSION){
   return {name:session,config:{webhooks}};
 }
 export async function ensureWahaSession(session=SESSION){
+  if(!session)throw new Error("whatsapp_session_unassigned");
   if(!wahaConfigured())throw new Error("waha_not_configured");
   const current=await wahaStatus(session),payload=sessionPayload(session);
   if(current.status==="MISSING")await request("/api/sessions",{method:"POST",body:JSON.stringify(payload)});
@@ -85,6 +89,7 @@ export async function ensureWahaSession(session=SESSION){
   return wahaStatus(session);
 }
 export async function wahaQr(session=SESSION){
+  if(!session)throw new Error("whatsapp_session_unassigned");
   if(!wahaConfigured())throw new Error("waha_not_configured");
   const r=await request("/api/"+encodeURIComponent(session)+"/auth/qr",{headers:{Accept:"application/json,image/png"}});
   const contentType=(r.headers.get("content-type")||"").split(";")[0];
@@ -104,6 +109,7 @@ export function normalizeWahaMessageId(v){
   return String(v);
 }
 export async function sendText(target,text,session=SESSION){
+  if(!session)throw new Error("whatsapp_session_unassigned");
   const raw=String(target||"").trim(),chatId=raw.includes("@")?raw:normalizePhone(raw)+"@c.us";
   const r=await request("/api/sendText",{method:"POST",body:JSON.stringify({session,chatId,text:String(text),linkPreview:false})});
   const j=await r.json();
@@ -166,7 +172,7 @@ function chatName(chat,phone){
   return String(chat?.name||chat?.formattedTitle||chat?.pushName||("WhatsApp "+String(phone).slice(-4))).trim().slice(0,160);
 }
 export async function syncWahaHistory(db,tenantId,{chatLimit=40,messageLimit=80}={}){
-  const session=sessionForTenant(db,tenantId),safeChats=Math.max(1,Math.min(120,Number(chatLimit||40))),safeMsgs=Math.max(1,Math.min(200,Number(messageLimit||80)));
+  const session=sessionForTenant(db,tenantId);if(!session)throw new Error("whatsapp_session_unassigned");const safeChats=Math.max(1,Math.min(120,Number(chatLimit||40))),safeMsgs=Math.max(1,Math.min(200,Number(messageLimit||80)));
   const chatsResp=await request("/api/"+encodeURIComponent(session)+"/chats?limit="+safeChats+"&sortOrder=DESC");
   const chats=await chatsResp.json(),stats={chats_seen:0,chats_imported:0,messages_imported:0,skipped:0};
   for(const chat of Array.isArray(chats)?chats:[]){
