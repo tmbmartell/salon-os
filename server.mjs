@@ -25,6 +25,8 @@ const HOST=process.env.HOST||"127.0.0.1";
 const DB_PATH=process.env.SALON_DB||path.join(__dirname,"data","salon.sqlite");
 const JEV_BASE=String(process.env.JEV_CONTROL_PLANE_URL||"http://100.68.82.8:9320").replace(/\/+$/,"");
 const DEFAULT_TENANT="11111111-1111-4111-8111-111111111111";
+// IA do WhatsApp desligada até homologação explícita da etapa de agentes.
+const WAHA_AGENT_ENABLED=process.env.NOVAGENTE_ENABLE_RECEPTIONIST_AI==="true";
 
 fs.mkdirSync(path.dirname(DB_PATH),{recursive:true});
 const db=new DatabaseSync(DB_PATH);
@@ -180,7 +182,7 @@ ensureSeed();
 installAuth(db);
 installWhatsApp(db);
 installLlmConfig(db);
-registerTenantSession(db,DEFAULT_TENANT);
+if(!sessionForTenant(db,DEFAULT_TENANT))registerTenantSession(db,DEFAULT_TENANT);
 installPhase2(db);
 installPhase3(db);
 installPhase4(db);
@@ -494,8 +496,8 @@ async function api(req,res,url){
     if(!verifyWebhook(raw,signature,algorithm))return send(res,401,{error:"invalid_webhook_signature"});
     const targetTenant=tenantForWahaEvent(db,body);if(!targetTenant)return send(res,200,{ok:true,accepted:false,reason:"unmapped_session"});
     const receptionProfile=one("select enabled from agent_profiles where tenant_id=? and agent_key='receptionist'",[targetTenant]),receptionConfig=getAgentConfig(db,targetTenant,"receptionist");
-    const defaultHandlingMode=Number(receptionProfile?.enabled)!==0&&receptionConfig.service?.auto_activate_new_conversations!==false?"ai":"human";
-    const out=await ingestWahaEvent({db,tenantId:targetTenant,event:body,interpret,autoReply:receptionistAgentReply,defaultHandlingMode});
+    const defaultHandlingMode=WAHA_AGENT_ENABLED&&Number(receptionProfile?.enabled)!==0&&receptionConfig.service?.auto_activate_new_conversations!==false?"ai":"human";
+    const out=await ingestWahaEvent({db,tenantId:targetTenant,event:body,interpret,autoReply:WAHA_AGENT_ENABLED?receptionistAgentReply:null,allowAi:WAHA_AGENT_ENABLED,defaultHandlingMode});
     return send(res,200,{ok:true,...out});
   }
 
@@ -690,6 +692,20 @@ async function api(req,res,url){
   }
 
   if(req.method==="GET"&&url.pathname==="/api/conversations"){guard("conversations.read");return send(res,200,listConversations(db,tenant))}
+  const clientContextRoute=routeMatch(url.pathname,"/api/conversations/:id/client-context");
+  if(req.method==="GET"&&clientContextRoute){
+    guard("conversations.read");guard("clients.read");
+    const co=one("select id,client_id from conversations where id=? and tenant_id=?",[clientContextRoute.id,tenant]);
+    if(!co)return send(res,404,{error:"conversation_not_found"});
+    if(!co.client_id)return send(res,200,{client:null,appointments:[]});
+    const client=one("select id,name,phone,tags,source from clients where id=? and tenant_id=?",[co.client_id,tenant]);
+    if(!client)return send(res,200,{client:null,appointments:[]});
+    const visits=all(`select a.id,a.start_at,a.status,s.name service_name,p.name professional_name
+      from appointments a left join services s on s.id=a.service_id and s.tenant_id=a.tenant_id
+      left join professionals p on p.id=a.professional_id and p.tenant_id=a.tenant_id
+      where a.tenant_id=? and a.client_id=? order by a.start_at desc limit 5`,[tenant,co.client_id]);
+    return send(res,200,{client:{...client,tags:jparse(client.tags,[])},appointments:visits});
+  }
   if(req.method==="GET"&&url.pathname==="/api/conversations/options"){
     guard("conversations.read");
     const users=all("select id,name,role from users where tenant_id=? and active=1 order by name",[tenant]);
@@ -715,6 +731,7 @@ async function api(req,res,url){
     guard("conversations.write");
     const b=await parseBody(req),mode=safeText(b.mode,16);
     if(!["human","ai"].includes(mode))return send(res,400,{error:"invalid_mode"});
+    if(mode==="ai"&&!WAHA_AGENT_ENABLED)return send(res,403,{error:"ai_not_enabled"});
     const info=run("update conversations set handling_mode=?,handling_mode_source='manual',updated_at=? where id=? and tenant_id=?",[mode,now(),modeRoute.id,tenant]);
     if(!info.changes)return send(res,404,{error:"conversation_not_found"});
     audit(db,user,"conversation.mode","conversation",modeRoute.id,{mode});
@@ -736,7 +753,20 @@ async function api(req,res,url){
       return send(res,200,{ok:true,...out});
     }catch(e){return send(res,503,{error:"whatsapp_sync_failed",detail:String(e.message||e).slice(0,180)})}
   }
-  if(req.method==="GET"&&url.pathname==="/api/whatsapp/status"){guard("conversations.read");return send(res,200,await wahaStatus(sessionForTenant(db,tenant)))}
+  if(req.method==="GET"&&url.pathname==="/api/whatsapp/status"){
+    guard("conversations.read");
+    const activeSession=sessionForTenant(db,tenant);
+    return send(res,200,{...await wahaStatus(activeSession),session:activeSession,ai_enabled:WAHA_AGENT_ENABLED});
+  }
+  if(req.method==="POST"&&url.pathname==="/api/whatsapp/session/link"){
+    if(user.role!=="owner")return send(res,403,{error:"owner_only"});
+    const b=await parseBody(req),session=safeText(b.session,64);
+    try{
+      const linked=registerTenantSession(db,tenant,session);
+      audit(db,user,"whatsapp.session.link","whatsapp",null,{session:linked});
+      return send(res,200,{ok:true,session:linked,...await wahaStatus(linked),ai_enabled:WAHA_AGENT_ENABLED});
+    }catch(e){return send(res,e.status||400,{error:String(e.message||"session_link_failed")})}
+  }
   if(req.method==="POST"&&url.pathname==="/api/whatsapp/session/prepare"){
     if(!["owner","manager"].includes(user.role))return send(res,403,{error:"forbidden"});
     try{const session=sessionForTenant(db,tenant),out=await ensureWahaSession(session);audit(db,user,"whatsapp.session.prepare","whatsapp",null,{status:out.status,session});return send(res,200,out)}

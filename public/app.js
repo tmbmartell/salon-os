@@ -46,10 +46,10 @@ $("#serviceForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntri
 $("#appointmentForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));b.tags=appointmentUi.tags();b.items=appointmentUi.items();try{await api("/api/appointments",{method:"POST",body:JSON.stringify(b)});$("#appointmentModal").close();e.target.reset();appointmentUi.reset();fillSelects();await loadAgendaPhase2();state.dashboard=await api("/api/dashboard");renderDashboard();toast("Agendamento criado")}catch(err){const c=err.data?.error;toast(c==="professional_time_conflict"?(err.data?.professional||"Esse profissional")+" já está ocupado":c==="resource_time_conflict"?(err.data.resource||"Esse recurso")+" já está ocupado":c==="invalid_custom_service"?"Preencha nome, duração e valor do serviço avulso":"Erro ao agendar")}};
 
 function updateWahaUi(){
-  const w=state.whatsapp||{},label=w.connected?"WhatsApp conectado":w.configured?(w.status||"WAHA pronto"):"WAHA aguardando configuração";
+  const w=state.whatsapp||{},label=w.connected?"WhatsApp conectado":w.status==="UNASSIGNED"?"Vincule o WhatsApp":w.configured?(w.status||"WAHA aguardando QR"):"WAHA sem configuração";
   $("#whatsappBadge").textContent=label;$("#whatsappBadge").classList.toggle("ok",!!w.connected);
-  $("#waSetupText").textContent=w.connected?"Sessão "+(w.session||"salon-os")+" conectada e pronta para atendimento.":w.configured?"Sessão "+(w.session||"salon-os")+" encontrada. Prepare e escaneie o QR se necessário.":"O adaptador está pronto, mas a chave/sessão do WAHA ainda não foi vinculada ao Salon OS.";
-  $("#prepareWaha").disabled=!w.configured;$("#showQr").disabled=!w.configured;
+  $("#waSetupText").textContent=w.connected?"Sessão "+w.session+" conectada. Atendimento humano disponível.":w.status==="UNASSIGNED"?"É necessário vincular uma sessão exclusiva a este salão.":w.configured?"Sessão "+w.session+" cadastrada. Prepare a conexão e escaneie o QR Code.":"Conectividade WAHA indisponível ou credenciais não configuradas.";
+  $("#prepareWaha").disabled=!w.configured||!w.session||!["owner","manager"].includes(state.user?.role);$("#showQr").disabled=!w.configured||!w.session||!["owner","manager"].includes(state.user?.role);
 }
 const convStatusName={open:"Aberta",pending:"Pendente",resolved:"Resolvida"};
 const convPriorityName={normal:"Normal",high:"Alta",urgent:"Urgente"};
@@ -82,7 +82,7 @@ function renderConversationList(){
 }
 function updateChatModeButton(){
   const b=$("#chatModeButton"),co=state.selectedConversation;if(!b||!co)return;
-  const ai=co.handling_mode==="ai";b.textContent=ai?"Recepcionista IA":"Humano";b.classList.toggle("aiOn",ai);
+  const ai=co.handling_mode==="ai";b.textContent=state.whatsapp?.ai_enabled===true?(ai?"Recepcionista IA":"Humano"):"Atendimento humano";b.disabled=state.whatsapp?.ai_enabled!==true;b.title=b.disabled?"Agente de atendimento será habilitado em uma etapa futura.":"";b.classList.toggle("aiOn",ai);
 }
 function renderConversationDetail(){
   const co=state.selectedConversation;
@@ -110,7 +110,36 @@ async function openConversation(cid){
   const msgs=await api("/api/conversations/"+cid+"/messages");co.unread_count=0;renderConversationList();
   $("#messageList").innerHTML=msgs.map(m=>'<div class="message '+(m.direction==="out"?"out":"in")+'"><div>'+esc(m.body).replace(/\n/g,"<br>")+'</div><small>'+new Date(m.created_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+(m.direction==="out"?" · "+esc(m.delivery_status):"")+'</small></div>').join("")||'<div class="muted">Conversa sem mensagens.</div>';
   $("#messageList").scrollTop=$("#messageList").scrollHeight;
+  loadConversationClientContext(cid);
 }
+async function loadConversationClientContext(cid){
+  const area=$("#neClientContext");if(!area)return;
+  area.replaceChildren();
+  try{
+    const data=await api("/api/conversations/"+encodeURIComponent(cid)+"/client-context");
+    if(state.selectedConversation?.id!==cid)return;
+    const heading=document.createElement("strong");heading.textContent="Atendimentos anteriores";
+    area.append(heading);
+    const appts=Array.isArray(data.appointments)?data.appointments:[];
+    if(!appts.length){const p=document.createElement("p");p.textContent="Esta cliente ainda não possui atendimentos registrados.";area.append(p);return}
+    for(const ap of appts){
+      const item=document.createElement("div");item.className="ne-client-appointment";
+      const title=document.createElement("strong");title.textContent=ap.service_name||"Serviço";
+      const detail=document.createElement("small");const dt=new Date(ap.start_at);
+      detail.textContent=(Number.isNaN(dt.valueOf())?"Data não disponível":dt.toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}))+" · "+(ap.professional_name||"Sem profissional")+" · "+(ap.status||"");
+      item.append(title,detail);area.append(item);
+    }
+  }catch{if(state.selectedConversation?.id===cid)area.textContent="Não foi possível consultar o histórico desta cliente."}
+}
+$("#scheduleFromChat").onclick=async()=>{
+  const co=state.selectedConversation;if(!co?.client_id){toast("Associe esta conversa a uma cliente para agendar");return}
+  const sel=$("#apClient");if(!sel)return;
+  const clientLabel=co.client_name||"Cliente";
+  if(![...sel.options].some(o=>o.value===co.client_id))sel.add(new Option(clientLabel,co.client_id));
+  sel.value=co.client_id;
+  sel.dispatchEvent(new Event("change",{bubbles:true}));
+  $("#appointmentModal").showModal();
+};
 $("#refreshInbox").onclick=loadInbox;
 $("#syncWhatsappHistory").onclick=async()=>{const b=$("#syncWhatsappHistory");b.disabled=true;b.textContent="Sincronizando…";try{const out=await api("/api/whatsapp/sync",{method:"POST",body:JSON.stringify({chat_limit:40,message_limit:80})});await loadInbox();toast("Sincronizado · "+out.chats_imported+" conversas · "+out.messages_imported+" mensagens")}catch{toast("Não foi possível sincronizar o histórico")}finally{b.disabled=false;b.textContent="Sincronizar histórico"}};
 ["conversationSearch","conversationStatusFilter","conversationPriorityFilter","conversationUnreadFilter"].forEach(id=>$("#"+id).addEventListener(id==="conversationSearch"?"input":"change",renderConversationList));
