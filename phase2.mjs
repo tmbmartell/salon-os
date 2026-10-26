@@ -72,7 +72,7 @@ function cashOverview(db,tenant){
 }
 function dashboard(db,tenant){
   const since=new Date();since.setHours(0,0,0,0);
-  const r=one(db,"select coalesce(sum(case when kind='income' and status='paid' then amount_cents else 0 end),0) income,coalesce(sum(case when kind='expense' and status='paid' then amount_cents else 0 end),0) expense from financial_entries where tenant_id=? and created_at>=?",[tenant,since.toISOString()])||{};
+  const r=one(db,"select coalesce(sum(case when kind='income' and status='paid' then amount_cents else 0 end),0) income,coalesce(sum(case when kind='expense' and status='paid' then amount_cents else 0 end),0) expense from financial_entries where tenant_id=? and status='paid' and paid_at>=?",[tenant,since.toISOString()])||{};
   const cp=one(db,"select coalesce(sum(amount_cents),0) n,count(*) c from commissions where tenant_id=? and status='pending'",[tenant])||{};
   let rp={n:0,c:0};try{rp=one(db,"select coalesce(sum(amount_cents),0) n,count(*) c from retail_commissions where tenant_id=? and status='pending'",[tenant])||rp}catch{}
   const low=one(db,"select count(*) c from products where tenant_id=? and active=1 and stock_qty<=min_qty",[tenant])||{};
