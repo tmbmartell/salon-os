@@ -1,4 +1,4 @@
-/* Beauty Woman — camada visual progressiva. Não altera APIs, banco nem permissões. */
+/* NOVAGENTE Estética — camada visual progressiva. Não altera APIs, banco nem permissões. */
 (() => {
   "use strict";
   const one = (s, root = document) => root.querySelector(s);
@@ -17,19 +17,19 @@
   ];
 
   function brand() {
-    document.title = "Beauty Woman | Gestão Integrada";
+    document.title = "NOVAGENTE Estética | Gestão Integrada";
     all(".brand, .authBrand").forEach(el => {
       const logo = one(".logo", el);
       const name = one("strong", el);
       const caption = one("small", el);
-      if (logo) { logo.textContent = "BW"; logo.title = "Identidade provisória — inserir logotipo original"; }
-      if (name) name.textContent = "Beauty Woman";
-      if (caption) caption.textContent = "Gestão integrada";
+      if (logo) { logo.textContent = "NG"; logo.title = "Espaço reservado para a logo oficial da NOVAGENTE"; }
+      if (name) name.textContent = "NOVAGENTE Estética";
+      if (caption) caption.textContent = "Sistema integrado";
     });
     const eyebrow = one(".topbar .eyebrow");
-    if (eyebrow) eyebrow.textContent = "BEAUTY WOMAN · GESTÃO INTEGRADA";
+    if (eyebrow) eyebrow.textContent = "NOVAGENTE ESTÉTICA · GESTÃO INTEGRADA";
     const login = one("#loginPanel h2");
-    if (login) login.textContent = "Entrar no Beauty Woman";
+    if (login) login.textContent = "Entrar no NOVAGENTE Estética";
   }
 
   function navigationMenu() {
