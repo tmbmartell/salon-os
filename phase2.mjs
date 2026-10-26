@@ -64,7 +64,7 @@ function dashboard(db,tenant){
   return {todayIncome:Number(r.income||0)/100,todayExpense:Number(r.expense||0)/100,todayNet:(Number(r.income||0)-Number(r.expense||0))/100,pendingCommissions:commissionTotal/100,pendingCommissionsCount:commissionCount,accountsPayable:Number(pay.n||0)/100,accountsPayableCount:Number(pay.c||0),lowStockCount:Number(low.c||0),cash:cash?{...cash,expected:expectedCash(db,tenant,cash.id)/100}:null};
 }
 function products(db,tenant){
-  return all(db,"select p.*,s.name supplier_name from products p left join suppliers s on s.id=p.supplier_id where p.tenant_id=? order by p.active desc,p.name",[tenant]).map(p=>({...p,avg_cost:Number(p.avg_cost_cents||0)/100,sale_price:Number(p.sale_price_cents||0)/100,low_stock:Number(p.stock_qty)<=Number(p.min_qty)}));
+  return all(db,"select p.*,s.name supplier_name from products p left join suppliers s on s.id=p.supplier_id and s.tenant_id=p.tenant_id where p.tenant_id=? order by p.active desc,p.name",[tenant]).map(p=>({...p,avg_cost:Number(p.avg_cost_cents||0)/100,sale_price:Number(p.sale_price_cents||0)/100,low_stock:Number(p.stock_qty)<=Number(p.min_qty)}));
 }
 function suppliers(db,tenant){return all(db,"select * from suppliers where tenant_id=? order by active desc,name",[tenant])}
 function commissions(db,tenant){
@@ -74,7 +74,7 @@ function commissions(db,tenant){
 }
 function serviceCosts(db,tenant){
   return all(db,"select * from services where tenant_id=? and active=1 order by category,name",[tenant]).map(s=>{
-    const recipe=all(db,"select r.qty_standard,p.name,p.unit,p.avg_cost_cents from service_recipes r join products p on p.id=r.product_id where r.tenant_id=? and r.service_id=?",[tenant,s.id]);
+    const recipe=all(db,"select r.qty_standard,p.name,p.unit,p.avg_cost_cents from service_recipes r join products p on p.id=r.product_id and p.tenant_id=r.tenant_id where r.tenant_id=? and r.service_id=?",[tenant,s.id]);
     const productCost=recipe.reduce((n,x)=>n+Number(x.qty_standard)*Number(x.avg_cost_cents||0),0);
     const commission=Math.round(Number(s.price_cents||0)*Number(s.commission_pct||0)/100);
     const direct=productCost+commission;
@@ -96,7 +96,7 @@ function consumeLots(db,tenant,productId,qty){
   return {allocations,unallocated:Math.max(0,remaining)};
 }
 function stockLots(db,tenant){
-  const rows=all(db,"select l.*,p.name product_name,p.unit,s.name supplier_name from product_lots l join products p on p.id=l.product_id left join suppliers s on s.id=l.supplier_id where l.tenant_id=? and l.qty_remaining>0 order by case when l.expiry_date is null or l.expiry_date='' then 1 else 0 end,l.expiry_date asc,l.received_at desc",[tenant]);
+  const rows=all(db,"select l.*,p.name product_name,p.unit,s.name supplier_name from product_lots l join products p on p.id=l.product_id and p.tenant_id=l.tenant_id left join suppliers s on s.id=l.supplier_id and s.tenant_id=l.tenant_id where l.tenant_id=? and l.qty_remaining>0 order by case when l.expiry_date is null or l.expiry_date='' then 1 else 0 end,l.expiry_date asc,l.received_at desc",[tenant]);
   const today=new Date();today.setHours(0,0,0,0);
   return rows.map(x=>{
     let days_to_expiry=null,status="no_expiry";
@@ -211,10 +211,10 @@ function checkoutPrep(db,tenant,appointmentId){
   return {appointment_id:a.id,client_id:a.client_id,client_name:a.client_name,service_id:a.service_id,service_name:items.map(x=>x.service_name+(Number(x.qty||1)>1?" ×"+x.qty:"")).join(" + "),professional_name:[...new Set(items.map(x=>x.professional_name||a.professional_name))].join(", "),price:subtotal/100,recipe,packages,items};
 }
 function clientConsumption(db,tenant,clientId){
-  return all(db,"select ac.product_id,p.name product_name,p.unit,ac.service_id,s.name service_name,avg(ac.actual_qty) avg_qty,avg(ac.standard_qty) avg_standard,sum(ac.actual_qty) total_qty,count(*) samples,max(ac.created_at) last_used_at from appointment_consumption ac join products p on p.id=ac.product_id join services s on s.id=ac.service_id where ac.tenant_id=? and ac.client_id=? group by ac.product_id,ac.service_id order by samples desc,product_name",[tenant,clientId]).map(x=>({...x,avg_qty:Number(x.avg_qty||0),avg_standard:Number(x.avg_standard||0),total_qty:Number(x.total_qty||0),samples:Number(x.samples||0)}));
+  return all(db,"select ac.product_id,p.name product_name,p.unit,ac.service_id,s.name service_name,avg(ac.actual_qty) avg_qty,avg(ac.standard_qty) avg_standard,sum(ac.actual_qty) total_qty,count(*) samples,max(ac.created_at) last_used_at from appointment_consumption ac join products p on p.id=ac.product_id and p.tenant_id=ac.tenant_id join services s on s.id=ac.service_id and s.tenant_id=ac.tenant_id where ac.tenant_id=? and ac.client_id=? group by ac.product_id,ac.service_id order by samples desc,product_name",[tenant,clientId]).map(x=>({...x,avg_qty:Number(x.avg_qty||0),avg_standard:Number(x.avg_standard||0),total_qty:Number(x.total_qty||0),samples:Number(x.samples||0)}));
 }
 function purchaseSuggestions(db,tenant){
-  return all(db,"select p.*,s.name supplier_name,s.lead_days from products p left join suppliers s on s.id=p.supplier_id where p.tenant_id=? and p.active=1 and p.stock_qty<=p.min_qty order by (p.min_qty-p.stock_qty) desc,p.name",[tenant]).map(p=>{
+  return all(db,"select p.*,s.name supplier_name,s.lead_days from products p left join suppliers s on s.id=p.supplier_id and s.tenant_id=p.tenant_id where p.tenant_id=? and p.active=1 and p.stock_qty<=p.min_qty order by (p.min_qty-p.stock_qty) desc,p.name",[tenant]).map(p=>{
     const avgDaily=one(db,"select abs(coalesce(sum(qty),0))/30 avg_daily from stock_movements where tenant_id=? and product_id=? and type='consumption' and created_at>=datetime('now','-30 day')",[tenant,p.id])?.avg_daily||0;
     const suggested=Math.max(0,Number(p.ideal_qty||p.min_qty)-Number(p.stock_qty||0));
     const daysLeft=Number(avgDaily)>0?Math.max(0,Number(p.stock_qty||0)/Number(avgDaily)):null;
@@ -222,7 +222,7 @@ function purchaseSuggestions(db,tenant){
   });
 }
 function purchases(db,tenant){
-  return all(db,"select p.*,s.name supplier_name,(select count(*) from purchase_items i where i.purchase_id=p.id) item_count from purchases p join suppliers s on s.id=p.supplier_id where p.tenant_id=? order by p.created_at desc",[tenant]).map(x=>({...x,total:Number(x.total_cents||0)/100}));
+  return all(db,"select p.*,s.name supplier_name,(select count(*) from purchase_items i where i.purchase_id=p.id) item_count from purchases p join suppliers s on s.id=p.supplier_id and s.tenant_id=p.tenant_id where p.tenant_id=? order by p.created_at desc",[tenant]).map(x=>({...x,total:Number(x.total_cents||0)/100}));
 }
 function dre(db,tenant,month){
   const m=/^\d{4}-\d{2}$/.test(month||"")?month:new Date().toISOString().slice(0,7),start=m+"-01T00:00:00.000Z";
@@ -262,7 +262,7 @@ export async function handlePhase2Api(ctx){
     audit(db,user,"product.create","product",pid,{unit,stock_qty:stock});
     return send(res,201,products(db,tenant).find(x=>x.id===pid));
   }
-  if(req.method==="GET"&&url.pathname==="/api/stock/movements"){guard("inventory.read");const pid=txt(url.searchParams.get("product_id")||"",64);const rows=pid?all(db,"select m.*,p.name product_name,p.unit from stock_movements m join products p on p.id=m.product_id where m.tenant_id=? and m.product_id=? order by m.created_at desc limit 300",[tenant,pid]):all(db,"select m.*,p.name product_name,p.unit from stock_movements m join products p on p.id=m.product_id where m.tenant_id=? order by m.created_at desc limit 300",[tenant]);return send(res,200,rows.map(x=>({...x,unit_cost:Number(x.unit_cost_cents||0)/100})))}
+  if(req.method==="GET"&&url.pathname==="/api/stock/movements"){guard("inventory.read");const pid=txt(url.searchParams.get("product_id")||"",64);const rows=pid?all(db,"select m.*,p.name product_name,p.unit from stock_movements m join products p on p.id=m.product_id and p.tenant_id=m.tenant_id where m.tenant_id=? and m.product_id=? order by m.created_at desc limit 300",[tenant,pid]):all(db,"select m.*,p.name product_name,p.unit from stock_movements m join products p on p.id=m.product_id and p.tenant_id=m.tenant_id where m.tenant_id=? order by m.created_at desc limit 300",[tenant]);return send(res,200,rows.map(x=>({...x,unit_cost:Number(x.unit_cost_cents||0)/100})))}
   if(req.method==="POST"&&url.pathname==="/api/stock/adjust"){
     guard("inventory.write");
     const b=await parseBody(req),pid=txt(b.product_id,64);
@@ -285,7 +285,7 @@ export async function handlePhase2Api(ctx){
     return send(res,200,{stock_qty:next});
   }
   const recipe=url.pathname.match(/^\/api\/services\/([^/]+)\/recipe$/);
-  if(recipe&&req.method==="GET"){guard("inventory.read");return send(res,200,all(db,"select r.*,p.name product_name,p.unit,p.avg_cost_cents from service_recipes r join products p on p.id=r.product_id where r.tenant_id=? and r.service_id=?",[tenant,decodeURIComponent(recipe[1])]))}
+  if(recipe&&req.method==="GET"){guard("inventory.read");return send(res,200,all(db,"select r.*,p.name product_name,p.unit,p.avg_cost_cents from service_recipes r join products p on p.id=r.product_id and p.tenant_id=r.tenant_id where r.tenant_id=? and r.service_id=?",[tenant,decodeURIComponent(recipe[1])]))}
   if(recipe&&req.method==="PUT"){
     guard("inventory.write");
     const sid=decodeURIComponent(recipe[1]),service=one(db,"select id from services where id=? and tenant_id=?",[sid,tenant]);
@@ -354,7 +354,7 @@ export async function handlePhase2Api(ctx){
   if(req.method==="POST"&&url.pathname==="/api/purchases"){
     guard("suppliers.write");const b=await parseBody(req),supplier=one(db,"select * from suppliers where id=? and tenant_id=?",[txt(b.supplier_id,64),tenant]);if(!supplier)return send(res,404,{error:"supplier_not_found"});
     const items=Array.isArray(b.items)?b.items:[];if(!items.length)return send(res,400,{error:"items_required"});const purchaseId=uid();let total=0;
-    try{transaction(db,()=>{for(const x of items){const p=one(db,"select id from products where id=? and tenant_id=?",[txt(x.product_id,64),tenant]);const q=Number(x.qty||0),unit=money(x.unit_cost||0);if(!p||!(q>0)||unit<0)throw Object.assign(new Error("invalid_purchase_item"),{status:400});const line=Math.round(q*unit);total+=line;run(db,"insert into purchase_items(id,purchase_id,product_id,qty,unit_cost_cents,total_cents,lot_code,expiry_date) values(?,?,?,?,?,?,?,?)",[uid(),purchaseId,p.id,q,unit,line,txt(x.lot_code,80)||null,txt(x.expiry_date,10)||null]);run(db,"insert into supplier_price_history(id,tenant_id,supplier_id,product_id,purchase_id,unit_cost_cents,recorded_at) values(?,?,?,?,?,?,?)",[uid(),tenant,supplier.id,p.id,purchaseId,unit,now()])}run(db,"insert into purchases(id,tenant_id,supplier_id,status,ordered_at,expected_at,total_cents,notes,created_by,created_at,updated_at) values(?,?,?,'ordered',?,?,?,?,?,?,?)",[purchaseId,tenant,supplier.id,now(),txt(b.expected_at,10)||null,total,txt(b.notes,500),user.id,now(),now()]);run(db,"insert into financial_entries(id,tenant_id,kind,category,description,amount_cents,status,due_date,supplier_id,reference_type,reference_id,created_by,created_at) values(?,?,?,?,?,?,'pending',?,?,?,?,?,?)",[uid(),tenant,"expense","purchases","Compra · "+supplier.name,total,txt(b.due_date,10)||null,supplier.id,"purchase",purchaseId,user.id,now()])})}catch(e){return send(res,e.status||400,{error:e.message})}
+    try{transaction(db,()=>{for(const x of items){const p=one(db,"select id from products where id=? and tenant_id=?",[txt(x.product_id,64),tenant]);const unit=money(x.unit_cost||0);let q;try{q=p?quantity(x.qty,p.unit,{zero:false}):null}catch{}if(!p||q===null||unit<0||!Number.isFinite(unit))throw Object.assign(new Error("invalid_purchase_item"),{status:400});const line=Math.round(q*unit);total+=line;run(db,"insert into purchase_items(id,purchase_id,product_id,qty,unit_cost_cents,total_cents,lot_code,expiry_date) values(?,?,?,?,?,?,?,?)",[uid(),purchaseId,p.id,q,unit,line,txt(x.lot_code,80)||null,txt(x.expiry_date,10)||null]);run(db,"insert into supplier_price_history(id,tenant_id,supplier_id,product_id,purchase_id,unit_cost_cents,recorded_at) values(?,?,?,?,?,?,?)",[uid(),tenant,supplier.id,p.id,purchaseId,unit,now()])}run(db,"insert into purchases(id,tenant_id,supplier_id,status,ordered_at,expected_at,total_cents,notes,created_by,created_at,updated_at) values(?,?,?,'ordered',?,?,?,?,?,?,?)",[purchaseId,tenant,supplier.id,now(),txt(b.expected_at,10)||null,total,txt(b.notes,500),user.id,now(),now()]);run(db,"insert into financial_entries(id,tenant_id,kind,category,description,amount_cents,status,due_date,supplier_id,reference_type,reference_id,created_by,created_at) values(?,?,?,?,?,?,'pending',?,?,?,?,?,?)",[uid(),tenant,"expense","purchases","Compra · "+supplier.name,total,txt(b.due_date,10)||null,supplier.id,"purchase",purchaseId,user.id,now()])})}catch(e){return send(res,e.status||400,{error:e.message})}
     audit(db,user,"purchase.create","purchase",purchaseId,{total});return send(res,201,{id:purchaseId,total:total/100,status:"ordered"})
   }
   const receive=url.pathname.match(/^\/api\/purchases\/([^/]+)\/receive$/);
