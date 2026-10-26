@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import {quantity,allocateConsumption} from "./inventory-rules.mjs";
 import { afterCheckoutRetention } from "./phase6.mjs";
 import { consumePackageCredit, availablePackageCredits } from "./phase8.mjs";
 
@@ -116,20 +117,37 @@ function supplierPriceHistory(db,tenant){
   });
 }
 
-function consumeRecipe(db,tenant,a,userId,actualItems=[],qtyMultiplier=1){
-  const recipe=all(db,"select r.product_id,r.qty_standard,p.stock_qty,p.avg_cost_cents,p.name,p.unit from service_recipes r join products p on p.id=r.product_id where r.tenant_id=? and r.service_id=?",[tenant,a.service_id]);
-  const actualMap=new Map((Array.isArray(actualItems)?actualItems:[]).map(x=>[txt(x.product_id,64),Number(x.actual_qty)]));
+function plannedConsumption(db,tenant,items,submitted=[]){
+  const rows=[];
+  items.forEach((item,itemIndex)=>{
+    const recipe=all(db,"select r.product_id,r.qty_standard,p.name product_name,p.unit,p.stock_qty,p.avg_cost_cents from service_recipes r join products p on p.id=r.product_id and p.tenant_id=r.tenant_id where r.tenant_id=? and r.service_id=?",[tenant,item.service_id]);
+    for(const row of recipe)rows.push({...row,item_index:itemIndex,service_id:item.service_id,
+      standard_qty:quantity(Number(row.qty_standard)*Math.max(1,Number(item.qty||1)),row.unit,{zero:false})});
+  });
+  const allocated=allocateConsumption(rows,submitted);
+  const totals=new Map();
+  for(const line of allocated)totals.set(line.product_id,(totals.get(line.product_id)||0)+line.actual_qty);
+  for(const [productId,total] of totals){
+    const product=rows.find(x=>x.product_id===productId);
+    if(total>Number(product.stock_qty)+0.000001)
+      throw Object.assign(new Error("insufficient_stock"),{status:409,product_id:productId,product_name:product.product_name});
+  }
+  return allocated;
+}
+function consumePlanned(db,tenant,a,userId,lines){
   const used=[];
-  for(const x of recipe){
-    const standard=Number(x.qty_standard||0)*Math.max(1,Number(qtyMultiplier||1)),actual=actualMap.has(x.product_id)?Number(actualMap.get(x.product_id)):standard;
-    if(!(actual>0))continue;
-    const next=Number(x.stock_qty)-actual,variance=actual-standard,lotUse=consumeLots(db,tenant,x.product_id,actual);
-    run(db,"update products set stock_qty=?,updated_at=? where id=? and tenant_id=?",[next,now(),x.product_id,tenant]);
+  for(const x of lines){
+    const actual=x.actual_qty,standard=x.standard_qty,variance=x.variance_qty;
+    if(actual>0){
+      const updated=run(db,"update products set stock_qty=round(stock_qty-?,3),updated_at=? where id=? and tenant_id=? and stock_qty>=?",[actual,now(),x.product_id,tenant,actual-0.000001]);
+      if(!updated.changes)throw Object.assign(new Error("insufficient_stock"),{status:409,product_id:x.product_id});
+    }
+    const lotUse=actual>0?consumeLots(db,tenant,x.product_id,actual):{allocations:[],unallocated:0};
     const lotId=lotUse.allocations.length===1?lotUse.allocations[0].lot_id:null;
     const lotNote=lotUse.allocations.length?" · lote(s) "+lotUse.allocations.map(z=>z.lot_code||z.lot_id.slice(0,8)).join(", "):"";
-    run(db,"insert into stock_movements(id,tenant_id,product_id,type,qty,unit_cost_cents,appointment_id,reason,created_by,created_at,lot_id) values(?,?,?,?,?,?,?,?,?,?,?)",[uid(),tenant,x.product_id,"consumption",-actual,Number(x.avg_cost_cents||0),a.id,(Math.abs(variance)<0.0001?"Consumo padrão do serviço":"Consumo real informado")+lotNote,userId,now(),lotId]);
-    run(db,"insert into appointment_consumption(id,tenant_id,appointment_id,client_id,service_id,product_id,standard_qty,actual_qty,unit_cost_cents,variance_qty,created_at) values(?,?,?,?,?,?,?,?,?,?,?)",[uid(),tenant,a.id,a.client_id,a.service_id,x.product_id,standard,actual,Number(x.avg_cost_cents||0),variance,now()]);
-    used.push({product_id:x.product_id,product_name:x.name,unit:x.unit,standard_qty:standard,actual_qty:actual,variance_qty:variance,lots:lotUse.allocations,unallocated_qty:lotUse.unallocated});
+    if(actual>0)run(db,"insert into stock_movements(id,tenant_id,product_id,type,qty,unit_cost_cents,appointment_id,reason,created_by,created_at,lot_id) values(?,?,?,?,?,?,?,?,?,?,?)",[uid(),tenant,x.product_id,"consumption",-actual,Number(x.avg_cost_cents||0),a.id,(Math.abs(variance)<0.0001?"Consumo padrão do serviço":"Consumo real informado")+lotNote,userId,now(),lotId]);
+    run(db,"insert into appointment_consumption(id,tenant_id,appointment_id,client_id,service_id,product_id,standard_qty,actual_qty,unit_cost_cents,variance_qty,created_at) values(?,?,?,?,?,?,?,?,?,?,?)",[uid(),tenant,a.id,a.client_id,x.service_id,x.product_id,standard,actual,Number(x.avg_cost_cents||0),variance,now()]);
+    used.push({product_id:x.product_id,product_name:x.product_name,service_id:x.service_id,unit:x.unit,standard_qty:standard,actual_qty:actual,variance_qty:variance,lots:lotUse.allocations,unallocated_qty:lotUse.unallocated});
   }
   return used;
 }
@@ -140,13 +158,15 @@ function appointmentCheckoutItems(db,tenant,a){
 }
 
 function checkout(db,tenant,user,b){
-  const a=one(db,"select a.*,s.price_cents,s.commission_pct,s.duration_min,s.name service_name,c.name client_name from appointments a join services s on s.id=a.service_id join clients c on c.id=a.client_id where a.id=? and a.tenant_id=?",[txt(b.appointment_id,64),tenant]);if(!a){const e=new Error("appointment_not_found");e.status=404;throw e}
+  const a=one(db,"select a.*,s.price_cents,s.commission_pct,s.duration_min,s.name service_name,c.name client_name from appointments a join services s on s.id=a.service_id and s.tenant_id=a.tenant_id join clients c on c.id=a.client_id and c.tenant_id=a.tenant_id where a.id=? and a.tenant_id=?",[txt(b.appointment_id,64),tenant]);if(!a){const e=new Error("appointment_not_found");e.status=404;throw e}
+  if(["cancelled","no_show"].includes(a.status))throw Object.assign(new Error("appointment_not_billable"),{status:409});
   if(one(db,"select id from checkout_records where tenant_id=? and appointment_id=?",[tenant,a.id])){const e=new Error("appointment_already_checked_out");e.status=409;throw e}
   const items=appointmentCheckoutItems(db,tenant,a),subtotal=items.reduce((sum,x)=>sum+Number(x.unit_price_cents||0)*Math.max(1,Number(x.qty||1)),0),method=txt(b.payment_method||"pix",32),discount=method==="package"?0:Math.min(subtotal,Math.max(0,money(b.discount||0)));
   if(!["pix","credit_card","debit_card","cash","voucher","package","other"].includes(method)){const e=new Error("invalid_payment_method");e.status=400;throw e}
   if(method==="package"&&(items.length>1||Number(items[0]?.qty||1)!==1)){const e=new Error("package_multi_service_not_supported");e.status=409;throw e}
   const cash=openCash(db,tenant);if(method==="cash"&&!cash){const e=new Error("cash_session_required");e.status=409;throw e}
   return transaction(db,()=>{
+    const stockPlan=plannedConsumption(db,tenant,items,b.consumption||[]);
     let packageUse=null,total=Math.max(0,subtotal-discount),financialId=null;
     if(method==="package"){packageUse=consumePackageCredit(db,tenant,a.client_id,items[0].service_id,txt(b.client_package_id,64)||null);total=Number(packageUse.allocated_unit_cents||0)}
     const checkoutId=uid(),description=items.map(x=>x.service_name+(Number(x.qty||1)>1?" ×"+x.qty:"")).join(" + ");
@@ -160,8 +180,7 @@ function checkout(db,tenant,user,b){
       const gross=i===items.length-1?Math.max(0,total-allocated):(subtotal>0?Math.round(total*list/subtotal):0);allocated+=gross;
       const pct=Number(item.commission_pct||0),amount=Math.round(gross*pct/100),commissionId=uid();commissionTotal+=amount;commissionIds.push(commissionId);
       run(db,"insert into commissions(id,tenant_id,appointment_id,professional_id,service_id,gross_cents,pct,amount_cents,status,created_at) values(?,?,?,?,?,?,?,?,?,?)",[commissionId,tenant,a.id,item.professional_id,item.service_id,gross,pct,amount,"pending",now()]);
-      const itemA={...a,service_id:item.service_id};
-      const used=consumeRecipe(db,tenant,itemA,user.id,i===0?(b.consumption||[]):[],Math.max(1,Number(item.qty||1)));consumption.push(...used);
+      const used=consumePlanned(db,tenant,a,user.id,stockPlan.filter(x=>x.item_index===i));consumption.push(...used);
     }
     run(db,"update appointments set status='completed',updated_at=? where id=?",[now(),a.id]);
     run(db,"insert into checkout_records(id,tenant_id,appointment_id,subtotal_cents,discount_cents,total_cents,payment_method,cash_session_id,financial_entry_id,commission_id,created_by,created_at) values(?,?,?,?,?,?,?,?,?,?,?,?)",[checkoutId,tenant,a.id,subtotal,discount,total,method,cash?.id||null,financialId,commissionIds[0]||null,user.id,now()]);
@@ -172,13 +191,23 @@ function checkout(db,tenant,user,b){
 
 
 function checkoutPrep(db,tenant,appointmentId){
-  const a=one(db,"select a.*,c.name client_name,c.id client_id,s.name service_name,s.price_cents,p.name professional_name from appointments a join clients c on c.id=a.client_id join services s on s.id=a.service_id join professionals p on p.id=a.professional_id where a.id=? and a.tenant_id=?",[appointmentId,tenant]);
+  const a=one(db,"select a.*,c.name client_name,c.id client_id,s.name service_name,s.price_cents,p.name professional_name from appointments a join clients c on c.id=a.client_id and c.tenant_id=a.tenant_id join services s on s.id=a.service_id and s.tenant_id=a.tenant_id join professionals p on p.id=a.professional_id and p.tenant_id=a.tenant_id where a.id=? and a.tenant_id=?",[appointmentId,tenant]);
   if(!a)return null;
-  const recipe=all(db,"select r.product_id,r.qty_standard,p.name product_name,p.unit,p.stock_qty,p.avg_cost_cents from service_recipes r join products p on p.id=r.product_id where r.tenant_id=? and r.service_id=?",[tenant,a.service_id]).map(x=>{
-    const avg=one(db,"select avg(actual_qty) avg_qty,count(*) n from appointment_consumption where tenant_id=? and client_id=? and service_id=? and product_id=?",[tenant,a.client_id,a.service_id,x.product_id])||{};
-    return {...x,client_avg_qty:avg.n?Number(avg.avg_qty):null,client_samples:Number(avg.n||0)};
-  });
   const items=appointmentCheckoutItems(db,tenant,a),subtotal=items.reduce((sum,x)=>sum+Number(x.unit_price_cents||0)*Math.max(1,Number(x.qty||1)),0),packages=items.length===1?availablePackageCredits(db,tenant,a.client_id,items[0].service_id):[];
+  const planned=plannedConsumption(db,tenant,items);
+  const grouped=new Map();
+  for(const row of planned){
+    const existing=grouped.get(row.product_id)||{product_id:row.product_id,product_name:row.product_name,unit:row.unit,stock_qty:row.stock_qty,qty_standard:0,client_avg_qty:null,client_samples:0};
+    existing.qty_standard=Math.round((existing.qty_standard+row.standard_qty)*1000)/1000;
+    grouped.set(row.product_id,existing);
+  }
+  const recipe=[...grouped.values()];
+  if(items.length===1){
+    for(const row of recipe){
+      const avg=one(db,"select avg(actual_qty) avg_qty,count(*) n from appointment_consumption where tenant_id=? and client_id=? and service_id=? and product_id=?",[tenant,a.client_id,items[0].service_id,row.product_id])||{};
+      if(avg.n){row.client_avg_qty=Math.round(Number(avg.avg_qty)*Math.max(1,Number(items[0].qty||1))*1000)/1000;row.client_samples=Number(avg.n)}
+    }
+  }
   return {appointment_id:a.id,client_id:a.client_id,client_name:a.client_name,service_id:a.service_id,service_name:items.map(x=>x.service_name+(Number(x.qty||1)>1?" ×"+x.qty:"")).join(" + "),professional_name:[...new Set(items.map(x=>x.professional_name||a.professional_name))].join(", "),price:subtotal/100,recipe,packages,items};
 }
 function clientConsumption(db,tenant,clientId){
