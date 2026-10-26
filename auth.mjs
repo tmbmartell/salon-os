@@ -153,7 +153,7 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
   if(url.pathname==="/api/auth/sessions"&&req.method==="GET"){
     const user=authenticate(req,db);
     if(!user)return {handled:true,result:send(res,401,{error:"unauthorized"})};
-    const rows=db.prepare("select id,device_label,created_at,last_seen_at,expires_at from auth_sessions where tenant_id=? and user_id=? and datetime(expires_at)>datetime('now') and datetime(last_seen_at)>datetime('now','-${SESSION_IDLE_HOURS} hours') order by last_seen_at desc").all(user.tenantId,user.id);
+    const rows=db.prepare("select id,device_label,created_at,last_seen_at,expires_at from auth_sessions where tenant_id=? and user_id=? and datetime(expires_at)>datetime('now') and datetime(last_seen_at)>datetime('now','-8 hours') order by last_seen_at desc").all(user.tenantId,user.id);
     return {handled:true,result:send(res,200,{sessions:rows.map(x=>({...x,current:x.id===user.sessionId})),idle_timeout_hours:SESSION_IDLE_HOURS})};
   }
   if(url.pathname==="/api/auth/sessions/revoke"&&req.method==="POST"){
