@@ -434,9 +434,43 @@ $("#recipeForm").onsubmit=async e=>{e.preventDefault();const sid=e.target.elemen
 $("#supplierForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/suppliers",{method:"POST",body:JSON.stringify(b)});e.target.reset();$("#supplierModal").close();await loadSuppliers();toast("Fornecedor cadastrado")}catch{toast("Erro ao salvar fornecedor")}};
 $("#productForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/products",{method:"POST",body:JSON.stringify(b)});e.target.reset();$("#productModal").close();await loadInventory();toast("Produto cadastrado")}catch{toast("Erro ao salvar produto")}};
 $("#stockAdjustForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));b.qty=Number(b.qty);try{await api("/api/stock/adjust",{method:"POST",body:JSON.stringify(b)}); $("#stockAdjustModal").close();e.target.reset();await loadInventory();toast("Estoque ajustado")}catch(err){toast(err.data?.error==="insufficient_stock"?"Não é possível retirar mais que o saldo existente":err.data?.error==="invalid_stock_quantity"?"Confira a quantidade e a unidade do produto":"Erro ao ajustar estoque")}};
-$("#financeEntryForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/finance/entries",{method:"POST",body:JSON.stringify(b)});e.target.reset();$("#financeEntryModal").close();await loadFinance();toast("Lançamento registrado")}catch(err){toast(err.data?.error==="cash_session_required"?"Abra o caixa antes de lançar dinheiro":"Erro ao registrar lançamento")}};
-$("#cashOpenForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/cash/open",{method:"POST",body:JSON.stringify(b)});e.target.reset();$("#cashOpenModal").close();await loadFinance();toast("Caixa aberto")}catch{toast("Não foi possível abrir o caixa")}};
-$("#cashCloseForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{const out=await api("/api/cash/close",{method:"POST",body:JSON.stringify(b)});$("#cashCloseModal").close();e.target.reset();await loadFinance();toast("Caixa fechado · diferença "+moneyBR(out.difference))}catch{toast("Não foi possível fechar o caixa")}};
+$("#financeEntryForm").onsubmit=async e=>{
+  e.preventDefault();const form=e.target,b=Object.fromEntries(new FormData(form));
+  try{
+    await api("/api/finance/entries",{method:"POST",body:JSON.stringify(b)});
+    form.reset();$("#financeEntryModal").close();setFinanceTab("entries");await loadFinance();toast("Lançamento registrado");
+  }catch(err){toast(err.data?.error==="cash_session_required"?"Abra o caixa antes de movimentar dinheiro":err.data?.error==="invalid_amount"?"Informe um valor positivo com até duas casas decimais":err.data?.error==="invalid_payment_method"?"Escolha uma forma de pagamento válida":"Não foi possível salvar o lançamento")}
+};
+$("#cashOpenForm").onsubmit=async e=>{
+  e.preventDefault();const b=Object.fromEntries(new FormData(e.target));
+  try{await api("/api/cash/open",{method:"POST",body:JSON.stringify(b)});
+    e.target.reset();$("#cashOpenModal").close();await loadFinance();toast("Caixa aberto");
+  }catch(err){toast(err.data?.error==="cash_already_open"?"Já existe um caixa aberto":err.data?.error==="invalid_amount"?"Confira o valor inicial":"Não foi possível abrir o caixa")}
+};
+$("#cashCloseForm").onsubmit=async e=>{
+  e.preventDefault();
+  const form=e.target,b=Object.fromEntries(new FormData(form));
+  const difference=Math.round((Number(b.actual)-Number(state.neCashExpected||0))*100);
+  if(difference!==0&&String(b.notes||"").trim().length<8){form.elements.notes.focus();toast("Explique a diferença do caixa antes de fechar");return}
+  if(!window.confirm("Confirmar o fechamento? Valor contado: "+moneyBR(b.actual)+"."))return;
+  try{const out=await api("/api/cash/close",{method:"POST",body:JSON.stringify(b)});
+    $("#cashCloseModal").close();form.reset();await loadFinance();
+    toast("Caixa fechado · diferença "+moneyBR(out.difference));
+  }catch(err){toast(err.data?.error==="cash_difference_reason_required"?"Informe o motivo da diferença (mínimo de oito caracteres)":err.data?.error==="cash_not_open"?"Este caixa já está fechado":"Não foi possível fechar o caixa")}
+};
+$("#cashWithdrawForm").onsubmit=async e=>{
+  e.preventDefault();const form=e.target,b=Object.fromEntries(new FormData(form));
+  if(!window.confirm("Confirmar retirada de "+moneyBR(b.amount)+" do caixa?"))return;
+  try{await api("/api/cash/withdraw",{method:"POST",body:JSON.stringify(b)});
+    form.reset();$("#cashWithdrawModal").close();await loadFinance();toast("Retirada registrada no caixa");
+  }catch(err){toast(err.data?.error==="insufficient_cash"?"O dinheiro em caixa é insuficiente":err.data?.error==="cash_not_open"?"Abra o caixa antes de retirar dinheiro":"Não foi possível registrar a retirada")}
+};
+$("#financePayForm").onsubmit=async e=>{
+  e.preventDefault();const form=e.target,b=Object.fromEntries(new FormData(form));
+  try{await api("/api/finance/entries/"+encodeURIComponent(b.entry_id)+"/pay",{method:"POST",body:JSON.stringify({payment_method:b.payment_method})});
+    form.reset();$("#financePayModal").close();await loadFinance();toast("Pagamento confirmado");
+  }catch(err){toast(err.data?.error==="already_paid"?"Esse lançamento já foi pago":err.data?.error==="cash_session_required"?"Abra o caixa para pagar em dinheiro":"Não foi possível registrar o pagamento")}
+};
 function decorateAgendaCheckout(){
   $$("[data-status]").forEach(sel=>{
     const status=sel.value,id=sel.dataset.status;if(["completed","cancelled","no_show"].includes(status)||sel.parentElement.querySelector("[data-checkout]"))return;
@@ -470,7 +504,7 @@ async function loadDre(){
   try{const d=await api("/api/reports/dre?month="+encodeURIComponent(month));$("#dreBody").innerHTML='<div class="dreHero"><div><span>Entradas</span><strong>'+moneyBR(d.income)+'</strong></div><div><span>Saídas</span><strong>'+moneyBR(d.expense)+'</strong></div><div><span>Resultado</span><strong>'+moneyBR(d.result)+'</strong></div></div><div class="stack">'+d.categories.map(c=>'<div class="row"><div><strong>'+c.category+'</strong><small>'+(c.kind==="income"?"receita":"despesa")+'</small></div><div class="money '+c.kind+'">'+moneyBR(c.total)+'</div></div>').join("")+'</div>'}catch{$("#dreBody").innerHTML='<p class="muted">Não foi possível calcular o DRE.</p>'}
 }
 $("#dreMonth").onchange=loadDre;
-$("#payPendingCommissions").onclick=async e=>{const ids=String(e.currentTarget.dataset.ids||"").split(",").filter(Boolean);if(!ids.length)return;try{const out=await api("/api/commissions/pay",{method:"POST",body:JSON.stringify({ids})});await loadFinance();toast(out.count+" comissões pagas · "+moneyBR(out.total))}catch{toast("Não foi possível pagar as comissões")}};
+$("#payPendingCommissions").onclick=async e=>{const ids=String(e.currentTarget.dataset.ids||"").split(",").filter(Boolean);if(!ids.length)return;const total=Number(e.currentTarget.dataset.total||0);if(!window.confirm("Confirmar pagamento de "+ids.length+" comissões no total de "+moneyBR(total)+"?"))return;try{const out=await api("/api/commissions/pay",{method:"POST",body:JSON.stringify({ids})});await loadFinance();toast(out.count+" comissões pagas · "+moneyBR(out.total))}catch{toast("Não foi possível pagar as comissões")}};
 function purchaseRow(selected="",qty="",cost="",lot="",expiry=""){
   return '<div class="purchaseRow"><select class="purchaseProduct"><option value="">Produto…</option>'+state.products.map(p=>'<option value="'+p.id+'" '+(p.id===selected?'selected':'')+'>'+p.name+' ('+p.unit+')</option>').join("")+'</select><input class="purchaseQty" type="number" step="0.01" min="0.01" value="'+qty+'" placeholder="Qtd."><input class="purchaseCost" type="number" step="0.0001" min="0" value="'+cost+'" placeholder="R$/un"><input class="purchaseLot" value="'+lot+'" placeholder="Lote"><input class="purchaseExpiry" type="date" value="'+expiry+'"><button type="button" class="x purchaseRemove">×</button></div>';
 }
@@ -518,8 +552,13 @@ function collectCheckoutConsumption(){
     return {product_id:row.dataset.consumptionProduct,actual_qty:number};
   });
 }
-async function payFinanceEntry(id){
-  try{await api("/api/finance/entries/"+id+"/pay",{method:"POST",body:JSON.stringify({payment_method:"pix"})});await loadFinance();toast("Lançamento marcado como pago")}catch(err){toast(err.data?.error==="already_paid"?"Esse lançamento já está pago":"Não foi possível pagar o lançamento")}
+function payFinanceEntry(id){
+  const entry=state.financeEntries?.find(x=>x.id===id);
+  if(!entry||entry.status!=="pending"){toast("Lançamento não encontrado ou já pago");return}
+  const form=$("#financePayForm");form.reset();
+  form.elements.entry_id.value=id;
+  $("#neFinancePayDescription").textContent=entry.description+" · "+moneyBR(entry.amount);
+  $("#financePayModal").showModal();
 }
 
 async function loadOwnerEye(){
