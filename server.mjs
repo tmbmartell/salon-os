@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { installAuth, authenticate, handleAuthApi, requirePermission, audit } from "./auth.mjs";
-import { installWhatsApp, wahaStatus, ensureWahaSession, wahaQr, verifyWebhook, listConversations, conversationMessages, markConversationRead, sendConversationMessage, ingestWahaEvent, sendText, registerTenantSession, sessionForTenant, tenantForWahaEvent, syncWahaHistory } from "./whatsapp.mjs";
+import { installWhatsApp, wahaConfigured, wahaStatus, ensureWahaSession, wahaQr, verifyWebhook, listConversations, conversationMessages, markConversationRead, sendConversationMessage, ingestWahaEvent, sendText, registerTenantSession, sessionForTenant, tenantForWahaEvent, syncWahaHistory } from "./whatsapp.mjs";
 import { installPhase2, handlePhase2Api } from "./phase2.mjs";
 import { installPhase3, handlePhase3Api } from "./phase3.mjs";
 import { handleOwnerEyeApi } from "./owner-eye.mjs";
@@ -495,8 +495,8 @@ async function api(req,res,url){
   }
 
   if(req.method==="POST"&&url.pathname==="/api/whatsapp/waha/webhook"){
-    const wa=await wahaStatus();
-    if(!wa.configured)return send(res,503,{ok:false,error:"waha_not_configured"});
+    // Não consultar o provedor externo antes de autenticar o pedido de entrada.
+    if(!wahaConfigured())return send(res,503,{ok:false,error:"waha_not_configured"});
     const parsed=await readRawJson(req),raw=parsed.raw,body=parsed.body;
     const signature=req.headers["x-webhook-hmac"],algorithm=req.headers["x-webhook-hmac-algorithm"];
     if(!verifyWebhook(raw,signature,algorithm))return send(res,401,{error:"invalid_webhook_signature"});
