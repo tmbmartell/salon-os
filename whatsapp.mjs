@@ -206,13 +206,16 @@ export async function syncWahaHistory(db,tenantId,{chatLimit=40,messageLimit=80}
     const msgResp=await request("/api/"+encodeURIComponent(session)+"/chats/"+encodeURIComponent(chatId)+"/messages?limit="+safeMsgs+"&downloadMedia=false&sortOrder=ASC");
     const msgs=await msgResp.json();let lastAt=co.last_message_at||co.created_at||ts;
     for(const m of Array.isArray(msgs)?msgs:[]){
-      if(!m?.id)continue;
-      if(db.prepare("select 1 x from messages where tenant_id=? and external_message_id=?").get(tenantId,String(m.id)))continue;
-      const created=m.timestamp?new Date(Number(m.timestamp)*1000).toISOString():ts;
+      const externalMessageId=normalizeWahaMessageId(m?.id);
+      if(!externalMessageId)continue;
+      if(db.prepare("select 1 x from messages where tenant_id=? and external_message_id=?").get(tenantId,externalMessageId))continue;
+      const timestamp=Number(m?.timestamp);
+      const created=Number.isFinite(timestamp)&&timestamp>0&&timestamp*1000<=Date.now()+60000?
+        new Date(timestamp*1000).toISOString():ts;
       if(created>lastAt)lastAt=created;
       const fromMe=!!m.fromMe,rawBody=String(m.body||"").trim(),body=m.hasMedia?(rawBody&&rawBody.length<=1000?rawBody:"📎 Mídia"):rawBody.slice(0,4000);
       db.prepare("insert into messages(id,tenant_id,conversation_id,direction,sender_type,body,message_type,external_message_id,delivery_status,metadata,created_at) values(?,?,?,?,?,?,?,?,?,?,?)")
-        .run(crypto.randomUUID(),tenantId,co.id,fromMe?"out":"in",fromMe?"staff":"client",body,m.hasMedia?"media":"text",String(m.id),String(m.ackName|| (fromMe?"sent":"received")).toLowerCase(),JSON.stringify({synced:true}),created);
+        .run(crypto.randomUUID(),tenantId,co.id,fromMe?"out":"in",fromMe?"staff":"client",body,m.hasMedia?"media":"text",externalMessageId,String(m.ackName|| (fromMe?"sent":"received")).toLowerCase(),JSON.stringify({synced:true}),created);
       stats.messages_imported++;
     }
     db.prepare("update conversations set last_message_at=?,updated_at=? where id=? and tenant_id=?").run(lastAt,ts,co.id,tenantId);
