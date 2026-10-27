@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import {fileURLToPath} from "node:url";
+import path from "node:path";
 // Verificação SOMENTE-LEITURA da futura prévia gratuita do Render.
 // Não inicia deploy, não cadastra dados e não imprime senhas/tokens.
 export function previewUrl(raw){
@@ -54,7 +56,7 @@ export async function auditPreview(base,{email,password,fetchFn}={}){
     // Nunca expor dados, telefones, credenciais ou nomes no relatório público.
     demo_login_verified:true};
 }
-if(process.argv[1]&&import.meta.url===new URL("file://"+process.argv[1]).href){
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   try{
     const report=await auditPreview(process.env.NOVAGENTE_PREVIEW_URL,{
       email:process.env.NOVAGENTE_DEMO_OWNER_EMAIL,
