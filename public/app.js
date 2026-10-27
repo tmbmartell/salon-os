@@ -13,7 +13,7 @@ function activate(view,{skipTechnicalLoad=false}={}){
   $("#pageTitle").textContent=cfg[0];$("#pageSub").textContent=cfg[1];if(view==="agenda"){loadAgendaPhase2();loadWaitlist()}if(view==="team")loadStaff();if(view==="clients")loadClients();if(view==="technical"&&!skipTechnicalLoad)loadTechnical();if(view==="intelligence")loadReceipts();if(view==="inbox")loadInbox();if(view==="finance")loadFinance();if(view==="inventory")loadInventory();if(view==="suppliers")loadSuppliers();if(view==="packages")loadPackages();if(view==="retail")loadRetail();if(view==="retention")loadRetention();if(view==="ownerEye")loadOwnerEye();if(view==="agents")loadAgents();if(view==="admin")loadAdmin();if(view==="reports")loadReports();if(view==="marketing")window.dispatchEvent(new CustomEvent("ne:marketing-open"));
 }
 $$("[data-view]").forEach(b=>b.onclick=()=>activate(b.dataset.view));$$("[data-jump]").forEach(b=>b.onclick=()=>activate(b.dataset.jump));$$("[data-open]").forEach(b=>b.onclick=()=>$("#"+b.dataset.open).showModal());$$("[data-close]").forEach(b=>b.onclick=()=>b.closest("dialog").close());$("#quickAppointment").onclick=()=>$("#appointmentModal").showModal();
-async function bootstrap(){const [boot,health]=await Promise.all([api("/api/bootstrap"),api("/api/health")]);state.health=health;state.user=boot.user;$(`[data-view="ownerEye"],[data-jump="ownerEye"]`).forEach(el=>{el.hidden=!["owner","manager"].includes(state.user?.role)});state.professionals=boot.professionals;state.services=boot.services;state.resources=boot.resources||[];state.dashboard=boot.dashboard;state.whatsapp=boot.whatsapp;$("#health").textContent=health.jev?"Sistema + JEV online":"Sistema online · JEV fallback";$("#jevState").textContent=health.jev?"JEV online":"fallback ativo";renderDashboard();renderTeam();renderServices();renderResources();await loadClients();fillSelects();updateWahaUi()}
+async function bootstrap(){const [boot,health]=await Promise.all([api("/api/bootstrap"),api("/api/health")]);state.health=health;state.user=boot.user;$$(`[data-view="ownerEye"],[data-jump="ownerEye"]`).forEach(el=>{el.hidden=!["owner","manager"].includes(state.user?.role)});state.professionals=boot.professionals;state.services=boot.services;state.resources=boot.resources||[];state.dashboard=boot.dashboard;state.whatsapp=boot.whatsapp;$("#health").textContent=health.jev?"Sistema + JEV online":"Sistema online · JEV fallback";$("#jevState").textContent=health.jev?"JEV online":"fallback ativo";renderDashboard();renderTeam();renderServices();renderResources();await loadClients();fillSelects();updateWahaUi()}
 function renderDashboard(){const d=state.dashboard;$("#mAppointments").textContent=d.todayAppointments;$("#mForecast").textContent=fmt.format(d.forecast);$("#mClients").textContent=d.clientCount;$("#mPros").textContent=d.profCount;$("#todayList").innerHTML=d.appointments.length?d.appointments.map(a=>`<div class="row"><div class="who"><span class="avatar">${initials(a.client_name)}</span><div><strong>${a.client_name}</strong><small>${a.service_summary||a.service_name} · ${a.professional_summary||a.professional_name}</small></div></div><div><div class="time">${new Date(a.start_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div><span class="status ${a.status}">${statusLabel(a.status)}</span></div></div>`).join(""):`<div class="muted">Nenhum atendimento hoje.</div>`}
 async function loadClients(q=""){state.clients=await api("/api/clients"+(q?`?q=${encodeURIComponent(q)}`:""));$("#clientCount").textContent=`${state.clients.length} encontrados`;$("#clientList").innerHTML=state.clients.map(c=>{const socials=[c.instagram?`Instagram: ${esc(c.instagram)}`:"",c.facebook?`Facebook: ${esc(c.facebook)}`:""].filter(Boolean).join(" · ");const ref=c.referral_reference?`Referência: ${esc(c.referral_reference)}`:"";const birthday=c.birthday?`Aniversário: ${esc(c.birthday.split("-").reverse().join("/"))}`:"";return `<article><div class="who"><span class="avatar">${initials(c.name)}</span><div><h3>${esc(c.name)}</h3><p>${esc(c.phone||"Sem WhatsApp")}</p></div></div><div class="clientMeta">${birthday?`<small>${birthday}</small>`:""}${socials?`<small>${socials}</small>`:""}${ref?`<small>${ref}</small>`:""}</div>${c.notes?`<p>${esc(c.notes)}</p>`:""}<div class="tags">${(c.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div></article>`}).join("")||`<p class="muted">Nenhum cliente encontrado.</p>`;fillSelects();fillWaitlistSelects()}
 let searchTimer;$("#clientSearch").oninput=e=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadClients(e.target.value),220)};
@@ -27,7 +27,7 @@ function renderServices(){
   const current=state.serviceCategory||"Todos";
   if(filters){
     filters.innerHTML=["Todos",...categories].map(cat=>'<button type="button" data-ne-category="'+encodeURIComponent(cat)+'" aria-pressed="'+String(cat===current)+'" class="'+(cat===current?"active":"")+'">'+esc(cat)+'</button>').join("");
-    $("[data-ne-category]",filters).forEach(btn=>btn.onclick=()=>{state.serviceCategory=decodeURIComponent(btn.dataset.neCategory);renderServices()});
+    $$("[data-ne-category]",filters).forEach(btn=>btn.onclick=()=>{state.serviceCategory=decodeURIComponent(btn.dataset.neCategory);renderServices()});
   }
   const visible=state.services.filter(s=>current==="Todos"||(s.category||"Geral")===current);
   if(counter)counter.textContent=visible.length+" "+(visible.length===1?"serviço":"serviços");
@@ -39,13 +39,13 @@ function renderServices(){
       (showCommission?'<span>Comissão <strong>'+Number(s.commission_pct||0).toLocaleString("pt-BR")+'%</strong></span>':"")+'</div>'+
       '<div class="ne-service-actions"><button type="button" class="primary" data-ne-book-service="'+id+'">Agendar serviço</button><button type="button" class="secondary" data-ne-service-tech="'+id+'">Fichas técnicas</button></div></div></details>';
   }).join("")||'<p class="muted">Nenhum serviço nesta categoria.</p>';
-  $("[data-ne-book-service]",list).forEach(btn=>btn.onclick=()=>{
+  $$("[data-ne-book-service]",list).forEach(btn=>btn.onclick=()=>{
     $("#apService").value=btn.dataset.neBookService;
     appointmentUi.refreshSuggestions();
     appointmentUi.refreshSummary();
     $("#appointmentModal").showModal();
   });
-  $("[data-ne-service-tech]",list).forEach(btn=>btn.onclick=()=>{
+  $$("[data-ne-service-tech]",list).forEach(btn=>btn.onclick=()=>{
     activate("technical");
   });
 }
@@ -189,7 +189,7 @@ function renderConversationList(){
       (Number(c.unread_count)>0?'<b class="unreadBadge">'+c.unread_count+'</b>':"")+'</button>';
   }).join("")||'<div class="muted emptyPad">Nenhuma conversa com esses filtros.</div>';
   if(window.organizeBeautyInbox)window.organizeBeautyInbox(convs);
-  $("[data-conversation]").forEach(b=>b.onclick=()=>openConversation(b.dataset.conversation));
+  $$("[data-conversation]").forEach(b=>b.onclick=()=>openConversation(b.dataset.conversation));
 }
 function updateChatModeButton(){
   const b=$("#chatModeButton"),co=state.selectedConversation;if(!b||!co)return;
@@ -380,14 +380,14 @@ async function loadFinance(){
 function showStockTab(type,id){
   const prefix=type==="inventory"?"stock":"purchase",other=prefix==="stock"?"products":"suppliers";
   const active=id||other;
-  $("[data-ne-"+prefix+"-tab]").forEach(button=>{
+  $$("[data-ne-"+prefix+"-tab]").forEach(button=>{
     const yes=button.dataset["ne"+prefix[0].toUpperCase()+prefix.slice(1)+"Tab"]===active;
     button.classList.toggle("is-active",yes);button.setAttribute("aria-pressed",String(yes));
   });
-  $("[data-ne-"+prefix+"-panel]").forEach(panel=>panel.classList.toggle("hidden",panel.dataset["ne"+prefix[0].toUpperCase()+prefix.slice(1)+"Panel"]!==active));
+  $$("[data-ne-"+prefix+"-panel]").forEach(panel=>panel.classList.toggle("hidden",panel.dataset["ne"+prefix[0].toUpperCase()+prefix.slice(1)+"Panel"]!==active));
 }
-$("[data-ne-stock-tab]").forEach(button=>button.addEventListener("click",()=>showStockTab("inventory",button.dataset.neStockTab)));
-$("[data-ne-purchase-tab]").forEach(button=>button.addEventListener("click",()=>showStockTab("purchase",button.dataset.nePurchaseTab)));
+$$("[data-ne-stock-tab]").forEach(button=>button.addEventListener("click",()=>showStockTab("inventory",button.dataset.neStockTab)));
+$$("[data-ne-purchase-tab]").forEach(button=>button.addEventListener("click",()=>showStockTab("purchase",button.dataset.nePurchaseTab)));
 async function loadInventory(){
   try{
     const data=await Promise.all([api("/api/products"),api("/api/stock/recipes-overview"),api("/api/suppliers"),api("/api/stock/movements"),api("/api/stock/lots")]);state.products=data[0];state.suppliers=data[2];const costs=data[1],movements=data[3],lots=data[4];
