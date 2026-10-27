@@ -252,7 +252,7 @@ $("#scheduleFromChat").onclick=async()=>{
   $("#appointmentModal").showModal();
 };
 $("#refreshInbox").onclick=loadInbox;
-$("#syncWhatsappHistory").onclick=async()=>{const b=$("#syncWhatsappHistory");b.disabled=true;b.textContent="Sincronizando…";try{const out=await api("/api/whatsapp/sync",{method:"POST",body:JSON.stringify({chat_limit:40,message_limit:80})});await loadInbox();toast("Sincronizado · "+out.chats_imported+" conversas · "+out.messages_imported+" mensagens")}catch{toast("Não foi possível sincronizar o histórico")}finally{b.disabled=false;b.textContent="Sincronizar histórico"}};
+$("#syncWhatsappHistory").onclick=()=>{$("#whatsappBackfillDetails").open=true;window.dispatchEvent(new Event("ne:backfill-open"))};
 ["conversationSearch","conversationStatusFilter","conversationPriorityFilter","conversationUnreadFilter"].forEach(id=>$("#"+id).addEventListener(id==="conversationSearch"?"input":"change",renderConversationList));
 $("#saveConversationMeta").onclick=async()=>{
   const co=state.selectedConversation;if(!co)return;
