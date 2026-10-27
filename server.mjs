@@ -7,6 +7,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { installAuth, authenticate, handleAuthApi, requirePermission, audit } from "./auth.mjs";
+import { installWhatsAppBackfill, handleWhatsAppBackfillApi } from "./whatsapp-backfill.mjs";
 import { installWhatsApp, wahaConfigured, wahaStatus, ensureWahaSession, wahaQr, verifyWebhook, listConversations, conversationMessages, markConversationRead, sendConversationMessage, ingestWahaEvent, sendText, registerTenantSession, sessionForTenant, tenantForWahaEvent, syncWahaHistory } from "./whatsapp.mjs";
 import { installPhase2, handlePhase2Api } from "./phase2.mjs";
 import { installPhase3, handlePhase3Api } from "./phase3.mjs";
@@ -185,6 +186,7 @@ function ensureSeed(){
 ensureSeed();
 installAuth(db);
 installWhatsApp(db);
+installWhatsAppBackfill(db);
 installLlmConfig(db);
 if(!sessionForTenant(db,DEFAULT_TENANT))registerTenantSession(db,DEFAULT_TENANT);
 installPhase2(db);
@@ -767,6 +769,8 @@ async function api(req,res,url){
     catch(e){return send(res,e.status||503,{error:String(e.message||"whatsapp_send_failed")})}
   }
 
+  const backfillResult=await handleWhatsAppBackfillApi({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit});
+  if(backfillResult!==false)return backfillResult;
   if(req.method==="POST"&&url.pathname==="/api/whatsapp/sync"){
     guard("conversations.write");
     try{
