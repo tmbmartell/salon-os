@@ -259,6 +259,11 @@ test("Etapa 13: um dia inteiro de salão em API real, sem WAHA",{timeout:95000},
     const postcare=tasks.filter(x=>completed.some(c=>c.appointment_id===x.appointment_id)&&x.kind==="postcare");
     assert.equal(postcare.length,5);
     assert.equal(new Set(postcare.map(t=>t.appointment_id)).size,5);
+    const finalSchedule=await expect(reception,`/api/appointments?from=${date}T00:00:00.000Z&to=${date}T23:59:59.999Z`,200);
+    const noShows=finalSchedule.filter(x=>x.status==="no_show");
+    const cancellations=finalSchedule.filter(x=>x.status==="cancelled");
+    assert.equal(noShows.length,1);
+    assert.equal(cancellations.length,1);
     const ownerEye=await expect(owner,"/api/owner-eye/summary",200);
     assert.equal(ownerEye.money.income,530);
     assert.equal(ownerEye.money.expenses,20);
@@ -268,6 +273,9 @@ test("Etapa 13: um dia inteiro de salão em API real, sem WAHA",{timeout:95000},
     assert.equal(ownerEye.operations.repeat_clients,1);
     assert.equal(ownerEye.operations.clients_with_checkout,4);
     assert.equal(ownerEye.operations.repeat_rate,25);
+    // Olho do Dono contabiliza faltas somente na janela histórica até agora.
+    // Como a agenda sintética foi criada no futuro, só a lista dessa data registra a falta.
+    assert.equal(ownerEye.operations.absence_count,0);
     assert.ok(ownerEye.alerts.some(a=>a.id==="stock"));
     const reports=await expect(owner,"/api/reports/summary",200);
     assert.equal(reports.services.count,5);
@@ -286,7 +294,7 @@ test("Etapa 13: um dia inteiro de salão em API real, sem WAHA",{timeout:95000},
     const expected={checkouts:5,no_show:1,cancelled:1,income:530,expenses:20,net:510,
       commissions:94,cash_closing:190,pigment_stock:330,finisher_stock:125,postcare:5};
     const actual={checkouts:ownerEye.operations.completed_services,
-      no_show:ownerEye.operations.absence_count,cancelled:1,income:ownerEye.money.income,
+      no_show:noShows.length,cancelled:cancellations.length,income:ownerEye.money.income,
       expenses:ownerEye.money.expenses,net:ownerEye.money.cash_net,commissions:actualCommissions/100,
       cash_closing:open.expected,pigment_stock:pigStock,finisher_stock:finStock,postcare:postcare.length};
     for(const key of Object.keys(expected))assert.equal(actual[key],expected[key],key);
