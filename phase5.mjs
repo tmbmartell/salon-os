@@ -119,6 +119,8 @@ export async function handlePhase5Api({req,res,url,db,user,tenant,send,parseBody
   const roleRoute=url.pathname.match(/^\/api\/admin\/users\/([^/]+)\/role$/);
   if(req.method==="PATCH"&&roleRoute){
     guard("admin.write");
+    // Apenas a proprietária pode promover, rebaixar ou conceder o papel owner.
+    if(user.role!=="owner")return send(res,403,{error:"owner_only"});
     const id=decodeURIComponent(roleRoute[1]),target=one(db,"select * from users where id=? and tenant_id=?",[id,tenant]);if(!target)return send(res,404,{error:"user_not_found"});
     const b=await parseBody(req),role=txt(b.role,30),allowed=["owner","manager","reception","professional"];
     if(!allowed.includes(role))return send(res,400,{error:"invalid_role"});
@@ -126,8 +128,15 @@ export async function handlePhase5Api({req,res,url,db,user,tenant,send,parseBody
       const owners=Number(one(db,"select count(*) n from users where tenant_id=? and role='owner' and active=1",[tenant])?.n||0);
       if(owners<=1)return send(res,409,{error:"last_owner"});
     }
-    run(db,"update users set role=?,updated_at=? where id=?",[role,now(),id]);
-    audit(db,user,"admin.user.role","user",id,{from:target.role,to:role});
+    if(role!==target.role){
+      // Revoga os cookies existentes após mudança de privilégio; o funcionário
+      // deverá autenticar novamente para obter sessão com o novo papel.
+      transaction(db,()=>{
+        run(db,"update users set role=?,updated_at=? where id=? and tenant_id=?",[role,now(),id,tenant]);
+        run(db,"delete from auth_sessions where user_id=? and tenant_id=?",[id,tenant]);
+      });
+    }
+    audit(db,user,"admin.user.role","user",id,{from:target.role,to:role,sessions_revoked:role!==target.role});
     return send(res,200,{ok:true,id,role});
   }
   const activeRoute=url.pathname.match(/^\/api\/admin\/users\/([^/]+)\/active$/);
