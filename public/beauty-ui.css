@@ -355,3 +355,19 @@ body{background:var(--bg);color:var(--ink)}
 .ne-stage8-card[hidden],.ne-stage8-panel [hidden]{display:none!important}
 @media(max-width:900px){.ne-stage8-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:580px){.ne-stage8-card{padding:12px;min-height:111px}.ne-stage8-card strong{font-size:12px}.ne-stage8-panel{padding:12px}.ne-stage8-form{grid-template-columns:1fr}.ne-stage8-user-actions{width:100%}.ne-stage8-user-actions select{flex:1}}
+
+/* Importação WhatsApp progressiva — sem poluir a central de mensagens. */
+.ne-backfill{border:1px solid var(--line);background:#fff;border-radius:15px;margin-bottom:15px;box-shadow:var(--shadow)}
+.ne-backfill>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;list-style:none;padding:14px 17px;font-size:13px;font-weight:700;cursor:pointer}
+.ne-backfill>summary::-webkit-details-marker{display:none}
+.ne-backfill>summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ne-backfill>summary small{font-weight:400;font-size:11px;color:var(--muted)}
+.ne-backfill[open]>summary{border-bottom:1px solid var(--line)}
+.ne-backfill-content{padding:14px 17px 18px;display:grid;gap:13px}
+.ne-backfill-note{font-size:12px;color:var(--muted);margin:0;line-height:1.5}
+.ne-backfill-controls{display:flex;align-items:end;gap:9px;flex-wrap:wrap}
+.ne-backfill-controls label{display:grid;gap:6px;font-size:11px;color:var(--muted);font-weight:600}
+.ne-backfill-controls input{padding:9px 10px;min-height:41px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:13px}
+.ne-backfill-controls button{min-height:41px;font-size:12px}
+#neBackfillStatus{font-size:12px;line-height:1.6;border:1px solid var(--line);border-radius:12px;background:var(--soft);padding:12px}
+@media(max-width:600px){.ne-backfill>summary{align-items:flex-start;flex-direction:column;gap:4px}.ne-backfill-controls button{flex:1 1 140px}}
