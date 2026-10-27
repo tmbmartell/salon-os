@@ -53,7 +53,7 @@ try{
   await page.locator("#loginPanel:not(.hidden)").waitFor({timeout:10000});
   await page.locator("#loginForm [name=password]").fill("QA-browser-senha-123456!");
   await page.locator("#loginForm button").click();
-  await page.locator("#authGate.hidden").waitFor({timeout:25000});
+  await page.locator("#authGate").waitFor({state:"hidden",timeout:25000});
   await page.waitForFunction(()=>{
     const node=document.querySelector("#mPros");
     return node&&node.textContent.trim()!=="—";
@@ -89,7 +89,7 @@ try{
   await page.locator("#neCampaignForm [name=title]").fill("Campanha de teste visual");
   await page.locator("#neCampaignForm [name=message]").fill("Rascunho privado para QA");
   await page.locator("#neCampaignForm button[type=submit]").click();
-  await page.locator("#neCampaignModal:not([open])").waitFor({timeout:12000});
+  await page.locator("#neCampaignModal").waitFor({state:"hidden",timeout:12000});
   await page.getByText("Campanha de teste visual").first().waitFor();
   await open("ownerEye");
   await page.waitForFunction(()=>document.querySelector("#oiRevenue")?.textContent?.trim()!=="—",{timeout:15000});
