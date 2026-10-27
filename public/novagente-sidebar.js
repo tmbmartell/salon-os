@@ -43,7 +43,7 @@ function start(){
    const trigger=group.querySelector('.bw-nav-trigger'),pop=group.querySelector('.bw-submenu');
    if(!trigger||!pop)return;
    const rect=trigger.getBoundingClientRect();
-   const width=Math.min(260,Math.max(195,window.innerWidth-rect.right-24));
+   const width=Math.min(300,Math.max(230,window.innerWidth-rect.right-24));
    const maxHeight=Math.min(500,window.innerHeight-24);
    const popupHeight=Math.min(pop.scrollHeight||180,maxHeight);
    const top=Math.max(12,Math.min(rect.top,window.innerHeight-popupHeight-12));
