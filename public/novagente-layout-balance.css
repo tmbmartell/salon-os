@@ -54,3 +54,12 @@
  #dashboard.active{width:auto;max-width:none}
  #dashboard .ne-experience{max-width:none}
 }
+
+/* Dashboard: remove faixa duplicada de título, preserva ações do topo. */
+body:has(#dashboard.active) .topbar > div:first-child{display:none}
+body:has(#dashboard.active) .topbar{min-height:0;justify-content:flex-end;align-items:center;padding-top:12px;padding-bottom:10px;gap:10px}
+body:has(#dashboard.active) .topbar .ne-theme-switcher{margin-left:0}
+@media(max-width:900px){
+ body:has(#dashboard.active) .topbar{padding:9px 14px;min-height:0;justify-content:flex-end}
+ body:has(#dashboard.active) .topbar .ne-theme-switcher{order:initial;width:auto;margin-left:0}
+}
