@@ -269,12 +269,36 @@ $("#showQr").onclick=()=>{$("#waQrImage").src="/api/whatsapp/session/qr?t="+Date
 $("#openClientFromChat").onclick=async()=>{const p=state.selectedConversation?.client_phone||"";activate("clients");$("#clientSearch").value=p;await loadClients(p)};
 $("#resourceForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{const x=await api("/api/resources",{method:"POST",body:JSON.stringify(b)});state.resources.push(x);renderResources();fillSelects();$("#resourceModal").close();e.target.reset();toast("Recurso cadastrado")}catch{toast("Erro ao salvar recurso")}};
 
-function showAuth(mode,name=""){const gate=$("#authGate");gate.classList.remove("hidden");$("#setupPanel").classList.toggle("hidden",mode!=="setup");$("#loginPanel").classList.toggle("hidden",mode!=="login");$("#resetPanel").classList.toggle("hidden",mode!=="reset");$("#authError").textContent="";if(name)$("#loginTenant").textContent="Acesso a "+name+"."}
+function showAuth(mode,name=""){const gate=$("#authGate");gate.classList.remove("hidden");$("#setupPanel").classList.toggle("hidden",mode!=="setup");$("#loginPanel").classList.toggle("hidden",mode!=="login");$("#resetPanel").classList.toggle("hidden",mode!=="reset");$("#mfaPanel").classList.toggle("hidden",mode!=="mfa");$("#authError").textContent="";if(name)$("#loginTenant").textContent="Acesso a "+name+"."}
 function hideAuth(){$("#authGate").classList.add("hidden")}
 async function initAuth(){const resetToken=new URLSearchParams(location.search).get("reset");if(resetToken){try{const info=await api("/api/auth/reset?token="+encodeURIComponent(resetToken));showAuth("reset");$("#resetIdentity").textContent="Redefinindo o acesso de "+info.email+".";return}catch{showAuth("login");$("#authError").textContent="Este link de redefinição expirou ou já foi usado.";return}}try{const s=await api("/api/auth/state");if(!s.claimed){showAuth("setup",s.tenant?.name);return}try{const me=await api("/api/auth/me");state.user=me.user;hideAuth();await bootstrap()}catch{showAuth("login",s.tenant?.name)}}catch{showAuth("login");$("#authError").textContent="Não foi possível verificar o acesso."}}
 $("#setupForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/auth/setup",{method:"POST",body:JSON.stringify(b)});showAuth("login");$("#loginForm").elements.email.value=b.email;toast("Acesso criado. Agora entre com sua senha.")}catch(err){$("#authError").textContent=err.data?.error==="password_too_short"?"Use uma senha com pelo menos 10 caracteres.":"Não foi possível criar o acesso."}};
 $("#resetForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target)),token=new URLSearchParams(location.search).get("reset");if(b.password!==b.confirm_password){$("#authError").textContent="As duas senhas precisam ser iguais.";return}try{await api("/api/auth/reset",{method:"POST",body:JSON.stringify({token,password:b.password})});history.replaceState({},document.title,location.pathname);showAuth("login");$("#authError").textContent="Senha redefinida. Entre com a nova senha."}catch(err){$("#authError").textContent=err.data?.error==="password_too_short"?"Use uma senha com pelo menos 10 caracteres.":"Não foi possível redefinir. Gere um novo link."}};
-$("#loginForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{const out=await api("/api/auth/login",{method:"POST",body:JSON.stringify(b)});state.user=out.user;hideAuth();await bootstrap()}catch(err){if(err.data?.error==="workspace_required"){$("#workspaceLoginField").classList.remove("hidden");$("#authError").textContent="Este e-mail existe em mais de um salão. Informe o identificador da empresa."}else $("#authError").textContent="E-mail ou senha incorretos."}};
+let mfaLoginChallenge=null;
+$("#loginForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{
+  const out=await api("/api/auth/login",{method:"POST",body:JSON.stringify(b)});
+  if(out.mfa_required){
+    mfaLoginChallenge=out.challenge;showAuth("mfa");
+    $("#mfaLoginForm").reset();$("#mfaLoginForm").elements.code.focus();return;
+  }
+  state.user=out.user;hideAuth();await bootstrap();
+}catch(err){
+  if(err.data?.error==="workspace_required"){$("#workspaceLoginField").classList.remove("hidden");$("#authError").textContent="Este e-mail existe em mais de um salão. Informe o identificador da empresa."}
+  else if(err.data?.error==="login_temporarily_blocked")$("#authError").textContent="Muitas tentativas. Aguarde 15 minutos e tente novamente.";
+  else $("#authError").textContent="E-mail ou senha incorretos.";
+}};
+$("#mfaLoginForm").onsubmit=async e=>{
+  e.preventDefault();if(!mfaLoginChallenge)return showAuth("login");
+  const code=String(e.target.elements.code.value||"").trim();
+  try{
+    const out=await api("/api/auth/mfa/verify",{method:"POST",body:JSON.stringify({challenge:mfaLoginChallenge,code})});
+    mfaLoginChallenge=null;e.target.reset();state.user=out.user;hideAuth();await bootstrap();
+  }catch(err){
+    $("#authError").textContent=err.status===429?"Limite de tentativas atingido. Volte ao login.":"Código inválido ou expirado.";
+    e.target.elements.code.value="";
+  }
+};
+$("#mfaCancelLogin").onclick=()=>{mfaLoginChallenge=null;$("#mfaLoginForm").reset();showAuth("login")};
 $("#logoutBtn").onclick=async()=>{try{await api("/api/auth/logout",{method:"POST",body:"{}"})}catch{}showAuth("login")};
 
 initAuth().catch(e=>{console.error(e);$("#health").textContent="Falha ao carregar";toast("Não foi possível carregar o sistema")});
