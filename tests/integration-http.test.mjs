@@ -143,8 +143,46 @@ test("E2E: servidor + login + CRM + agenda + ficha + estoque + caixa + pós-vend
     assert.equal((await owner("/api/checkout",{method:"POST",body:{
       appointment_id:appointment.id,payment_method:"pix"
     }})).status,409);
+    // Segundo atendimento com dois serviços usando o mesmo pigmento: 60 + 40 g padrão,
+    // consumo real de 125 g, sem baixa duplicada. Também valida o caixa físico.
+    const otherService=boot.services.find(x=>x.id!==service.id);
+    assert.ok(otherService,"Dados de demonstração precisam conter ao menos dois serviços");
+    await expectStatus(owner,"/api/services/"+otherService.id+"/recipe",200,{
+      method:"PUT",body:{items:[{product_id:item.id,qty_standard:40}]}
+    });
+    const combined=await expectStatus(owner,"/api/appointments",201,{
+      method:"POST",body:{client_id:customer.id,professional_id:professional.id,service_id:service.id,
+        start_at:new Date(Date.now()+12*86400000).toISOString(),
+        items:[{service_id:otherService.id,professional_id:professional.id,qty:1}]}
+    });
+    const multiPrep=await expectStatus(owner,"/api/checkout/"+combined.id+"/prep",200);
+    assert.equal(multiPrep.recipe.find(x=>x.product_id===item.id).qty_standard,100);
+    const cashDenied=await owner("/api/checkout",{method:"POST",body:{
+      appointment_id:combined.id,payment_method:"cash",
+      consumption:[{product_id:item.id,actual_qty:125}]
+    }});
+    assert.equal(cashDenied.status,409,"dinheiro exige caixa aberto");
+    const opened=await expectStatus(owner,"/api/cash/open",201,{
+      method:"POST",body:{opening:20}
+    });
+    assert.equal(opened.status,"open");
+    const multiCheckout=await expectStatus(owner,"/api/checkout",201,{method:"POST",body:{
+      appointment_id:combined.id,payment_method:"cash",
+      consumption:[{product_id:item.id,actual_qty:125}]
+    }});
+    assert.equal(multiCheckout.consumption.reduce((sum,x)=>sum+x.actual_qty,0),125);
+    assert.equal(multiCheckout.consumption.length,2);
+    const afterCombined=await expectStatus(owner,"/api/products",200);
+    assert.equal(afterCombined.find(x=>x.id===item.id).stock_qty,10);
+    const cashView=await expectStatus(owner,"/api/cash/overview",200);
+    assert.equal(cashView.expected,20+multiCheckout.total);
+    const closed=await expectStatus(owner,"/api/cash/close",200,{
+      method:"POST",body:{actual:cashView.expected}
+    });
+    assert.equal(closed.difference,0);
     const finance=await expectStatus(owner,"/api/finance/entries",200);
     assert.equal(finance.filter(x=>x.appointment_id===appointment.id&&x.kind==="income").length,1);
+    assert.equal(finance.filter(x=>x.appointment_id===combined.id&&x.kind==="income").length,1);
     const commissions=await expectStatus(owner,"/api/commissions",200);
     assert.ok(commissions.some(x=>x.appointment_id===appointment.id));
     const tasks=await expectStatus(owner,"/api/retention/tasks?status=pending",200);
@@ -153,7 +191,8 @@ test("E2E: servidor + login + CRM + agenda + ficha + estoque + caixa + pós-vend
     assert.match(postcare[0].message,/Cliente/);
     const ownerEye=await expectStatus(owner,"/api/owner-eye/summary",200);
     assert.ok(ownerEye.money.income>=done.total);
-    assert.ok(ownerEye.operations.completed_services>=1);
+    assert.ok(ownerEye.operations.completed_services>=2);
+    assert.ok(ownerEye.attention.critical_stock>=1);
     assert.ok(ownerEye.charts.cashflow14.length===14);
     assert.equal((await expectStatus(owner,"/api/marketing/campaigns",200)).length,1);
     // Sem escalar privilégios: convite de recepcionista cria acesso limitado.
