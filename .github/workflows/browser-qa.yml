@@ -23,8 +23,17 @@ jobs:
           node-version: '22'
       - name: Instalar Playwright no runner de QA
         run: npm install --no-save playwright@1.57.0
-      - name: Preparar navegador Chromium isolado
-        run: npx playwright install --with-deps chromium
+      - name: Usar navegador Chrome do runner (ou instalar Chromium)
+        run: |
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "QA_CHROME=$(command -v google-chrome)" >> "$GITHUB_ENV"
+          elif command -v google-chrome-stable >/dev/null 2>&1; then
+            echo "QA_CHROME=$(command -v google-chrome-stable)" >> "$GITHUB_ENV"
+          elif command -v chromium >/dev/null 2>&1; then
+            echo "QA_CHROME=$(command -v chromium)" >> "$GITHUB_ENV"
+          else
+            npx playwright install chromium
+          fi
       - name: Testar interface com banco de dados temporário
         run: node tests/browser-smoke.mjs
       - name: Guardar capturas de homologação
