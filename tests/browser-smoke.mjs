@@ -42,7 +42,7 @@ try{
   browser=await chromium.launch({headless:true,...(process.env.QA_CHROME?{executablePath:process.env.QA_CHROME}:{}),args:["--no-sandbox"]});
   const context=await browser.newContext({viewport:{width:1440,height:900},locale:"pt-BR",timezoneId:"America/Porto_Velho"});
   page=await context.newPage();
-  page.on("pageerror",error=>errors.push(error.message));
+  page.on("pageerror",error=>errors.push(error.stack||error.message));
   await page.goto(base,{waitUntil:"domcontentloaded"});
   await page.locator("#setupPanel:not(.hidden)").waitFor({timeout:15000});
   await page.screenshot({path:path.join(artifact,"01-primeiro-acesso.png"),fullPage:true});
