@@ -27,5 +27,4 @@ services:
         sync: false
       - key: NOVAGENTE_SETUP_TOKEN
         generateValue: true
-      - key: NOVAGENTE_MFA_KEY
-        generateValue: true
+      # Chave MFA temporária gerada no start para banco de dados descartável.
