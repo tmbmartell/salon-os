@@ -147,8 +147,9 @@ export function restorePilotBackup({archivePath,targetDirectory,passphrase}){
     }
     fs.renameSync(working,target);moved=true;
     // Prova que uma restauração PARA PASTA NOVA foi realizada, não somente listada.
-    const receipt={ok:true,checked_at:new Date().toISOString(),backup_sha256:hash(fs.readFileSync(archive)),
-      asset_count:report.asset_count,sqlite_integrity:report.sqlite_integrity};
+    const receipt={ok:true,checked_at:new Date().toISOString(),archive_name:path.basename(archive),
+      backup_sha256:hash(fs.readFileSync(archive)),asset_count:report.asset_count,
+      sqlite_integrity:report.sqlite_integrity};
     fs.writeFileSync(path.join(path.dirname(archive),"restore-verify.json"),JSON.stringify(receipt,null,2),{mode:0o600});
     return {...report,restored_to:target,verified:true};
   }finally{if(!moved)fs.rmSync(working,{recursive:true,force:true})}
