@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - 'public/**'
+      - 'server.mjs'
+      - 'auth.mjs'
+      - 'phase5.mjs'
+      - 'request-security.mjs'
       - 'tests/browser-smoke.mjs'
       - '.github/workflows/browser-qa.yml'
   workflow_dispatch:
