@@ -675,7 +675,6 @@ function setAgentField(form,name,value){
   if(el.type==="checkbox")el.checked=!!value;
   else el.value=value??"";
 }
-async 
 function updateLlmFields(){
   const f=$("#agentConfigForm"),external=f.elements.llm_provider.value!=="internal";
   f.elements.llm_model.disabled=!external;
