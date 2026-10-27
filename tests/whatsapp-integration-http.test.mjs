@@ -30,6 +30,18 @@ async function mockWaha(){
       const name=decodeURIComponent(url.pathname.slice("/api/sessions/".length));
       return sessions.has(name)?respond(200,{name,...sessions.get(name)}):respond(404,{error:"missing"});
     }
+    if(req.method==="GET"&&url.pathname==="/api/qa-only/chats"){
+      return respond(200,[
+        {id:"556999922113@c.us",name:"Contato Histórico",unreadCount:0},
+        {id:"123456-22222@g.us",name:"Grupo de teste",unreadCount:0}
+      ]);
+    }
+    if(req.method==="GET"&&url.pathname==="/api/qa-only/chats/556999922113%40c.us/messages"){
+      return respond(200,[{
+        id:{_serialized:"historic-001"},timestamp:Date.parse("2026-04-15T12:00:00Z")/1000,
+        body:"Olá, quero informações do salão",fromMe:false,hasMedia:false
+      }]);
+    }
     if(req.method==="POST"&&url.pathname==="/api/sendText"){
       const request=JSON.parse(body||"{}");received.push(request);
       return respond(200,{id:"sent-qa-"+received.length});
@@ -130,7 +142,23 @@ test("WAHA simulado: HMAC, mensagem, cliente CRM, conversa, agenda, resposta, AC
     const duplicate=await app.webhook(text);
     assert.equal(duplicate.status,200);
     assert.equal(duplicate.data.type,"duplicate");
+    // Importação de histórico a partir de abril de 2026, com id em formato objeto.
+    const sync1=await expect(owner,"/api/whatsapp/sync",200,{method:"POST",
+      body:{chat_limit:5,message_limit:10}});
+    assert.equal(sync1.messages_imported,1);
+    assert.equal(sync1.skipped,1,"grupos ignorados");
+    const sync2=await expect(owner,"/api/whatsapp/sync",200,{method:"POST",
+      body:{chat_limit:5,message_limit:10}});
+    assert.equal(sync2.messages_imported,0,"sincronização é idempotente");
+    assert.equal(app.waha.received.length,0,"importação histórica jamais envia mensagens");
     const clients=await expect(owner,"/api/clients",200);
+    assert.ok(clients.some(c=>c.name==="Contato Histórico"));
+    const historyCo=(await expect(owner,"/api/conversations",200)).find(c=>c.client_name==="Contato Histórico");
+    assert.ok(historyCo);
+    const historyMsgs=await expect(owner,"/api/conversations/"+historyCo.id+"/messages",200);
+    assert.equal(historyMsgs.length,1);
+    assert.equal(historyMsgs[0].external_message_id,"historic-001");
+    assert.ok(historyMsgs[0].created_at.startsWith("2026-04-15"));
     const client=clients.find(x=>x.id===incoming.data.clientId);
     assert.equal(client.name,"Cliente Piloto");
     assert.equal(client.phone,"556999988776");
