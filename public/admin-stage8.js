@@ -98,7 +98,8 @@
   const inviteStatus=make("p","ne-stage8-help");inviteStatus.setAttribute("role","status");
   inviteForm.append(inviteActions,inviteStatus);
   inviteDialog.append(inviteForm);document.body.append(inviteDialog);
-  inviteButton.onclick=()=>{inviteForm.reset();detailMessage(inviteStatus,"");inviteDialog.showModal()};
+  const inviteFormOriginal=[...inviteForm.childNodes];
+  inviteButton.onclick=()=>{inviteForm.replaceChildren(...inviteFormOriginal);inviteForm.reset();submitInvite.disabled=false;detailMessage(inviteStatus,"");inviteDialog.showModal()};
   inviteForm.onsubmit=async event=>{
     event.preventDefault();submitInvite.disabled=true;
     try{
