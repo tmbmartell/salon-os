@@ -1,0 +1,115 @@
+/* Theme controller: light remains existing approved interface, dark is opt-in */
+.ne-theme-switcher{display:flex;align-items:center;gap:9px;margin-left:auto;flex:none;padding:6px;background:#fff;border:1px solid #e4e2ee;border-radius:14px;box-shadow:0 7px 22px #1113250b}
+.ne-theme-label{font-size:11px;color:#77718b;font-weight:750;margin:0 3px 0 6px}
+.ne-theme-options{display:flex;gap:3px}
+.ne-theme-option{font-size:11px;line-height:1;border:1px solid transparent;border-radius:10px;padding:10px 12px;cursor:pointer;background:transparent;color:#555b73;font-weight:750;white-space:nowrap}
+.ne-theme-option:hover{background:#f3effa}
+.ne-theme-option.is-selected{color:#673399;background:#f0e5fb;border-color:#d8c5ed}
+.ne-theme-option:focus-visible,.ne-theme-rail-trigger:focus-visible{outline:3px solid #b68af1;outline-offset:2px}
+.ne-theme-rail-trigger{display:grid;place-items:center;color:#c2cfdf;background:#213149;border:1px solid #3d506a;border-radius:12px;width:40px;height:35px;font-size:22px;cursor:pointer}
+.ne-theme-rail-trigger:hover{color:white;background:#354664}
+html[data-ne-theme="dark"]{--bg:#111724;--card:#20283a;--ink:#e9edf8;--muted:#9ca9bf;--line:#364257;--soft:#303952;--accent:#aa85ed;--ne-ink:#edf1fb;--ne-muted:#a7b4c9;--ne-edge:#354158;--ne-bg:#111724;--ne-shadow:0 12px 30px #070b1645;color-scheme:dark}
+html[data-ne-theme="dark"] body{background:#111724;color:#e9edf8}
+html[data-ne-theme="dark"] main{background:linear-gradient(135deg,#121a2a,#151b2c 70%,#111928)}
+html[data-ne-theme="dark"] .topbar h1,html[data-ne-theme="dark"] .topbar p:not(.eyebrow){color:#eef2fc}
+html[data-ne-theme="dark"] .topbar .eyebrow{color:#c49ee6}
+html[data-ne-theme="dark"] .ne-theme-switcher{background:#202b3e;border-color:#3e4b60;box-shadow:none}
+html[data-ne-theme="dark"] .ne-theme-label{color:#b1bdd2}
+html[data-ne-theme="dark"] .ne-theme-option{color:#b2c0d6}
+html[data-ne-theme="dark"] .ne-theme-option:hover{background:#33425b}
+html[data-ne-theme="dark"] .ne-theme-option.is-selected{background:#493763;color:#f8e7ff;border-color:#8a69b9}
+html[data-ne-theme="dark"] .view:not(#dashboard)>.sectionTitle{background:linear-gradient(120deg,#20293a,#222a3d);border-color:#39455a}
+html[data-ne-theme="dark"] .view:not(#dashboard)>.sectionTitle h2,html[data-ne-theme="dark"] .view .panelhead h2{color:#eff2fa}
+html[data-ne-theme="dark"] .view:not(#dashboard)>.sectionTitle p,html[data-ne-theme="dark"] .view .panelhead p{color:#a4b0c7}
+html[data-ne-theme="dark"] .view .panel,html[data-ne-theme="dark"] .view .metrics>article,html[data-ne-theme="dark"] .view .hubCard,html[data-ne-theme="dark"] .view .cards>article{background:#20293b;color:#e6ecf6;border-color:#3a465b}
+html[data-ne-theme="dark"] .view .metrics strong{color:#f6edff}
+html[data-ne-theme="dark"] .view .metrics span,html[data-ne-theme="dark"] .view .metrics small,html[data-ne-theme="dark"] .view .muted{color:#b0bdd0}
+html[data-ne-theme="dark"] .view .hubCard{background:linear-gradient(145deg,#272c48,#20283a);border-color:#47405b}
+html[data-ne-theme="dark"] .view .hubCard h3,html[data-ne-theme="dark"] .view .hubCard strong{color:#f0f1ff}
+html[data-ne-theme="dark"] .view .hubCard small{color:#b7bfce}
+html[data-ne-theme="dark"] .view .bw-disclosure-summary,html[data-ne-theme="dark"] .ne-operational-details>summary{background:#283348;color:#e8edfa;border-color:#43516a}
+html[data-ne-theme="dark"] .view .bw-disclosure-summary:hover{background:#35415a}
+html[data-ne-theme="dark"] .view .bw-disclosure-arrow{background:#554071;color:#f4e7ff}
+html[data-ne-theme="dark"] .view .secondary{background:#3d3654;color:#f1ddff}
+html[data-ne-theme="dark"] .view .secondary:hover{background:#54436a}
+html[data-ne-theme="dark"] .view .link{color:#c3a1ff}
+html[data-ne-theme="dark"] .view input,html[data-ne-theme="dark"] .view select,html[data-ne-theme="dark"] .view textarea{background:#171f30;color:#ebeff9;border-color:#43516a}
+html[data-ne-theme="dark"] .view input::placeholder,html[data-ne-theme="dark"] .view textarea::placeholder{color:#8e9db5}
+html[data-ne-theme="dark"] .view .searchrow input,html[data-ne-theme="dark"] #inbox .messengerToolbar input,html[data-ne-theme="dark"] #inbox .messengerToolbar select{background:#171f30;border-color:#43516a;color:#e7ecf5}
+html[data-ne-theme="dark"] #inbox .messengerToolbar{background:#20293b;border-color:#3a465b}
+html[data-ne-theme="dark"] #inbox .inboxListPanel,html[data-ne-theme="dark"] #inbox .chatPanel,html[data-ne-theme="dark"] #inbox .conversationDetailPanel{background:#20293b}
+html[data-ne-theme="dark"] #inbox .chatHead{background:#293149;border-color:#39475f}
+html[data-ne-theme="dark"] #inbox .bw-conversation-card{background:#29344a;border-color:#40516b;color:#eff2fb}
+html[data-ne-theme="dark"] #inbox .bw-conversation-card:hover,html[data-ne-theme="dark"] #inbox .bw-conversation-card.active{background:#403653;border-color:#a885c6}
+html[data-ne-theme="dark"] #inbox .bw-conversation-heading strong{color:#f0f3fb}
+html[data-ne-theme="dark"] #inbox .bw-conversation-heading small{color:#aebbd0}
+html[data-ne-theme="dark"] #inbox .message.in{background:#2e3b50;color:#f3f5fc}
+html[data-ne-theme="dark"] #inbox .message.out{background:#574270;color:#fff}
+html[data-ne-theme="dark"] #inbox .conversationDetailPanel select,html[data-ne-theme="dark"] #inbox .conversationDetailPanel input{background:#182236;color:#edf1f9;border-color:#465470}
+html[data-ne-theme="dark"] #clients #clientList article{background:linear-gradient(135deg,#29344b,#212b3c);border-color:#46516b;color:#eef1fc}
+html[data-ne-theme="dark"] #clients .searchrow{border-color:#39455a}
+html[data-ne-theme="dark"] #agenda .ne-action-card,html[data-ne-theme="dark"] #finance .ne-finance-action{background:linear-gradient(135deg,#283248,#202a3b);border-color:#42516a;color:#e9eef8}
+html[data-ne-theme="dark"] #finance .ne-finance-action.is-active{background:#45345b;border-color:#9973d3}
+html[data-ne-theme="dark"] .view .chip,html[data-ne-theme="dark"] .view .tag{background:#354158;color:#d7e2f5;border-color:#4d5a75}
+html[data-ne-theme="dark"] .view .ne-ops-mini-nav button{background:#263147;color:#d9d6e8;border-color:#495670}
+html[data-ne-theme="dark"] .view .ne-ops-mini-nav button:hover{background:#48375f}
+html[data-ne-theme="dark"] dialog{background:#20293b;color:#e7edf9}
+html[data-ne-theme="dark"] dialog .modalForm,html[data-ne-theme="dark"] dialog .modalHead{background:#20293b;color:#e7edf9}
+html[data-ne-theme="dark"] dialog input,html[data-ne-theme="dark"] dialog select,html[data-ne-theme="dark"] dialog textarea{background:#152033;color:#ebeffb;border-color:#46536d}
+html[data-ne-theme="dark"] dialog .x{background:#354359;color:#e9edf7}
+html[data-ne-theme="dark"] .view .tableLike,html[data-ne-theme="dark"] .view .row{color:#e8edf7;border-color:#3d4961}
+html[data-ne-theme="dark"] .view .result,html[data-ne-theme="dark"] .view .pipeline span{background:#2d3950;color:#e9eef8;border-color:#435168}
+html[data-ne-theme="dark"] #dashboard.active{background:#111722;color:#f9faff}
+html[data-ne-theme="light"] #dashboard.active{background:#f8f5ff;color:#22213a;border:1px solid #e4d9f2}
+html[data-ne-theme="light"] #dashboard .ne-section h3{color:#25243c}
+html[data-ne-theme="light"] #dashboard .ne-kicker{color:#9553a6}
+html[data-ne-theme="light"] #dashboard .ne-intro h2{color:#1d2138}
+html[data-ne-theme="light"] #dashboard .ne-sub{color:#6d7088}
+html[data-ne-theme="light"] #dashboard .ne-operational-details[open]{color:#1f2a45}
+html[data-ne-theme="dark"] .authCard{background:#20293b;color:#f3f5fa}
+html[data-ne-theme="dark"] .authCard input{background:#161e2e;color:#f5f7fd;border-color:#46536a}
+html[data-ne-theme="dark"] .authCard h2{color:#f4f5ff}
+@media(max-width:1100px){.ne-theme-switcher{margin-left:auto}.ne-theme-label{display:none}.ne-theme-option{padding:9px 8px}}
+@media(max-width:650px){.topbar{flex-wrap:wrap}.ne-theme-switcher{order:3;margin-left:0;width:100%;justify-content:center}.topbar #quickAppointment{margin-left:auto}}
+
+/* Agenda: contraste previsível para temas claro e escuro */
+html[data-ne-theme="dark"] #agenda .ne-agenda-card,
+html[data-ne-theme="dark"] #agenda .ne-service-card,
+html[data-ne-theme="dark"] #agenda .ne-technical-card{background:#273449;color:#f2f5ff;border-color:#51617a}
+html[data-ne-theme="dark"] #agenda .ne-agenda-card summary,
+html[data-ne-theme="dark"] #agenda .ne-service-card summary,
+html[data-ne-theme="dark"] #agenda .ne-technical-card summary{background:#273449;color:#f2f5ff}
+html[data-ne-theme="dark"] #agenda .ne-agenda-card summary:hover,
+html[data-ne-theme="dark"] #agenda .ne-service-card summary:hover,
+html[data-ne-theme="dark"] #agenda .ne-technical-card summary:hover{background:#35445d}
+html[data-ne-theme="dark"] #agenda .ne-agenda-summary strong,
+html[data-ne-theme="dark"] #agenda .ne-service-card strong,
+html[data-ne-theme="dark"] #agenda .ne-technical-card strong{color:#f7f8ff}
+html[data-ne-theme="dark"] #agenda .ne-agenda-summary small,
+html[data-ne-theme="dark"] #agenda .ne-agenda-time small,
+html[data-ne-theme="dark"] #agenda .ne-agenda-meta span,
+html[data-ne-theme="dark"] #agenda .ne-service-facts span,
+html[data-ne-theme="dark"] #agenda .ne-agenda-chevron,
+html[data-ne-theme="dark"] #agenda .ne-service-arrow{color:#bac9e1}
+html[data-ne-theme="dark"] #agenda .ne-agenda-time{color:#c6a0ff}
+html[data-ne-theme="dark"] #agenda .ne-agenda-details,
+html[data-ne-theme="dark"] #agenda .ne-service-details,
+html[data-ne-theme="dark"] #agenda .ne-technical-body{background:#202c40;color:#edf2ff;border-color:#51617a}
+html[data-ne-theme="dark"] #agenda .ne-agenda-meta strong,
+html[data-ne-theme="dark"] #agenda .ne-service-facts strong{color:#f4f6ff}
+html[data-ne-theme="dark"] #agenda .ne-agenda-status{background:#3a4864;color:#f7faff;border-color:#647491}
+html[data-ne-theme="dark"] #agenda .ne-agenda-controls label{color:#c6d1e2}
+html[data-ne-theme="light"] #agenda .ne-agenda-card,
+html[data-ne-theme="light"] #agenda .ne-service-card,
+html[data-ne-theme="light"] #agenda .ne-technical-card{background:#fff;color:#18253d;border-color:#d4ddec}
+html[data-ne-theme="light"] #agenda .ne-agenda-card summary,
+html[data-ne-theme="light"] #agenda .ne-service-card summary,
+html[data-ne-theme="light"] #agenda .ne-technical-card summary{background:#fff;color:#18253d}
+html[data-ne-theme="light"] #agenda .ne-agenda-summary strong{color:#1c2941}
+html[data-ne-theme="light"] #agenda .ne-agenda-summary small,
+html[data-ne-theme="light"] #agenda .ne-agenda-time small{color:#52627c}
+html[data-ne-theme="light"] #agenda .ne-agenda-time{color:#7139a7}
+html[data-ne-theme="light"] #agenda .ne-agenda-status{color:#23314b;background:#eff0f8;border-color:#d5daea}
+html[data-ne-theme="light"] #agenda .ne-agenda-details,
+html[data-ne-theme="light"] #agenda .ne-service-details,
+html[data-ne-theme="light"] #agenda .ne-technical-body{background:#f9faff;color:#24324c}

@@ -1,0 +1,103 @@
+/* NOVAGENTE · auditoria global dos 22 módulos · camada de tokens de contraste */
+html[data-ne-theme="dark"]{
+--ne-surface:#202b3e;--ne-surface-alt:#28354a;--ne-surface-hover:#35445c;
+--ne-text:#eff3fc;--ne-text-secondary:#bccbe0;--ne-outline:#465773;
+--ne-field:#182337;--ne-positive:#b8edd4;--ne-focus:#d7a9ff;
+}
+html[data-ne-theme="light"]{
+--ne-surface:#ffffff;--ne-surface-alt:#f7f8fc;--ne-surface-hover:#f1eefa;
+--ne-text:#202b43;--ne-text-secondary:#53627b;--ne-outline:#d4ddeb;
+--ne-field:#ffffff;--ne-positive:#195d45;--ne-focus:#6331a0;
+}
+html[data-ne-theme] .view:not(#dashboard){color:var(--ne-text)}
+html[data-ne-theme] .view:not(#dashboard) :is(.panel,.hubCard,.cards>article,.metrics>article,.ne-service-card,.ne-technical-card,.ne-stock-product,.ne-stock-action,.ne-finance-action,.ne-marketing-card,.ne-marketing-entry,.ne-owner-kpi,.ne-stage8-card,.ne-stage8-panel,.ne-backfill,.ne-pilot-readiness,.ne-mfa-box,.ne-owner-definitions,.ne-agenda-card,[data-owner-panel],.ne-finance-guidance,.ne-client-context,.ne-hint,.ne-work-toolbar,.ne-client-context-card,.ne-owner-small-metrics>div,.ne-stage8-role){
+background:var(--ne-surface);border-color:var(--ne-outline);color:var(--ne-text);
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-marketing-entry-details,.ne-agenda-details,.ne-service-details,.ne-technical-body,.ne-stock-product [class*="detail"],.ne-owner-chart,.result,.conversationList,.chatHead,.detailInfo,.chatEmpty,.tableLike,.ne-agenda-controls,.ne-service-facts){
+background-color:var(--ne-surface-alt);color:var(--ne-text);
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-marketing-entry summary,.ne-agenda-card summary,.ne-service-card summary,.ne-technical-card summary,.ne-stock-product summary){
+background-color:var(--ne-surface);color:var(--ne-text);
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-marketing-entry summary,.ne-agenda-card summary,.ne-service-card summary,.ne-technical-card summary,.ne-stock-product summary):hover{
+background-color:var(--ne-surface-hover)
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.panel,.cards,.hubCard,.ne-owner-kpi,.ne-stage8-card,.ne-stock-product,.ne-marketing-entry,.ne-marketing-card,.ne-agenda-card,.ne-service-card,.ne-technical-card) :is(h2,h3,h4,strong){
+color:var(--ne-text);
+}
+html[data-ne-theme] .view:not(#dashboard) :is(p,small,.muted,.ne-agenda-summary small,.ne-agenda-time small,.ne-owner-kpi small,.ne-marketing-card small,.ne-stock-action small,.ne-stage8-card small,.ne-owner-small-metrics small,.ne-backfill-note,.ne-marketing-hint){
+color:var(--ne-text-secondary);
+}
+html[data-ne-theme] .view:not(#dashboard) :is(input,select,textarea){
+background:var(--ne-field);color:var(--ne-text);border-color:var(--ne-outline);
+}
+html[data-ne-theme] .view:not(#dashboard) :is(input,select,textarea)::placeholder{color:var(--ne-text-secondary);opacity:.9}
+html[data-ne-theme] .view:not(#dashboard) :is(input,select,textarea):focus-visible{
+outline:2px solid var(--ne-focus);outline-offset:1px;border-color:var(--ne-focus);
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.tableLike,.row,.detailFields,.ne-stage8-user-actions,.ne-owner-small-metrics,.configChecks,.ne-marketing-list) {color:var(--ne-text)}
+html[data-ne-theme] .view:not(#dashboard) :is(.row,.tableLike>div,.ne-stage8-role,.ne-marketing-entry,.ne-backfill) {border-color:var(--ne-outline)}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-owner-menu-item,.ne-owner-menu-item.active,.ne-marketing-card,.ne-stage8-card,.ne-stock-action,.ne-ops-mini-nav button) {color:var(--ne-text)}
+html[data-ne-theme="dark"] .view:not(#dashboard) :is(.ne-owner-menu-item,.ne-stock-action,.ne-stage8-user-actions select,.ne-stage8-user-actions button,.ne-stage8-field input,.ne-stage8-field select,.ne-backfill-controls input,.ne-mfa-field input){background:var(--ne-surface);color:var(--ne-text);border-color:var(--ne-outline)}
+html[data-ne-theme="dark"] .view:not(#dashboard) :is(.ne-owner-chart,.ne-owner-small-metrics>div,.ne-marketing-entry-details,.ne-stock-product[open],.ne-stock-product [class*="detail"]){background:var(--ne-surface-alt);color:var(--ne-text)}
+html[data-ne-theme="dark"] .view:not(#dashboard) :is(.ne-stage8-card,.ne-owner-kpi,.ne-stock-action,.ne-marketing-card,.ne-finance-action):hover{
+background:var(--ne-surface-hover);border-color:#9877d3;
+}
+html[data-ne-theme="dark"] .view:not(#dashboard) :is(.ne-agenda-time,.ne-owner-kpi strong,.ne-finance-action strong,.ne-stock-action strong,.ne-marketing-card strong,.ne-service-facts strong,.ne-agenda-meta strong){color:#e0c5ff}
+html[data-ne-theme="light"] .view:not(#dashboard) :is(.ne-agenda-time,.ne-owner-kpi strong,.ne-finance-action strong,.ne-stock-action strong,.ne-marketing-card strong){color:#503273}
+html[data-ne-theme] .view:not(#dashboard) :is(.status,.chip,.tag,.ne-agenda-status){border:1px solid var(--ne-outline)}
+html[data-ne-theme="dark"] .view:not(#dashboard) :is(.status,.chip,.tag,.ne-agenda-status){background:#374761;color:#f4f7ff}
+html[data-ne-theme="light"] .view:not(#dashboard) :is(.status,.chip,.tag,.ne-agenda-status){background:#eef0f8;color:#283650}
+html[data-ne-theme="dark"] .view:not(#dashboard) .status.completed,
+html[data-ne-theme="dark"] .view:not(#dashboard) .status.confirmed{background:#184b3b;color:#b8f0d5;border-color:#286c50}
+html[data-ne-theme="light"] .view:not(#dashboard) .status.completed,
+html[data-ne-theme="light"] .view:not(#dashboard) .status.confirmed{background:#e0f5e9;color:#165439;border-color:#aed8c0}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-finance-action.is-active,.ne-stock-action.is-active,.ne-marketing-card.is-active,.ne-owner-menu-item.active){
+outline:2px solid var(--ne-focus);outline-offset:0;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-ops-mini-nav button,button,.ne-module):focus-visible{
+outline:2px solid var(--ne-focus);outline-offset:2px;
+}
+html[data-ne-theme="dark"] :is(dialog,.ne-marketing-modal,.ne-security-dialog){
+background:#202b3e;color:#eff3fc;border-color:#465773;
+}
+html[data-ne-theme="dark"] :is(dialog,.ne-marketing-modal,.ne-security-dialog) :is(.modalForm,.modalHead,.ne-security-heading,.ne-security-card){
+background:#202b3e;color:#eff3fc;border-color:#465773;
+}
+html[data-ne-theme="dark"] :is(dialog,.ne-marketing-modal,.ne-security-dialog) :is(input,select,textarea){
+background:#182337;color:#eff3fc;border-color:#52617a;
+}
+html[data-ne-theme="dark"] :is(dialog,.ne-marketing-modal,.ne-security-dialog) :is(p,small,label){
+color:#c1cee2;
+}
+html[data-ne-theme="dark"] :is(dialog,.ne-marketing-modal,.ne-security-dialog) :is(h2,h3,strong){color:#f4f6ff}
+html[data-ne-theme="dark"] :is(dialog,.ne-marketing-modal,.ne-security-dialog) ::placeholder{color:#b3c0d5}
+html[data-ne-theme="light"] :is(dialog,.ne-marketing-modal,.ne-security-dialog){
+background:#fff;color:#202b43;border-color:#d4ddeb;
+}
+html[data-ne-theme="light"] :is(dialog,.ne-marketing-modal,.ne-security-dialog) :is(input,select,textarea){
+background:#fff;color:#202b43;border-color:#d4ddeb;
+}
+@media(prefers-reduced-motion:reduce){html[data-ne-theme] .view *{scroll-behavior:auto;transition:none!important}}
+
+/* Security quick actions — explicit contrast in both themes */
+html[data-ne-theme="dark"] #admin .ne-security-card,
+html[data-ne-theme="dark"] .ne-stage8-security .ne-security-card{
+background:#2b3950!important;color:#f3f6fd!important;border:1px solid #64738d!important;
+box-shadow:0 3px 12px #080e1b25;
+}
+html[data-ne-theme="dark"] #admin .ne-security-card strong,
+html[data-ne-theme="dark"] .ne-stage8-security .ne-security-card strong{color:#f8f9ff!important}
+html[data-ne-theme="dark"] #admin .ne-security-card small,
+html[data-ne-theme="dark"] .ne-stage8-security .ne-security-card small{color:#c4d0e3!important}
+html[data-ne-theme="dark"] #admin .ne-security-card:hover,
+html[data-ne-theme="dark"] #admin .ne-security-card:focus-visible{
+background:#364960!important;border-color:#bd94ef!important;
+}
+html[data-ne-theme="light"] #admin .ne-security-card,
+html[data-ne-theme="light"] .ne-stage8-security .ne-security-card{
+background:#fff!important;color:#1c2940!important;border:1px solid #cbd5e6!important;
+}
+html[data-ne-theme="light"] #admin .ne-security-card strong{color:#1b2943!important}
+html[data-ne-theme="light"] #admin .ne-security-card small{color:#53627c!important}
+html[data-ne-theme="light"] #admin .ne-security-card:hover{background:#f5effd!important;border-color:#9164c6!important}
