@@ -39,9 +39,11 @@ export function browserMutationAllowed(req,url){
   // preflight para origens externas; o servidor não habilita CORS.
   // Exigir esse tipo em POST/PATCH/PUT com corpo, inclusive em clientes antigos
   // sem cabeçalhos Origin e Sec-Fetch-Site.
+  const contentType=String(req.headers["content-type"]||"");
   const length=Number(req.headers["content-length"]||0);
   const hasBody=length>0||!!req.headers["transfer-encoding"];
-  if(hasBody&&!/^application\/json(?:\s*;|\s*$)/i.test(String(req.headers["content-type"]||"")))
+  // Rejeitar também formulários POST sem campos, cuja carga pode vir vazia.
+  if((hasBody||contentType)&&!/^application\/json(?:\s*;|\s*$)/i.test(contentType))
     return false;
   return true;
 }
