@@ -57,7 +57,7 @@ function restoreStatus(){
       typeof verified.backup_sha256==="string"&&
       /^[a-f0-9]{64}$/.test(verified.backup_sha256)&&
       typeof verified.archive_name==="string"&&
-      /^[a-zA-Z0-9._-]+\\.nebak$/.test(verified.archive_name)){
+      /^[a-zA-Z0-9._-]+\.nebak$/.test(verified.archive_name)){
       const archive=path.join(backupDir,verified.archive_name);
       if(fs.existsSync(archive)){
         const actual=crypto.createHash("sha256").update(fs.readFileSync(archive)).digest("hex");
