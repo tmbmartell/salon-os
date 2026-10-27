@@ -92,3 +92,24 @@ body:has(#dashboard.active) .topbar .ne-theme-switcher{margin-left:0}
 .sidebar.ne-rail-sidebar nav{gap:3px}
 .sidebar.ne-rail-sidebar nav .ne-rail-button{min-height:46px}
 }
+
+/* Submenus tipográficos: texto claro, sem ícones, alvos confortáveis. */
+@media(min-width:901px){
+ .sidebar.ne-rail-sidebar nav .ne-rail-group .bw-submenu{
+   padding:9px!important;min-width:270px;gap:5px!important;
+ }
+ .sidebar.ne-rail-sidebar nav .ne-rail-group .bw-submenu [data-view]{
+   display:flex!important;align-items:center;min-height:51px!important;
+   width:100%;padding:13px 16px!important;text-align:left!important;
+   font-size:15px!important;line-height:1.35!important;font-weight:650!important;
+   letter-spacing:0!important;color:#e9eefb!important;
+   background:transparent;border:1px solid transparent;border-radius:11px;
+ }
+ .sidebar.ne-rail-sidebar nav .ne-rail-group .bw-submenu [data-view]:hover,
+ .sidebar.ne-rail-sidebar nav .ne-rail-group .bw-submenu [data-view]:focus-visible{
+   background:#30435e!important;color:#fff!important;border-color:#526887;
+ }
+ .sidebar.ne-rail-sidebar nav .ne-rail-group .bw-submenu [data-view].active{
+   background:#493864!important;border-color:#9d78bf;color:#fff!important;
+ }
+}
