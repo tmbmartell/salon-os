@@ -79,7 +79,7 @@ export function can(user,permission){
   const grants={
     manager:["marketing.read","marketing.write","dashboard.read","clients.read","clients.write","team.read","team.write","services.read","services.write","appointments.read","appointments.write","resources.read","resources.write","conversations.read","conversations.write","whatsapp.send","jev.read","finance.read","finance.write","cash.read","cash.write","inventory.read","inventory.write","suppliers.read","suppliers.write","commissions.read","commissions.write","checkout.write","analytics.read","recovery.write","agents.read","agents.write","agents.approve","agents.execute","admin.read","retention.read","retention.write","technical.read","technical.write","packages.read","packages.manage","packages.sell","staff.read","staff.manage","retail.read","retail.manage","retail.sell","reports.read","reports.export"],
     reception:["marketing.read","dashboard.read","clients.read","clients.write","team.read","services.read","appointments.read","appointments.write","resources.read","conversations.read","conversations.write","whatsapp.send","cash.read","cash.write","inventory.read","suppliers.read","checkout.write","analytics.read","recovery.write","retention.read","retention.write","technical.read","packages.read","packages.sell","staff.read","retail.read","retail.sell"],
-    professional:["dashboard.read","clients.read","team.read","services.read","appointments.read","appointments.write","technical.read","technical.write"]
+    professional:["dashboard.read","clients.read","team.read","staff.read","services.read","appointments.read","appointments.write","technical.read","technical.write"]
   };
   return (grants[user.role]||[]).includes(permission);
 }
