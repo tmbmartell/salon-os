@@ -31,6 +31,14 @@ function start(){
   const labelText=document.createElement('span');labelText.className='ne-rail-label';labelText.textContent=label;
   btn.replaceChildren(svg(ico),labelText);
  }
+ // Submenus: usar apenas o nome legível, sem glifos ou ícones decorativos.
+ nav.querySelectorAll('.bw-submenu [data-view]').forEach(item=>{
+   const label=item.querySelector('span')?.textContent?.trim()||
+     item.textContent.replace(/^[^\p{L}\p{N}]+/u,'').trim();
+   item.textContent=label;
+   item.title=label;
+   item.setAttribute('aria-label',label);
+ });
  nav.querySelectorAll('.bw-nav-group .bw-nav-trigger').forEach(t=>t.addEventListener('click',()=>{
   nav.querySelectorAll('.bw-nav-group').forEach(group=>{
    if(group!==t.closest('.bw-nav-group')){group.classList.remove('is-open');group.querySelector('.bw-nav-trigger')?.setAttribute('aria-expanded','false')}
