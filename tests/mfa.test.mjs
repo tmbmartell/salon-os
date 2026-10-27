@@ -122,6 +122,27 @@ test("HTTP MFA: configuração cifrada, segundo fator antes do cookie, recupera�
     assert.equal(disabled.status,200);
     assert.equal((await send("/api/auth/mfa/status",{cookie:verify.cookie})).data.enabled,false);
     assert.equal((await login()).status,200);
+    // Mesmo solicitando um novo desafio, erros do MFA somam no bloqueio da conta.
+    const secondEnroll=await owner("/api/auth/mfa/enroll",{method:"POST",body:{password:pass}});
+    assert.equal(secondEnroll.status,200);
+    assert.equal((await owner("/api/auth/mfa/confirm",{method:"POST",body:{
+      code:totpAt(secondEnroll.data.secret)
+    }})).status,200);
+    const challengeA=await login();assert.equal(challengeA.status,202);
+    for(let i=0;i<5;i++){
+      const bad=await send("/api/auth/mfa/verify",{method:"POST",body:{
+        challenge:challengeA.data.challenge,code:"INVALID"
+      }});
+      assert.equal(bad.status,i===4?429:401);
+    }
+    const challengeB=await login();assert.equal(challengeB.status,202);
+    for(let i=0;i<3;i++){
+      const bad=await send("/api/auth/mfa/verify",{method:"POST",body:{
+        challenge:challengeB.data.challenge,code:"INVALID"
+      }});
+      assert.equal(bad.status,i===2?429:401);
+    }
+    assert.equal((await login()).status,429,"novos desafios não anulam bloqueio de conta");
     assert.equal((await send("/api/auth/mfa/confirm",{method:"POST",cookie:verify.cookie,body:{code:correct}})).status,409);
   }finally{await app.close()}
 });
