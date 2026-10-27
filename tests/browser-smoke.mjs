@@ -39,7 +39,7 @@ try{
     await sleep(120);
   }
   assert.ok(ready,"O servidor não ficou disponível: "+output);
-  browser=await chromium.launch({headless:true});
+  browser=await chromium.launch({headless:true,...(process.env.QA_CHROME?{executablePath:process.env.QA_CHROME}:{}),args:["--no-sandbox"]});
   const context=await browser.newContext({viewport:{width:1440,height:900},locale:"pt-BR",timezoneId:"America/Porto_Velho"});
   page=await context.newPage();
   page.on("pageerror",error=>errors.push(error.message));
