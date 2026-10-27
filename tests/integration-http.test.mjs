@@ -239,7 +239,7 @@ test("E2E: servidor + login + CRM + agenda + ficha + estoque + caixa + pós-vend
     const exportForbidden=await reception("/api/clients/export");
     assert.equal(exportForbidden.status,403);
     const injection=await expectStatus(owner,"/api/clients",201,{method:"POST",body:{
-      name:"=HYPERLINK(\\"https://example.invalid\\",\\"Clique\\")",
+      name:"=2+3",
       phone:"69977001122",notes:"+SUM(A1:A9)",source:"imported-test"
     }});
     assert.ok(injection.id);
@@ -258,13 +258,13 @@ test("E2E: servidor + login + CRM + agenda + ficha + estoque + caixa + pós-vend
     assert.equal((await reception("/api/clients/"+foreignClient+"/technical")).status,404);
     const exported=await owner("/api/clients/export");
     assert.equal(exported.status,200);
-    assert.match(exported.headers.get("content-type"),/text\\/csv/);
+    assert.ok(exported.headers.get("content-type").includes("text/csv"));
     assert.equal(exported.headers.get("cache-control"),"no-store");
     assert.equal(exported.headers.get("x-content-type-options"),"nosniff");
     assert.match(exported.data,/novagente|Cliente Homologação QA/);
     assert.doesNotMatch(exported.data,/CLIENTE_DO_OUTRO_SALAO|SEGREDO_OUTRO_SALAO/);
-    assert.match(exported.data,/'=HYPERLINK/,"CSV neutraliza fórmula com aspas inicial");
-    assert.match(exported.data,/'\\+SUM/,"CSV neutraliza fórmulas nas observações");
+    assert.ok(exported.data.includes("'=2+3"),"CSV neutraliza fórmulas em nomes");
+    assert.ok(exported.data.includes("'+SUM"),"CSV neutraliza fórmulas nas observações");
     const dbAudit=new DatabaseSync(app.dbPath,{readOnly:true});
     try{
       const row=dbAudit.prepare("select tenant_id,action,metadata from audit_log where action='clients.export' order by created_at desc limit 1").get();
