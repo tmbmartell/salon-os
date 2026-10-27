@@ -113,3 +113,18 @@ body:has(#dashboard.active) .topbar .ne-theme-switcher{margin-left:0}
    background:#493864!important;border-color:#9d78bf;color:#fff!important;
  }
 }
+
+/* Navegação uniforme: apenas um título por módulo, dentro do container. */
+body .topbar > div:first-child{display:none!important}
+body .topbar{
+  min-height:0!important;
+  justify-content:flex-end!important;
+  align-items:center!important;
+  gap:10px;
+  padding-top:10px!important;
+  padding-bottom:10px!important;
+}
+body .topbar .ne-theme-switcher{margin-left:0!important}
+@media(max-width:900px){
+ body .topbar{padding:9px 14px!important;flex-wrap:wrap}
+}
