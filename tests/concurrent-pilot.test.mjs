@@ -82,6 +82,7 @@ function report(data){
     "| Mesmo horário e profissional | "+data.booking_collision+" |",
     "| Checkout simultâneo | "+data.checkout_once+" |",
     "| Ajuste concorrente de estoque | "+data.stock_consistency+" |",
+    "| Duas aberturas simultâneas de caixa | "+data.cash_open+" |",
     "| Duas despesas em espécie acima do caixa | "+data.cash_overdraft+" |",
     "| Fechamento do mesmo caixa em paralelo | "+data.cash_close+" |",
     "| Tentativa de acessar relatórios pela recepção | "+data.roles+" |",
@@ -170,9 +171,19 @@ test("Etapa 14: dois terminais/servidores e requisições simultâneas preservam
     assert.equal(movements.filter(x=>x.type==="adjust_in"||x.type==="adjust_out").length,40);
     assert.equal(Math.round(movements.filter(x=>x.type==="adjust_in"||x.type==="adjust_out")
       .reduce((n,x)=>n+Number(x.qty),0)),0);
+    // Duas saídas simultâneas superiores ao saldo total: jamais ficar negativo.
+    const competingWithdrawals=await Promise.all([a,b].map(server=>owner(server,
+      "/api/stock/adjust",{method:"POST",body:{
+        product_id:product.id,qty:-100,reason:"Saída simultânea QA com saldo limitado"
+      }})));
+    checkExactlyOnce(competingWithdrawals,200,409);
+    const afterWithdrawals=await expect(owner,b,"/api/products",200);
+    assert.equal(afterWithdrawals.find(x=>x.id===product.id).stock_qty,40);
 
-    const opened=await expect(owner,a,"/api/cash/open",201,{method:"POST",body:{opening:100}});
-    assert.equal(opened.status,"open");
+    const openRequests=await Promise.all([a,b].map(server=>owner(server,
+      "/api/cash/open",{method:"POST",body:{opening:100}})));
+    checkExactlyOnce(openRequests,201,409);
+    assert.equal(openRequests.find(x=>x.status===201).data.status,"open");
     const costs=await Promise.all([a,b].map((server,i)=>owner(server,"/api/finance/entries",{
       method:"POST",body:{kind:"expense",category:"supplies",description:"Compra simultânea QA "+i,
         amount:80,payment_method:"cash",status:"paid"}
@@ -198,7 +209,8 @@ test("Etapa 14: dois terminais/servidores e requisições simultâneas preservam
     const result={synthetic:true,shared_database:true,server_processes:2,
       duplicate_client:"1 criado, 13 recusados",booking_collision:"1 reservado, 15 recusados",
       checkout_once:"1 confirmado, 13 recusados",
-      stock_consistency:"40 ajustes aceitos; saldo sem divergência; 40 movimentos",
+      stock_consistency:"40 ajustes aceitos sem divergência; uma de duas saídas excessivas recusada",
+      cash_open:"1 abertura aceita, 1 recusada",
       cash_overdraft:"1 despesa autorizada, 1 negada; caixa esperado R$ 20",
       cash_close:"1 fechamento aceito, 1 recusado",
       roles:"acesso financeiro/gerencial negado à recepção",production_ready:false};
