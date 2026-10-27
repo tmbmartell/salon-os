@@ -4,13 +4,8 @@ on:
     branches:
       - feat/beauty-woman-ui-consolidada
   pull_request:
-    paths:
-      - "auth.mjs"
-      - "server.mjs"
-      - "public/**"
-      - "tests/**"
-      - "package.json"
-      - ".github/workflows/security.yml"
+    # Candidata integrada: rodar regressão para QUALQUER arquivo alterado,
+    # incluindo módulos de estoque, financeiro, MFA, migrations e scripts.
 
 permissions:
   contents: read
@@ -25,6 +20,8 @@ jobs:
           node-version: "22"
       - name: Sintaxe
         run: npm run check
+      - name: Pré-validação da versão candidata
+        run: npm run release:preflight
       - name: Testes de segurança e dia operacional
         run: npm test
         env:
