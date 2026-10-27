@@ -77,7 +77,7 @@ test("preview gratuita cria conta fictícia automaticamente, exige login e reini
     assert.equal(health.data.mode,"free_preview_disposable");
     const state=await request("/api/auth/state");
     assert.equal(state.status,200);
-    assert.equal(state.data.needs_setup,false);
+    assert.equal(state.data.claimed,true);
     const setup=await request("/api/auth/setup",{method:"POST",body:{
       email:"attacker@example.invalid",name:"Attacker",password:"bad-password-long-enough"
     }});
