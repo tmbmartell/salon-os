@@ -69,6 +69,9 @@ test("HTTP: bloqueia formulários cross-site, JSON de origem externa, spoof IP, 
     const form=await call("/api/auth/login",{method:"POST",
       headers:{"content-type":"application/x-www-form-urlencoded"},body:"email=x&password=y"});
     assert.equal(form.status,403);
+    const emptyForm=await call("/api/auth/logout",{method:"POST",
+      headers:{"content-type":"application/x-www-form-urlencoded"},body:""});
+    assert.equal(emptyForm.status,403,"formulário vazio também não pode forçar logout");
     const correctOrigin=await call("/api/auth/login",{method:"POST",headers:{origin:h.base},
       body:{email:"owner-security@example.invalid",password:"segredo-local-123456789"}});
     assert.equal(correctOrigin.status,200);
