@@ -99,6 +99,7 @@
   inviteForm.append(inviteActions,inviteStatus);
   inviteDialog.append(inviteForm);document.body.append(inviteDialog);
   const inviteFormOriginal=[...inviteForm.childNodes];
+  inviteButton.hidden=true;
   inviteButton.onclick=()=>{inviteForm.replaceChildren(...inviteFormOriginal);inviteForm.reset();submitInvite.disabled=false;detailMessage(inviteStatus,"");inviteDialog.showModal()};
   inviteForm.onsubmit=async event=>{
     event.preventDefault();submitInvite.disabled=true;
@@ -232,7 +233,7 @@
     try{
       const data=await api("/api/auth/me");logged=data.user;
       await loadProfile();
-      if(logged?.role==="owner")inviteButton.hidden=false;
+      inviteButton.hidden=logged?.role!=="owner";
     }catch{logged=null;detailMessage(profileMessage,"Entre com sua conta para acessar as configurações.")}
   }
   document.addEventListener("click",event=>{
