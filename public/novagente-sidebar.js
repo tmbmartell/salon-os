@@ -36,6 +36,33 @@ function start(){
    if(group!==t.closest('.bw-nav-group')){group.classList.remove('is-open');group.querySelector('.bw-nav-trigger')?.setAttribute('aria-expanded','false')}
   })
  }));
+ const closeAll=(except=null)=>nav.querySelectorAll('.bw-nav-group').forEach(g=>{
+   if(g!==except){g.classList.remove('is-open');g.querySelector('.bw-nav-trigger')?.setAttribute('aria-expanded','false')}
+ });
+ const positionPopup=(group)=>{
+   const trigger=group.querySelector('.bw-nav-trigger'),pop=group.querySelector('.bw-submenu');
+   if(!trigger||!pop)return;
+   const rect=trigger.getBoundingClientRect();
+   const width=Math.min(260,Math.max(195,window.innerWidth-rect.right-24));
+   const maxHeight=Math.min(500,window.innerHeight-24);
+   const popupHeight=Math.min(pop.scrollHeight||180,maxHeight);
+   const top=Math.max(12,Math.min(rect.top,window.innerHeight-popupHeight-12));
+   pop.style.left=(rect.right+12)+'px';
+   pop.style.top=top+'px';
+   pop.style.width=width+'px';
+   pop.style.maxHeight=maxHeight+'px';
+ };
+ nav.querySelectorAll('.bw-nav-group').forEach(group=>{
+   const trigger=group.querySelector('.bw-nav-trigger');
+   trigger?.addEventListener('click',()=>{
+     closeAll(group);
+     if(group.classList.contains('is-open'))positionPopup(group);
+   });
+ });
+ nav.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>closeAll()));
+ window.addEventListener('resize',()=>nav.querySelectorAll('.bw-nav-group.is-open').forEach(positionPopup));
+ nav.addEventListener('scroll',()=>nav.querySelectorAll('.bw-nav-group.is-open').forEach(positionPopup),{passive:true});
+ closeAll();
  nav.addEventListener('click',e=>{if(e.target.closest('.bw-submenu [data-view]')){
    nav.querySelectorAll('.bw-nav-group').forEach(g=>{g.classList.remove('is-open');g.querySelector('.bw-nav-trigger')?.setAttribute('aria-expanded','false')})
  }});
