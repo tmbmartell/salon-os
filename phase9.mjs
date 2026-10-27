@@ -60,7 +60,15 @@ export async function handlePhase9Api({req,res,url,db,user,tenant,send,parseBody
   const guard=p=>requirePermission(user,p);
   if(req.method==="GET"&&url.pathname==="/api/staff/overview"){
     guard("staff.read");const period=txt(url.searchParams.get("period")||new Date().toISOString().slice(0,7),7);
-    return send(res,200,{period,metrics:staffMetrics(db,tenant,period),time_off:timeOffRows(db,tenant)});
+    const privileged=["owner","manager"].includes(user.role);
+    if(!privileged){
+      // A recepção pode consultar a equipe, mas nunca desempenho financeiro,
+      // comissões, metas individuais nem justificativas de afastamento.
+      const basics=all(db,"select id,name,role,specialties from professionals where tenant_id=? and active=1 order by name",[tenant])
+        .map(p=>({...p,specialties:(()=>{try{return JSON.parse(p.specialties||"[]")}catch{return []}})()}));
+      return send(res,200,{period,limited:true,metrics:basics,time_off:[]});
+    }
+    return send(res,200,{period,limited:false,metrics:staffMetrics(db,tenant,period),time_off:timeOffRows(db,tenant)});
   }
   const schedule=url.pathname.match(/^\/api\/staff\/([^/]+)\/schedule$/);
   if(schedule&&req.method==="GET"){
