@@ -6,7 +6,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="/styles.css">
-<link rel="stylesheet" href="/beauty-ui.css?v=9">
+<link rel="stylesheet" href="/beauty-ui.css?v=10">
 </head>
 <body>
 <div id="authGate" class="authGate">
@@ -108,8 +108,23 @@
     <section id="inbox" class="view messengerView">
       <div class="sectionTitle">
         <div><h2>Central de Mensagens</h2><p>WhatsApp conectado pelo WAHA, organizado como uma mensageria de atendimento.</p></div>
-        <div class="sectionActions"><span id="whatsappBadge" class="chip">verificando</span><button id="syncWhatsappHistory" class="secondary">Sincronizar histórico</button><button id="refreshInbox" class="secondary">Atualizar</button></div>
+        <div class="sectionActions"><span id="whatsappBadge" class="chip">verificando</span><button id="syncWhatsappHistory" class="secondary">Importar histórico</button><button id="refreshInbox" class="secondary">Atualizar</button></div>
       </div>
+      <details id="whatsappBackfillDetails" class="ne-backfill">
+        <summary><span>Importação controlada de conversas antigas</span><small>Abra para acompanhar o progresso</small></summary>
+        <div class="ne-backfill-content">
+          <p class="ne-backfill-note">Importação manual por etapas, sem enviar mensagens. O fim das páginas disponíveis no WAHA não garante que todo o histórico foi recuperado.</p>
+          <div class="ne-backfill-controls">
+            <label>Importar a partir de <input id="neBackfillDate" type="date" value="2026-04-01"></label>
+            <button id="neBackfillStart" type="button" class="secondary">Iniciar importação</button>
+            <button id="neBackfillStep" type="button" class="primary">Processar até 10 páginas</button>
+            <button id="neBackfillPause" type="button" class="secondary">Pausar</button>
+            <button id="neBackfillResume" type="button" class="secondary">Retomar</button>
+          </div>
+          <div id="neBackfillStatus" role="status" aria-live="polite">Consulte o estado da importação para começar.</div>
+          <p class="ne-backfill-note">Apenas proprietária e gerência. Os resultados são registrados no salão conectado; arquivos e mídias não são baixados.</p>
+        </div>
+      </details>
       <div class="messengerToolbar">
         <input id="conversationSearch" type="search" placeholder="Buscar cliente, telefone ou mensagem…">
         <select id="conversationStatusFilter"><option value="">Todos os status</option><option value="open">Aberta</option><option value="pending">Pendente</option><option value="resolved">Resolvida</option></select>
@@ -979,10 +994,11 @@
   </form>
 </dialog>
 <div id="toast" class="toast"></div>
-<script src="/app.js?v=198" type="module"></script>
+<script src="/app.js?v=199" type="module"></script>
 <script src="/marketing-ui.js?v=1" defer></script>
 <script src="/beauty-ui.js?v=2" defer></script>
 <script src="/security-center.js?v=1" defer></script>
 <script src="/whatsapp-onboarding.js?v=1" defer></script>
 <script src="/admin-stage8.js?v=1" defer></script>
+<script src="/whatsapp-backfill-ui.js?v=1" defer></script>
 </body></html>
