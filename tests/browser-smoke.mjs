@@ -140,6 +140,8 @@ try{
 
   // O fluxo MFA é feito por interface real, sem QR/conta externa.
   await page.setViewportSize({width:1440,height:900});
+  await open("admin"); // O roteiro móvel termina em Financeiro; voltar à Administração.
+  await page.locator('#admin [data-ne-tab="security"]').click();
   const mfaBox=page.locator("#admin .ne-mfa-box");
   await mfaBox.locator("summary").click();
   await mfaBox.locator("input[type=password]").fill("QA-browser-senha-123456!");
