@@ -7,6 +7,7 @@ const now=()=>new Date().toISOString();
 const all=(db,s,p=[])=>db.prepare(s).all(...p);
 const one=(db,s,p=[])=>db.prepare(s).get(...p);
 const run=(db,s,p=[])=>db.prepare(s).run(...p);
+function transaction(db,fn){db.exec("BEGIN IMMEDIATE");try{const out=fn();db.exec("COMMIT");return out}catch(e){db.exec("ROLLBACK");throw e}}
 const txt=(v,n=400)=>String(v??"").trim().slice(0,n);
 
 export function installPhase5(db){
