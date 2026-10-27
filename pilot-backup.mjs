@@ -118,7 +118,12 @@ export function createPilotBackup({databasePath,archivePath,passphrase}){
       database:{sha256:hash(contents),data:contents.toString("base64")},assets};
     const encrypted=createEnvelope(pack,passphrase);
     fs.mkdirSync(path.dirname(target),{recursive:true,mode:0o700});
-    fs.writeFileSync(target,encrypted,{flag:"wx",mode:0o600});
+    // Só apresenta o .nebak quando a escrita terminou; não substituir backups existentes.
+    const temporary=path.join(path.dirname(target),"."+crypto.randomUUID()+".partial");
+    try{
+      fs.writeFileSync(temporary,encrypted,{flag:"wx",mode:0o600});
+      fs.linkSync(temporary,target); // criação atômica, falha se target já existe
+    }finally{fs.rmSync(temporary,{force:true})}
     return {archive_path:target,archive_bytes:encrypted.length,assets:assets.length,encrypted:true};
   }finally{fs.rmSync(work,{recursive:true,force:true})}
 }
