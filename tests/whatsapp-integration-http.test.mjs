@@ -32,16 +32,22 @@ async function mockWaha(){
       return sessions.has(name)?respond(200,{name,...sessions.get(name)}):respond(404,{error:"missing"});
     }
     if(req.method==="GET"&&url.pathname==="/api/qa-only/chats"){
-      return respond(200,[
-        {id:"556999922113@c.us",name:"Contato Histórico",unreadCount:0},
-        {id:"123456-22222@g.us",name:"Grupo de teste",unreadCount:0}
-      ]);
+      const chats=[
+        {id:"123456-22222@g.us",name:"Grupo de teste",unreadCount:0},
+        {id:"556999922113@c.us",name:"Contato Histórico",unreadCount:0}
+      ];
+      const page=url.searchParams.has("offset")?chats:chats.slice().reverse();
+      const offset=Math.max(0,Number(url.searchParams.get("offset")||0)),limit=Math.max(1,Number(url.searchParams.get("limit")||40));
+      return respond(200,page.slice(offset,offset+limit));
     }
     if(req.method==="GET"&&url.pathname==="/api/qa-only/chats/556999922113%40c.us/messages"){
-      return respond(200,[{
+      const messages=[{
         id:{_serialized:"historic-001"},timestamp:Date.parse("2026-04-15T12:00:00Z")/1000,
         body:"Olá, quero informações do salão",fromMe:false,hasMedia:false
-      }]);
+      }];
+      const offset=Math.max(0,Number(url.searchParams.get("offset")||0)),limit=Math.max(1,Number(url.searchParams.get("limit")||40));
+      const since=Number(url.searchParams.get("filter.timestamp.gte")||0);
+      return respond(200,messages.filter(m=>m.timestamp>=since).slice(offset,offset+limit));
     }
     if(req.method==="POST"&&url.pathname==="/api/sendText"){
       const request=JSON.parse(body||"{}");received.push(request);
@@ -154,6 +160,35 @@ test("WAHA simulado: HMAC, mensagem, cliente CRM, conversa, agenda, resposta, AC
       body:{chat_limit:5,message_limit:10}});
     assert.equal(sync2.messages_imported,0,"sincronização é idempotente");
     assert.equal(app.waha.received.length,0,"importação histórica jamais envia mensagens");
+    // Etapa 11: checkpoints paginados. Pausar/retomar não apaga progresso.
+    const started=await expect(owner,"/api/whatsapp/backfill/start",201,{
+      method:"POST",body:{from_date:"2026-04-01",page_size:1}
+    });
+    assert.equal(started.job.status,"running");
+    assert.equal(started.job.from_date,"2026-04-01");
+    assert.equal((await owner("/api/whatsapp/backfill/start",{method:"POST",body:{from_date:"2026-04-01"}})).status,409);
+    const paused=await expect(owner,"/api/whatsapp/backfill/pause",200,{method:"POST"});
+    assert.equal(paused.job.status,"paused");
+    assert.equal((await owner("/api/whatsapp/backfill/step",{method:"POST"})).status,409);
+    const resumed=await expect(owner,"/api/whatsapp/backfill/resume",200,{method:"POST"});
+    assert.equal(resumed.job.status,"running");
+    let last;
+    for(let i=0;i<8;i++){
+      const step=await expect(owner,"/api/whatsapp/backfill/step",200,{method:"POST"});
+      last=step.job;
+      if(last.status==="completed")break;
+    }
+    assert.equal(last.status,"completed");
+    assert.equal(last.chats_processed,2);
+    assert.equal(last.groups_skipped,1);
+    assert.equal(last.messages_scanned,1);
+    assert.equal(last.messages_imported,0,"mensagem já importada não é duplicada");
+    assert.equal(last.chat_offset,2);
+    assert.equal((await owner("/api/whatsapp/backfill/step",{method:"POST"})).status,409);
+    const current=await expect(owner,"/api/whatsapp/backfill/status",200);
+    assert.equal(current.job.status,"completed");
+    assert.equal(app.waha.received.length,0,"paginação e retomada nunca enviam mensagens");
+
     const clients=await expect(owner,"/api/clients",200);
     assert.ok(clients.some(c=>c.name==="Contato Histórico"));
     const historyCo=(await expect(owner,"/api/conversations",200)).find(c=>c.client_name==="Contato Histórico");
