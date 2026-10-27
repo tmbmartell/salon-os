@@ -133,6 +133,30 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
     }catch(e){db.exec("ROLLBACK");throw e}
     return {handled:true,result:send(res,200,{ok:true})};
   }
+  // Convites: o token só é retornado uma vez à proprietária, jamais listado.
+  // Aceitação não concede acesso de proprietária e exige senha própria.
+  if(url.pathname==="/api/auth/invitations/accept"&&req.method==="POST"){
+    const b=await parseBody(req),token=String(b.token||"").trim(),
+      password=String(b.password||"");
+    if(token.length<30||password.length<12||password.length>128)
+      return {handled:true,result:send(res,400,{error:"invalid_invite_or_password"})};
+    let result;
+    db.exec("BEGIN IMMEDIATE");
+    try{
+      const invite=db.prepare(`select * from user_invites where token_hash=? and accepted_at is null and expires_at>?`).get(sha(token),new Date().toISOString());
+      if(!invite||!["manager","reception","professional"].includes(invite.role))
+        throw Object.assign(new Error("invitation_invalid_or_expired"),{status:410});
+      const existing=db.prepare("select id from users where tenant_id=? and lower(email)=?").get(invite.tenant_id,invite.email.toLowerCase());
+      if(existing)throw Object.assign(new Error("user_already_exists"),{status:409});
+      const userId=crypto.randomUUID(),stamp=new Date().toISOString();
+      db.prepare(`insert into users(id,tenant_id,name,email,role,active,created_at,password_hash,updated_at)
+        values(?,?,?,?,?,1,?,?,?)`).run(userId,invite.tenant_id,invite.name,invite.email,invite.role,stamp,makePasswordHash(password),stamp);
+      db.prepare("update user_invites set accepted_at=? where id=? and accepted_at is null").run(stamp,invite.id);
+      db.exec("COMMIT");
+      result={ok:true,email:invite.email,role:invite.role};
+    }catch(e){db.exec("ROLLBACK");return {handled:true,result:send(res,e.status||400,{error:e.message||"invitation_failed"})}}
+    return {handled:true,result:send(res,201,result)};
+  }
   if(url.pathname==="/api/auth/login"&&req.method==="POST"){
     const b=await parseBody(req),email=String(b.email||"").trim().toLowerCase(),password=String(b.password||""),workspace=String(b.workspace||"").trim().toLowerCase();
     let matches;
