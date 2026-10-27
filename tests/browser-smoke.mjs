@@ -113,8 +113,35 @@ try{
   await page.screenshot({path:path.join(artifact,"05-administracao-desktop.png"),fullPage:true});
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:path.join(artifact,"06-administracao-mobile.png"),fullPage:true});
+  // Etapa 20: percorrer o fluxo essencial de recepção em telas pequenas.
+  // Teste de viewport do Chromium; validação com aparelhos físicos segue pendente.
+  for(const width of [360,390,768]){
+    await page.setViewportSize({width,height:844});
+    for(const view of ["dashboard","agenda","clients","finance"]){
+      const button=page.locator('.mobileNav [data-view="'+view+'"]');
+      await button.scrollIntoViewIfNeeded();
+      await button.click();
+      await page.locator("#"+view+".view.active").waitFor({timeout:12000});
+      const overflow=await page.evaluate(()=>({
+        viewport:window.innerWidth,
+        width:document.documentElement.scrollWidth,
+        activeView:document.querySelector(".view.active")?.id,
+        navVisible:getComputedStyle(document.querySelector(".mobileNav")).display!=="none"
+      }));
+      assert.equal(overflow.activeView,view,"painel móvel deve abrir: "+view);
+      assert.equal(overflow.navVisible,true,"menu móvel visível em "+width+"px");
+      assert.ok(overflow.width<=overflow.viewport+12,
+        "Página com rolagem horizontal indesejada no "+view+" em "+width+
+        "px: "+JSON.stringify(overflow));
+      assert.equal(errors.length,0,"JS na navegação móvel: "+errors.join(" | "));
+    }
+    await page.screenshot({path:path.join(artifact,"09-fluxo-mobile-"+width+".png"),fullPage:true});
+  }
+
   // O fluxo MFA é feito por interface real, sem QR/conta externa.
   await page.setViewportSize({width:1440,height:900});
+  await open("admin"); // O roteiro móvel termina em Financeiro; voltar à Administração.
+  await page.locator('#admin [data-ne-tab="security"]').click();
   const mfaBox=page.locator("#admin .ne-mfa-box");
   await mfaBox.locator("summary").click();
   await mfaBox.locator("input[type=password]").fill("QA-browser-senha-123456!");
