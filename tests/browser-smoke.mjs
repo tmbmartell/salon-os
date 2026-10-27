@@ -95,7 +95,7 @@ try{
   await page.waitForFunction(()=>document.querySelector("#oiRevenue")?.textContent?.trim()!=="—",{timeout:15000});
   await page.screenshot({path:path.join(artifact,"04-olho-do-dono-desktop.png"),fullPage:true});
   await open("admin");
-  await page.locator(".ne-stage8-grid").first().waitFor();
+  await page.locator("#admin .ne-stage8-grid").first().waitFor();
   await page.screenshot({path:path.join(artifact,"05-administracao-desktop.png"),fullPage:true});
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:path.join(artifact,"06-administracao-mobile.png"),fullPage:true});
