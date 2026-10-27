@@ -87,7 +87,7 @@ export async function handlePhase9Api({req,res,url,db,user,tenant,send,parseBody
     }catch(e){db.exec("ROLLBACK");throw e}
     audit(db,user,"staff.schedule.update","professional",id,{days:days.length});return send(res,200,scheduleRows(db,tenant,id));
   }
-  if(req.method==="GET"&&url.pathname==="/api/staff/time-off"){guard("staff.read");return send(res,200,timeOffRows(db,tenant))}
+  if(req.method==="GET"&&url.pathname==="/api/staff/time-off"){guard("staff.read");if(!["owner","manager"].includes(user.role))return send(res,403,{error:"staff_private_data_forbidden"});return send(res,200,timeOffRows(db,tenant))}
   if(req.method==="POST"&&url.pathname==="/api/staff/time-off"){
     guard("staff.manage");const b=await parseBody(req),pid=txt(b.professional_id,64);if(!one(db,"select id from professionals where id=? and tenant_id=?",[pid,tenant]))return send(res,404,{error:"professional_not_found"});
     const start=txt(b.start_date,10),end=txt(b.end_date||b.start_date,10),type=txt(b.type||"day_off",40);if(!/^\d{4}-\d{2}-\d{2}$/.test(start)||!/^\d{4}-\d{2}-\d{2}$/.test(end)||end<start)return send(res,400,{error:"invalid_dates"});
