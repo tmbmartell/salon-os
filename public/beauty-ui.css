@@ -371,3 +371,13 @@ body{background:var(--bg);color:var(--ink)}
 .ne-backfill-controls button{min-height:41px;font-size:12px}
 #neBackfillStatus{font-size:12px;line-height:1.6;border:1px solid var(--line);border-radius:12px;background:var(--soft);padding:12px}
 @media(max-width:600px){.ne-backfill>summary{align-items:flex-start;flex-direction:column;gap:4px}.ne-backfill-controls button{flex:1 1 140px}}
+
+/* Etapa 12 — diagnóstico enxuto de ambiente piloto, sem conexão externa. */
+.ne-pilot-readiness{margin-top:16px;border:1px solid var(--line);border-radius:13px;background:#fff;overflow:hidden}
+.ne-pilot-readiness summary{padding:14px 16px;cursor:pointer;font-size:13px;font-weight:700}
+.ne-pilot-readiness summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ne-pilot-readiness-body{padding:12px 15px;display:grid;gap:10px;border-top:1px solid var(--line)}
+.ne-pilot-check{display:grid;grid-template-columns:1fr auto;gap:3px 10px;background:var(--soft);border-radius:10px;padding:12px}
+.ne-pilot-check strong{font-size:12px}.ne-pilot-check-status{color:var(--muted);font-size:11px;font-weight:650}
+.ne-pilot-check p{grid-column:1/-1;color:var(--muted);font-size:11px;line-height:1.5;margin:0}
+.ne-pilot-warning{border-left:3px solid var(--accent);padding:10px 12px;color:var(--muted);font-size:12px;line-height:1.5;margin:5px 0}
