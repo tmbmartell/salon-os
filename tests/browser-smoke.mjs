@@ -124,7 +124,7 @@ try{
   await mfaBox.locator('input[autocomplete="one-time-code"]').fill(totpAt(secret));
   await mfaBox.getByRole("button",{name:"Confirmar e ativar MFA"}).click();
   await mfaBox.getByText("Códigos de recuperação",{exact:true}).waitFor();
-  const recovery=(await mfaBox.locator(".ne-mfa-codes").textContent()).trim().split("\\n")[0];
+  const recovery=(await mfaBox.locator(".ne-mfa-codes").textContent()).trim().split(/\r?\n/)[0];
   assert.match(recovery,/^[0-9A-F]{32}$/);
   // Não armazenar o código em arquivos, logs ou screenshots.
   await page.locator("#logoutBtn").click();
