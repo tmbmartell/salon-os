@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import crypto from "node:crypto";
+import path from "node:path";
 
 const now=()=>new Date().toISOString();
 const all=(db,s,p=[])=>db.prepare(s).all(...p);
@@ -28,22 +29,46 @@ function dbStats(db){
   try{integrity=one(db,"pragma integrity_check")?.integrity_check||one(db,"pragma integrity_check")?.["integrity_check"]||"ok"}catch{}
   return {integrity,counts};
 }
+function configuredPaths(){
+  const database=path.resolve(process.env.SALON_DB||path.join(process.cwd(),"data","salon.sqlite"));
+  return {dbDir:path.dirname(database),backupDir:path.resolve(
+    process.env.NOVAGENTE_BACKUP_DIR||path.join(path.dirname(database),"backups"))};
+}
 function backupStatus(){
-  const dir="/srv/margot/salon-os/backups";
+  const {backupDir}=configuredPaths();
   try{
-    const files=fs.readdirSync(dir).filter(x=>x.endsWith(".sqlite.gz")).map(name=>({name,...fileStat(dir+"/"+name)})).sort((a,b)=>String(b.mtime).localeCompare(String(a.mtime)));
-    return {directory:dir,count:files.length,latest:files[0]||null,recent:files.slice(0,10)};
-  }catch{return {directory:dir,count:0,latest:null,recent:[]}}
+    const records=fs.readdirSync(backupDir).filter(n=>n.endsWith(".nebak"))
+      .map(name=>({name,...fileStat(path.join(backupDir,name))}))
+      .sort((a,b)=>String(b.mtime).localeCompare(String(a.mtime)));
+    return {configured:true,encrypted:true,count:records.length,
+      latest:records[0]||null,recent:records.slice(0,10),
+      warning:"Cópia cifrada local. Não substitui cópia externa e teste de restauração."};
+  }catch{
+    return {configured:true,encrypted:true,count:0,latest:null,recent:[],
+      warning:"Nenhum backup cifrado encontrado no diretório configurado."};
+  }
 }
 function restoreStatus(){
-  const file="/srv/margot/salon-os/data/restore-verify.json";
-  try{return JSON.parse(fs.readFileSync(file,"utf8"))}catch{return {ok:false,checked_at:null,error:"not_checked"}}
+  const {backupDir}=configuredPaths();
+  const receipt=path.join(backupDir,"restore-verify.json");
+  try{
+    const verified=JSON.parse(fs.readFileSync(receipt,"utf8"));
+    if(verified.ok===true&&verified.sqlite_integrity==="ok"&&
+      typeof verified.backup_sha256==="string"&&
+      /^[a-f0-9]{64}$/.test(verified.backup_sha256))
+      return {ok:true,checked_at:verified.checked_at,
+        asset_count:verified.asset_count,warning:"Restauração verificada em diretório separado."};
+  }catch{}
+  return {ok:false,checked_at:null,error:"restore_not_verified"};
 }
 function systemInfo(){
   const memTotal=os.totalmem(),memFree=os.freemem();
   let disk=null;
-  try{const s=fs.statfsSync("/srv/margot/salon-os");disk={total:s.blocks*s.bsize,free:s.bavail*s.bsize,used:(s.blocks-s.bavail)*s.bsize}}catch{}
-  return {uptime_seconds:Math.round(process.uptime()),host_uptime_seconds:Math.round(os.uptime()),memory:{total:memTotal,free:memFree,used:memTotal-memFree},disk};
+  try{const s=fs.statfsSync(configuredPaths().dbDir);
+    disk={total:s.blocks*s.bsize,free:s.bavail*s.bsize,used:(s.blocks-s.bavail)*s.bsize};
+  }catch{}
+  return {uptime_seconds:Math.round(process.uptime()),host_uptime_seconds:Math.round(os.uptime()),
+    memory:{total:memTotal,free:memFree,used:memTotal-memFree},disk};
 }
 
 export async function handlePhase5Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit}){
