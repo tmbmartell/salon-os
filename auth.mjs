@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { requestIsSecure } from "./request-security.mjs";
+import { installMfa, mfaEnabled, beginMfaLogin, completeMfaLogin, mfaStatus, enrollMfa, confirmMfa, disableMfa } from "./mfa.mjs";
 
 const SESSION_COOKIE="salon_session";
 const DAY=86400000;
@@ -48,6 +49,7 @@ export function installAuth(db){
       metadata TEXT NOT NULL DEFAULT '{}',created_at TEXT NOT NULL
     );
   `);
+  installMfa(db);
   const sessionCols=db.prepare("pragma table_info(auth_sessions)").all().map(x=>x.name);
   if(!sessionCols.includes("device_label"))db.exec("alter table auth_sessions add column device_label TEXT NOT NULL DEFAULT 'Dispositivo não identificado'");
 }
@@ -217,6 +219,10 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
       return {handled:true,result:locked?
         send(res,429,{error:"login_temporarily_blocked"},{"retry-after":"900"}):
         send(res,401,{error:"invalid_credentials"})};
+    }
+    if(mfaEnabled(db,u.id,u.tenant_id)){
+      const challenge=beginMfaLogin(db,u);
+      return {handled:true,result:send(res,202,challenge)};
     }
     db.prepare("delete from auth_login_attempts where attempt_key=?").run(attemptKey);
     const token=crypto.randomBytes(32).toString("base64url"),ts=new Date(),expires=new Date(ts.getTime()+7*DAY);
