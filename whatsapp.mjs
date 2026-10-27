@@ -177,10 +177,17 @@ function chatSerializedId(chat){
 function chatName(chat,phone){
   return String(chat?.name||chat?.formattedTitle||chat?.pushName||("WhatsApp "+String(phone).slice(-4))).trim().slice(0,160);
 }
-export async function syncWahaHistory(db,tenantId,{chatLimit=40,messageLimit=80}={}){
-  const session=sessionForTenant(db,tenantId);if(!session)throw new Error("whatsapp_session_unassigned");const safeChats=Math.max(1,Math.min(120,Number(chatLimit||40))),safeMsgs=Math.max(1,Math.min(200,Number(messageLimit||80)));
-  const chatsResp=await request("/api/"+encodeURIComponent(session)+"/chats?limit="+safeChats+"&sortOrder=DESC");
-  const chats=await chatsResp.json(),stats={chats_seen:0,chats_imported:0,messages_imported:0,skipped:0};
+export async function syncWahaHistory(db,tenantId,{chatLimit=40,messageLimit=80,chatOffset=0,messageOffset=0,sinceTimestamp=null,paginated=false}={}){
+  const session=sessionForTenant(db,tenantId);if(!session)throw new Error("whatsapp_session_unassigned");const safeChats=Math.max(1,Math.min(120,Math.trunc(Number(chatLimit||40)))),safeMsgs=Math.max(1,Math.min(200,Math.trunc(Number(messageLimit||80))));
+  const safeChatOffset=Math.max(0,Math.trunc(Number(chatOffset)||0)),safeMsgOffset=Math.max(0,Math.trunc(Number(messageOffset)||0));
+  if(paginated&&(!Number.isSafeInteger(safeChatOffset)||!Number.isSafeInteger(safeMsgOffset)))throw new Error("invalid_sync_cursor");
+  const since=sinceTimestamp==null?null:Math.trunc(Number(sinceTimestamp));
+  if(paginated&&(since==null||!Number.isSafeInteger(since)||since<0))throw new Error("invalid_sync_since");
+  const chatsResp=await request("/api/"+encodeURIComponent(session)+"/chats?limit="+safeChats+(paginated?"&offset="+safeChatOffset+"&sortBy=id&sortOrder=asc":"&sortOrder=DESC"));
+  const chats=await chatsResp.json();
+  if(!Array.isArray(chats))throw new Error("waha_invalid_chat_page");
+  const stats={chats_seen:0,chats_imported:0,messages_imported:0,skipped:0,
+    chats_page_length:chats.length,messages_page_length:0,processed_chat_id:null,chat_offset:safeChatOffset,message_offset:safeMsgOffset};
   for(const chat of Array.isArray(chats)?chats:[]){
     stats.chats_seen++;
     const chatId=chatSerializedId(chat);if(!chatId||chatId.endsWith("@g.us")||chatId==="0@c.us"){stats.skipped++;continue}
@@ -203,8 +210,12 @@ export async function syncWahaHistory(db,tenantId,{chatLimit=40,messageLimit=80}
       db.prepare("update conversations set external_id=?,unread_count=?,updated_at=? where id=? and tenant_id=?")
         .run(chatId,Number(chat.unreadCount||0),ts,co.id,tenantId);
     }
-    const msgResp=await request("/api/"+encodeURIComponent(session)+"/chats/"+encodeURIComponent(chatId)+"/messages?limit="+safeMsgs+"&downloadMedia=false&sortOrder=ASC");
-    const msgs=await msgResp.json();let lastAt=co.last_message_at||co.created_at||ts;
+    const msgParams="?limit="+safeMsgs+"&downloadMedia=false"+(paginated?
+      "&offset="+safeMsgOffset+"&filter.timestamp.gte="+since+"&sortOrder=asc":"&sortOrder=ASC");
+    const msgResp=await request("/api/"+encodeURIComponent(session)+"/chats/"+encodeURIComponent(chatId)+"/messages"+msgParams);
+    const msgs=await msgResp.json();if(!Array.isArray(msgs))throw new Error("waha_invalid_message_page");
+    stats.processed_chat_id=chatId;stats.messages_page_length=msgs.length;
+    let lastAt=co.last_message_at||co.created_at||ts;
     for(const m of Array.isArray(msgs)?msgs:[]){
       const externalMessageId=normalizeWahaMessageId(m?.id);
       if(!externalMessageId)continue;
