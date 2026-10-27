@@ -42,7 +42,7 @@ Referências:
 3. Criar um **Blueprint** a partir do `render.yaml` da branch `feat/novagente-estetica-demo-gratuita-etapa19`.
 4. Conferir se o serviço foi configurado como `plan: free`, se aponta **apenas para a branch de preview**, com deploy automático desligado.
 5. Preencher `NOVAGENTE_DEMO_OWNER_EMAIL` e `NOVAGENTE_DEMO_OWNER_PASSWORD` nas variáveis privadas do Render (senha de no mínimo 16 caracteres). Não publicar a senha em README, mensagem ou captura.
-6. Manter `NODE_ENV=production`, `NOVAGENTE_FREE_PREVIEW=yes`, `HOST=0.0.0.0`; o Blueprint gera os segredos iniciais `NOVAGENTE_SETUP_TOKEN` e `NOVAGENTE_MFA_KEY`.
+6. Manter `NODE_ENV=production`, `NOVAGENTE_FREE_PREVIEW=yes`, `HOST=0.0.0.0`; o Blueprint gera `NOVAGENTE_SETUP_TOKEN`, e o processo cria a chave MFA temporária em base64 **a cada inicialização**, acompanhando o banco descartável.
 7. Conferir que variáveis de integração externa como `WAHA_API_KEY`, `WAHA_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `JEV_CONTROL_PLANE_URL`, `DATABASE_URL` estejam **vazias ou ausentes**.
 8. Autorizar o primeiro deploy **manual** da demonstração. Verificar a URL real disponibilizada pelo Render; nunca inventar uma URL.
 9. Verificar `GET /api/health`: `mode: "free_preview_disposable"`, `disposable_demo: true`.
