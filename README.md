@@ -1,65 +1,80 @@
-# NOVAGENTE Estética — versão em desenvolvimento
+# NOVAGENTE Estética — release candidate RC1 (piloto sem WhatsApp)
 
-Plataforma de gestão integrada para salões e negócios de estética, criada pela **NOVAGENTE**.
+Sistema integrado de gestão para salões e negócios de estética: agenda + CRM, serviços, estoque, caixa/financeiro, equipe, marketing, indicadores e administração em **uma base SQLite com isolamento por salão**.
 
-**Situação:** implementação progressiva sobre a base do Salon OS. Alterações em uma branch de revisão; não está homologada nem publicada em produção.
+**Status atual:** `v0.9.0-rc.1` é uma *candidata de revisão*, ainda sem publicação, homologação com clientes reais ou merge em `main`. **Não é uma versão comercial pronta para produção.**
 
-## Componentes existentes aproveitados do Salon OS
+## O que entra na candidata
 
-- Clientes, CRM, histórico e WhatsApp via WAHA;
-- Agenda, serviços, fichas técnicas e recursos de trabalho;
-- Equipe, escalas, metas e comissões;
-- Caixa, financeiro, estoque, compras e fornecedores;
-- Pacotes, revenda, fidelização e relatórios;
-- PWA e estrutura inicial de agentes de IA.
+| Frente | Componentes |
+|---|---|
+| Atendimento | Clientes, agenda, serviços, fichas técnicas e pacotes |
+| Operação | Profissionais, equipe, estoque, compras, insumos e revenda |
+| Financeiro | Checkout, caixa, métodos de pagamento registrados, comissões e relatórios |
+| Gestão | Olho do Dono, alertas, dashboards, configuração e usuários |
+| Relacionamento | Campanhas, tarefas de pós-atendimento e réguas sem disparo automático |
+| Segurança | Sessões, permissões por perfil, MFA TOTP opcional para gestores, auditoria e proteção de exportação |
+| Continuidade | Backup cifrado local experimental e restauração isolada para homologação |
 
-> Existir código para um recurso não é garantia de integração real, disponibilidade de WhatsApp ou homologação de segurança.
+**O WhatsApp/WAHA não faz parte da condição de entrega inicial**. A integração existe no código e terá configuração e homologação próprias depois. Nada na candidata implica sessão real conectada ou envio real habilitado.
 
-## Etapa atual: identidade, interface e fundação de segurança
+## Pré-requisitos e execução local
 
-- Identidade **NOVAGENTE Estética** no título, login, menu e PWA;
-- Logotipo NOVAGENTE otimizado e incorporado em `public/novagente-logo.svg`;
-- Menu agrupado, painéis recolhíveis e triagem visual de conversas;
-- Central de Segurança em cards dentro de Administração;
-- Acesso pessoal **Meus dispositivos** para visualizar e revogar sessões;
-- Sessões com expiração por inatividade de oito horas, além do vencimento absoluto;
-- Vínculo conferido entre usuário e empresa durante autenticação;
-- Operações HTTP com origem cruzada bloqueadas quando o navegador fornece evidência de origem;
-- Sessões WAHA sem compartilhamento implícito entre empresas; falta configurar sessões específicas para novas empresas;
-- Testes automatizados em `tests/` e validação no GitHub Actions.
-
-## Rodar localmente
-
-Node.js 22 ou superior:
+Node.js **22+**, ambiente de teste separado e SQLite da aplicação. Não usar os dados de um salão real para testes.
 
 ```bash
 npm run check
+npm run release:preflight
 npm test
 npm start
 ```
 
-O aplicativo usa SQLite (`node:sqlite`). Para integrar WhatsApp é necessário configurar WAHA e suas credenciais no ambiente de execução.
+A primeira execução sem conta é um provisionamento de teste. Em produção, o provisionamento da primeira proprietária exige um segredo configurado fora do código (`NOVAGENTE_SETUP_TOKEN`). O serviço usa `SALON_DB` para apontar o arquivo SQLite.
 
-## Antes de usar com clientes reais
+Se utilizar a autenticação em duas etapas, a chave `NOVAGENTE_MFA_KEY` deve conter **32 bytes aleatórios em base64** e ser armazenada no gerenciador de segredos do servidor. Não a inserir em `.env` versionado nem em mensagens. Se a chave for perdida, segredos MFA existentes se tornam ilegíveis.
 
-- Validar toda a navegação e atendimento com WhatsApp conectado;
-- Configurar sessão WhatsApp individual por empresa e testar isolamentos;
-- Adicionar MFA, proteção anti-CSRF por token e políticas mais completas de sessão;
-- Revisar permissões de dados sensíveis e autorização por registro;
-- Homologar backups cifrados e **testar restauração**;
-- Revisar LGPD, retenção, consentimentos, incidentes e segurança de arquivos;
-- Realizar testes de ponta a ponta e revisão de segurança;
-- Somente depois disso considerar deploy ou merge na branch principal.
+### Testes e evidências
 
-## Arquitetura de referência
+- `npm run check`: verifica sintaxe dos módulos críticos;
+- `npm run release:preflight`: confere presença de arquivos e scripts que compõem a candidata, **não** aprova infraestrutura real;
+- `npm test`: testes de API, concorrência, agenda, financeiro, estoque, segurança, MFA, isolamento entre salões e simulação de um dia operacional, sempre com dados fictícios;
+- `.github/workflows/browser-qa.yml`: Chrome/Playwright com capturas de interface em ambiente temporário;
+- `npm run release:production-check`: lista pendências bloqueantes de configuração e **encerra com falha até aprovações manuais**. Não cria segredos, não faz deploy e não valida conexão bancária.
 
-- `server.mjs`: servidor, API e headers;
-- `auth.mjs`: autenticação, sessões, autorização e auditoria;
-- `whatsapp.mjs`: mensageria e isolamento de sessões WAHA;
-- `public/beauty-ui.js` e `public/beauty-ui.css`: camada visual progressiva da NOVAGENTE Estética (nomes de arquivos legados);
-- `public/security-center.js`: Central de Segurança e gerenciamento de dispositivos;
-- `public/novagente-logo.svg`: logo oficial otimizada;
-- `phase*.mjs`: funcionalidades herdadas;
-- `tests/`: testes automatizados.
+Todos os workflows de pull request da candidata rodam para **qualquer alteração de arquivo**, inclusive módulos adicionados após as primeiras etapas.
 
-A construção continuará por entregas: **WhatsApp+CRM → Agenda+Serviços → Estoque+Equipe → Caixa+Financeiro → Marketing+Automações → Relatórios → IA/RH premium**.
+## Estrutura do projeto
+
+| Área | Caminho |
+|---|---|
+| Servidor/API/SQLite | `server.mjs`, `phase*.mjs` |
+| Acesso, sessões, MFA | `auth.mjs`, `mfa.mjs`, `request-security.mjs` |
+| Negócio | `finance-rules.mjs`, `inventory-rules.mjs`, `appointment-status.mjs` |
+| Marketing e mensagens | `marketing.mjs`, `whatsapp.mjs`, `whatsapp-backfill.mjs` |
+| Dashboards | `owner-eye.mjs`, `public/app.js` |
+| Interface | `public/index.html`, `public/beauty-ui.css` e scripts específicos |
+| Backup piloto | `pilot-backup.mjs`, `scripts/pilot-backup.mjs` |
+| Pré-validação | `scripts/release-preflight.mjs` |
+| Testes | `tests/*.test.mjs`, `tests/browser-smoke.mjs` |
+| Histórico e documentação | `docs/ETAPA-*.md` |
+
+## Como revisar a candidata
+
+- A branch `release/novagente-estetica-piloto-offline-rc1` foi criada a partir da última etapa do desenvolvimento encadeado (Etapa 17), **sem cherry-pick ou cópia manual** de arquivos.
+- O PR consolidado aponta para `main`, reunindo o trabalho acumulado para **uma revisão única**.
+- Os PRs anteriores continuam como histórico de mudanças e testes; não devem ser mesclados separadamente sobre o mesmo trabalho sem planejamento, sob risco de duplicação de revisão.
+- Antes de mesclar, conferir `main` novamente, revisar arquivos/segredos, auditoria de dados e resultados de CI; solicitar aprovação técnica explícita.
+- Não implantar o código diretamente em domínio público; executar primeiro em homologação com credenciais e banco descartáveis.
+
+## Critérios ainda necessários para disponibilização real
+
+1. Revisão do PR consolidado e aprovação para integrar a versão principal, com plano de rollback.
+2. Hospedagem segura, HTTPS, reverse proxy e segredos sob controle do operador.
+3. Backups **fora do servidor**, rotina de rotação, teste de restauração e recuperação de chave MFA.
+4. Ajuste de permissões por profissional/ficha, retenção e política de privacidade compatível com LGPD.
+5. Teste supervisionado com proprietária, recepção e profissional em dispositivos físicos.
+6. Monitoramento, revisão de segurança independente e aceite final para o piloto.
+
+**Não há promessa de funcionamento de WhatsApp real, cobranças bancárias reais ou homologação comercial.**
+
+Veja `docs/ETAPA-18-CANDIDATA-ENTREGA.md` e `docs/ETAPA-17-PRIVACIDADE-CHECKLIST-ENTREGA.md`.
