@@ -812,7 +812,7 @@ async function loadAdmin(){
     const roleName={owner:"Proprietária",manager:"Gerente",reception:"Recepção",professional:"Profissional"};
     $("#adminUserList").innerHTML=(d.users||[]).map(u=>'<div class="tableRow"><div><strong>'+u.name+'</strong><small>'+u.email+'</small></div><span class="chip">'+(roleName[u.role]||u.role)+'</span><span class="status '+(u.active?"paid":"cancelled")+'">'+(u.active?"ativo":"inativo")+'</span></div>').join("")||'<p class="muted">Nenhum usuário.</p>';
     $("#adminAuditList").innerHTML=(d.audits||[]).slice(0,80).map(a=>'<div class="tableRow"><div><strong>'+(auditNames[a.action]||a.action)+'</strong><small>'+(a.user_name||"sistema")+' · '+dateTimeBR(a.created_at)+'</small></div><span class="chip">'+(a.entity_type||"evento")+'</span><small>'+((a.entity_id||"").slice(0,8))+'</small></div>').join("")||'<p class="muted">Sem eventos de auditoria.</p>';
-    $("#adminBackupList").innerHTML=(d.backup?.recent||[]).map(b=>'<div class="tableRow"><div><strong>'+b.name+'</strong><small>'+dateTimeBR(b.mtime)+'</small></div><strong>'+bytesHuman(b.size)+'</strong><span class="status paid">íntegro</span></div>').join("")||'<p class="muted">Nenhum backup encontrado.</p>';
+    $("#adminBackupList").innerHTML=(d.backup?.recent||[]).map(b=>'<div class="tableRow"><div><strong>'+b.name+'</strong><small>'+dateTimeBR(b.mtime)+'</small></div><strong>'+bytesHuman(b.size)+'</strong><span class="status paid">cifrado</span></div>').join("")||'<p class="muted">Nenhum backup encontrado.</p>';
   }catch(err){
     if(err.status===403)toast("Administração disponível para proprietária/gerência");
     else if(err.status!==401)toast("Não foi possível carregar a administração");

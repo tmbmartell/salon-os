@@ -486,9 +486,19 @@ async function readRawJson(req){
 
 async function api(req,res,url){
   if(req.method==="GET"&&url.pathname==="/api/health"){
-    let jev=false;try{const r=await fetch(JEV_BASE+"/health",{signal:AbortSignal.timeout(1500)});const j=await r.json();jev=!!j.jev_enabled}catch{}
+    let jev=false;
+    // No piloto offline, não consultar instâncias opcionais não configuradas.
+    if(process.env.JEV_CONTROL_PLANE_URL){
+      try{const r=await fetch(JEV_BASE+"/health",{signal:AbortSignal.timeout(1500)});const j=await r.json();jev=!!j.jev_enabled}catch{}
+    }
     const wa=await wahaStatus();
-    return send(res,200,{ok:true,service:"Salon OS",version:"1.9.1",jev,whatsapp:{configured:wa.configured,connected:wa.connected,status:wa.status}});
+    const databaseOk=!!db.prepare("select 1 ok").get()?.ok;
+    return send(res,databaseOk?200:503,{
+      ok:databaseOk,service:"NOVAGENTE Estética",version:"pilot-qa",
+      mode:wa.connected?"whatsapp_connected":"offline_without_whatsapp",
+      database:{connected:databaseOk},
+      optional_integrations:{jev_connected:jev,whatsapp:{configured:wa.configured,connected:wa.connected,status:wa.status}}
+    });
   }
 
   if(url.pathname.startsWith("/api/auth/")){

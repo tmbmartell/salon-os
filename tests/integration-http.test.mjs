@@ -61,6 +61,11 @@ async function expectStatus(request,pathname,expected,options={}){
 test("E2E: servidor + login + CRM + agenda + ficha + estoque + caixa + pós-venda + indicadores + perfis",{timeout:80000},async()=>{
   const app=await start(),publicApi=client(app.base);
   try{
+    const offline=await expectStatus(publicApi,"/api/health",200);
+    assert.equal(offline.ok,true);
+    assert.equal(offline.mode,"offline_without_whatsapp");
+    assert.equal(offline.database.connected,true);
+    assert.equal(offline.service,"NOVAGENTE Estética");
     const state=await expectStatus(publicApi,"/api/auth/state",200);
     assert.equal(state.claimed,false);
     assert.equal((await publicApi("/api/bootstrap")).status,401);
@@ -78,6 +83,13 @@ test("E2E: servidor + login + CRM + agenda + ficha + estoque + caixa + pós-vend
     assert.ok(cookie?.startsWith("salon_session="));
     const owner=client(app.base,cookie);
     const boot=await expectStatus(owner,"/api/bootstrap",200);
+    const pilot=await expectStatus(owner,"/api/admin/pilot-checks",200);
+    assert.equal(pilot.mode,"pilot_offline");
+    assert.equal(pilot.production_ready,false);
+    assert.equal(pilot.checks.find(c=>c.id==="sqlite").status,"passed");
+    assert.equal(pilot.checks.find(c=>c.id==="whatsapp").status,"deferred");
+    assert.equal(pilot.checks.find(c=>c.id==="restore").status,"needs_attention");
+
     assert.ok(boot.services.length>0);
     assert.ok(boot.professionals.length>0);
     const service=boot.services[0],professional=boot.professionals[0];
@@ -210,6 +222,7 @@ test("E2E: servidor + login + CRM + agenda + ficha + estoque + caixa + pós-vend
     const reception=client(app.base,rlogin.headers.get("set-cookie").split(";")[0]);
     assert.equal((await reception("/api/finance/entries")).status,403);
     assert.equal((await reception("/api/owner-eye/summary")).status,403);
+    assert.equal((await reception("/api/admin/pilot-checks")).status,403);
     assert.equal((await reception("/api/staff/time-off")).status,403);
     const staff=await expectStatus(reception,"/api/staff/overview",200);
     assert.equal(staff.limited,true);

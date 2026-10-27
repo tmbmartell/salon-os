@@ -106,6 +106,33 @@
       cards.append(card);
     }
     section.append(cards);
+    const readiness=make("details","ne-pilot-readiness");
+    const trigger=make("summary","","Diagnóstico do ambiente piloto (sem WhatsApp)");
+    const content=make("div","ne-pilot-readiness-body");
+    content.setAttribute("role","status");
+    readiness.append(trigger,content);
+    let loading=false;
+    readiness.addEventListener("toggle",async()=>{
+      if(!readiness.open||loading)return;
+      loading=true;content.replaceChildren(make("p","","Verificando as condições deste ambiente..."));
+      try{
+        const result=await request("/api/admin/pilot-checks");
+        content.replaceChildren();
+        for(const check of result.checks||[]){
+          const line=make("article","ne-pilot-check");
+          const title=make("strong","",check.title);
+          const icon=check.status==="passed"?"Verificado":check.status==="deferred"?"Adiado":"Pendente";
+          const status=make("small","ne-pilot-check-status",icon);
+          const description=make("p","",check.explanation);
+          line.append(title,status,description);
+          content.append(line);
+        }
+        content.append(make("p","ne-pilot-warning",
+          "Ambiente de testes: a aprovação desses itens não representa autorização para disponibilizar o sistema publicamente."));
+      }catch(error){content.replaceChildren(make("p","",error.message))}
+      finally{loading=false}
+    });
+    section.append(readiness);
     admin.after(section);
   }
 })();
