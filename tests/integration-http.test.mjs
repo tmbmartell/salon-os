@@ -256,6 +256,7 @@ test("E2E: servidor + login + CRM + agenda + ficha + estoque + caixa + pós-vend
     }finally{db.close()}
     assert.equal((await owner("/api/clients/"+foreignClient+"/technical")).status,404);
     assert.equal((await reception("/api/clients/"+foreignClient+"/technical")).status,404);
+    const visibleClients=await expectStatus(owner,"/api/clients",200);
     const exported=await owner("/api/clients/export");
     assert.equal(exported.status,200);
     assert.ok(exported.headers.get("content-type").includes("text/csv"));
@@ -269,7 +270,7 @@ test("E2E: servidor + login + CRM + agenda + ficha + estoque + caixa + pós-vend
     try{
       const row=dbAudit.prepare("select tenant_id,action,metadata from audit_log where action='clients.export' order by created_at desc limit 1").get();
       assert.equal(row.tenant_id,boot.tenant.id);
-      assert.equal(JSON.parse(row.metadata).count,2);
+      assert.equal(JSON.parse(row.metadata).count,visibleClients.length);
     }finally{dbAudit.close()}
 
   }catch(err){err.message+="\nLogs finais do servidor de teste:\n"+app.logs().slice(-2500);throw err}
