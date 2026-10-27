@@ -1,0 +1,26 @@
+#clients #clientList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;align-items:start}
+#clients #clientList>article{display:flex;flex-direction:column;gap:12px;min-height:0!important;padding:16px!important;border-radius:16px;background:var(--ne-surface)!important;border:1px solid var(--ne-outline)!important;color:var(--ne-text)!important;box-shadow:0 6px 18px #0000000c!important}
+#clients #clientList>article:hover{border-color:#a07eca!important;box-shadow:0 10px 22px #00000022!important}
+#clients #clientList>article>.who{display:flex;align-items:center;gap:12px}
+#clients #clientList>article .avatar{height:48px;width:48px;min-width:48px;border-radius:15px;background:linear-gradient(140deg,#e1c4ff,#b9dafa);color:#49316d;display:grid;place-items:center;font-size:16px;font-weight:800}
+#clients #clientList>article:nth-child(3n+2) .avatar{background:linear-gradient(140deg,#ffd2d9,#ead0b0);color:#743f51}
+#clients #clientList>article:nth-child(3n+3) .avatar{background:linear-gradient(140deg,#b1eddf,#c4d8fa);color:#17595a}
+#clients #clientList>article h3{font-size:15px;font-weight:800;margin:0 0 3px;color:var(--ne-text)}
+#clients #clientList>article .who p{font-size:12px;margin:0;color:var(--ne-text-secondary)}
+#clients #clientList>article>.clientMeta{display:none}
+#clients #clientList>article>.tags{display:flex;flex-wrap:wrap;gap:6px;margin:0}
+#clients #clientList>article .tag{padding:5px 9px;border-radius:50px;background:var(--ne-surface-alt);border:1px solid var(--ne-outline);font-size:11px;color:var(--ne-text-secondary)}
+#clients #clientList>article>p{margin:0;font-size:12px;line-height:1.5;color:var(--ne-text-secondary)}
+#clients .ne-client-commands{display:flex;gap:8px;padding-top:12px;border-top:1px solid var(--ne-outline);margin-top:auto}
+#clients .ne-client-commands button{border-radius:10px;padding:9px 13px;min-height:40px;cursor:pointer;font-size:12px;font-weight:750;background:var(--ne-surface-alt);border:1px solid var(--ne-outline);color:var(--ne-text)}
+#clients .ne-client-commands .ne-client-primary{background:#8051b4;border-color:#8051b4;color:white}
+#clients .ne-client-commands button:focus-visible{outline:3px solid #aa8bd9;outline-offset:2px}
+#clients .ne-client-expanded{background:var(--ne-surface-alt);border:1px solid var(--ne-outline);border-radius:11px;padding:12px;color:var(--ne-text-secondary);font-size:12px}
+#clients .ne-client-expanded[hidden]{display:none}
+#clients .ne-client-expanded strong{color:var(--ne-text)}
+#clients .ne-client-expanded p{margin:6px 0;color:var(--ne-text-secondary)}
+#clients #clientCount{font-size:12px;font-weight:700;color:var(--ne-text-secondary);padding:8px;background:var(--ne-surface-alt);border-radius:30px;border:1px solid var(--ne-outline)}
+#clients .searchrow{padding-bottom:15px;border-bottom:1px solid var(--ne-outline);margin-bottom:16px}
+@media(max-width:1170px){#clients #clientList{grid-template-columns:1fr}}
+@media(max-width:900px){#clients #clientList{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:680px){#clients #clientList{grid-template-columns:1fr}#clients .searchrow{flex-wrap:wrap}#clients .searchrow input{min-width:0}}
