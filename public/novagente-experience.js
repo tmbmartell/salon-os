@@ -15,7 +15,7 @@ function mount(){
  if(!dashboard||dashboard.querySelector(".ne-experience"))return;
  const root=document.createElement("div");root.className="ne-experience";
  const intro=document.createElement("div");intro.className="ne-intro";
- intro.innerHTML='<div><p class="ne-kicker">NOVAGENTE • ESTÉTICA</p><h2>Seu salão, em um só lugar<span>.</span></h2><p class="ne-sub">Tudo conectado, sem sobrecarregar sua rotina. Escolha por onde começar.</p></div>';
+ intro.innerHTML='<div><h2>Seu salão, em um só lugar<span>.</span></h2><p class="ne-sub">Tudo conectado, sem sobrecarregar sua rotina. Escolha por onde começar.</p></div>';
  root.append(intro);
  for(const [title,items] of groups){
   const section=document.createElement("section");section.className="ne-section";
