@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { requestIsSecure } from "./request-security.mjs";
 
 const SESSION_COOKIE="salon_session";
 const DAY=86400000;
@@ -14,7 +15,7 @@ function cookies(req){
   }
   return out;
 }
-function secureRequest(req){return String(req.headers["x-forwarded-proto"]||"").split(",")[0].trim()==="https"}
+function secureRequest(req){return requestIsSecure(req)}
 
 export function installAuth(db){
   const cols=db.prepare("pragma table_info(users)").all().map(x=>x.name);
@@ -38,6 +39,10 @@ export function installAuth(db){
       expires_at TEXT NOT NULL,used_at TEXT,created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token_hash);
+    CREATE TABLE IF NOT EXISTS auth_login_attempts(
+      attempt_key TEXT PRIMARY KEY, failures INTEGER NOT NULL,window_started TEXT NOT NULL,
+      blocked_until TEXT
+    );
     CREATE TABLE IF NOT EXISTS audit_log(
       id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,user_id TEXT,action TEXT NOT NULL,entity_type TEXT,entity_id TEXT,
       metadata TEXT NOT NULL DEFAULT '{}',created_at TEXT NOT NULL
@@ -94,6 +99,42 @@ function sessionCookie(req,token,maxAgeSec){
 }
 function deleteSessionCookie(req){return sessionCookie(req,"",0)}
 
+const LOGIN_WINDOW_MS=15*60*1000;
+const LOGIN_MAX_FAILURES=8;
+function loginAttemptKey(email,workspace){return sha(email+"|"+workspace)}
+function blockedLogin(db,key,ts){
+  const row=db.prepare("select blocked_until from auth_login_attempts where attempt_key=?").get(key);
+  return !!(row?.blocked_until&&new Date(row.blocked_until).getTime()>ts);
+}
+function loginFailure(db,key,ts){
+  db.exec("BEGIN IMMEDIATE");
+  try{
+    const row=db.prepare("select failures,window_started from auth_login_attempts where attempt_key=?").get(key);
+    const windowStart=new Date(row?.window_started||0).getTime();
+    const fresh=!row||!Number.isFinite(windowStart)||ts-windowStart>LOGIN_WINDOW_MS;
+    const failures=(fresh?0:Number(row.failures))+1;
+    const started=fresh?new Date(ts).toISOString():row.window_started;
+    const until=failures>=LOGIN_MAX_FAILURES?new Date(ts+LOGIN_WINDOW_MS).toISOString():null;
+    db.prepare(`insert into auth_login_attempts(attempt_key,failures,window_started,blocked_until)
+      values(?,?,?,?) on conflict(attempt_key) do update
+      set failures=excluded.failures,window_started=excluded.window_started,blocked_until=excluded.blocked_until`)
+      .run(key,failures,started,until);
+    db.exec("COMMIT");
+    return failures>=LOGIN_MAX_FAILURES;
+  }catch(e){db.exec("ROLLBACK");throw e}
+}
+function secureSetupRequired(){
+  return process.env.NODE_ENV==="production";
+}
+function setupAuthorized(req){
+  if(!secureSetupRequired())return true;
+  const secret=String(process.env.NOVAGENTE_SETUP_TOKEN||"");
+  if(secret.length<32)return false;
+  const supplied=String(req.headers["x-novagente-setup-token"]||"");
+  const actual=Buffer.from(supplied),expected=Buffer.from(secret);
+  return actual.length===expected.length&&crypto.timingSafeEqual(actual,expected);
+}
+
 export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant}){
   if(url.pathname==="/api/auth/state"&&req.method==="GET"){
     const tenant=db.prepare("select id,name,slug from tenants where id=?").get(defaultTenant);
@@ -101,6 +142,9 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
     return {handled:true,result:send(res,200,{claimed,tenant})};
   }
   if(url.pathname==="/api/auth/setup"&&req.method==="POST"){
+    // Em produção, quem alcança a página pública não pode tomar a conta dona.
+    // O provisionamento inicial exige segredo longo definido fora do repositório.
+    if(!setupAuthorized(req))return {handled:true,result:send(res,503,{error:"initial_setup_requires_server_token"})};
     const claimed=!!db.prepare("select 1 x from users where tenant_id=? and role='owner' and password_hash is not null limit 1").get(defaultTenant);
     if(claimed)return {handled:true,result:send(res,409,{error:"already_claimed"})};
     const b=await parseBody(req);const password=String(b.password||"");
@@ -158,13 +202,23 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
     return {handled:true,result:send(res,201,result)};
   }
   if(url.pathname==="/api/auth/login"&&req.method==="POST"){
-    const b=await parseBody(req),email=String(b.email||"").trim().toLowerCase(),password=String(b.password||""),workspace=String(b.workspace||"").trim().toLowerCase();
+    const b=await parseBody(req),email=String(b.email||"").trim().toLowerCase().slice(0,200),password=String(b.password||""),workspace=String(b.workspace||"").trim().toLowerCase().slice(0,120);
+    if(!email||password.length>256)return {handled:true,result:send(res,401,{error:"invalid_credentials"})};
+    const attemptKey=loginAttemptKey(email,workspace),time=Date.now();
+    if(blockedLogin(db,attemptKey,time))
+      return {handled:true,result:send(res,429,{error:"login_temporarily_blocked"},{"retry-after":"900"})};
     let matches;
     if(workspace)matches=db.prepare("select u.id,u.tenant_id,u.name,u.email,u.role,u.active,u.password_hash from users u join tenants t on t.id=u.tenant_id where lower(u.email)=? and lower(t.slug)=?").all(email,workspace);
     else matches=db.prepare("select id,tenant_id,name,email,role,active,password_hash from users where lower(email)=?").all(email);
     if(matches.length>1&&!workspace)return {handled:true,result:send(res,409,{error:"workspace_required"})};
     const u=matches[0];
-    if(!u||!u.active||!verifyPassword(password,u.password_hash))return {handled:true,result:send(res,401,{error:"invalid_credentials"})};
+    if(!u||!u.active||!verifyPassword(password,u.password_hash)){
+      const locked=loginFailure(db,attemptKey,time);
+      return {handled:true,result:locked?
+        send(res,429,{error:"login_temporarily_blocked"},{"retry-after":"900"}):
+        send(res,401,{error:"invalid_credentials"})};
+    }
+    db.prepare("delete from auth_login_attempts where attempt_key=?").run(attemptKey);
     const token=crypto.randomBytes(32).toString("base64url"),ts=new Date(),expires=new Date(ts.getTime()+7*DAY);
     db.prepare("delete from auth_sessions where datetime(expires_at)<=datetime('now')").run();
     const deviceLabel=String(req.headers["user-agent"]||"Dispositivo não identificado").slice(0,180);
