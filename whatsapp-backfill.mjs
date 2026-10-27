@@ -28,7 +28,7 @@ export function installWhatsAppBackfill(db){
   CREATE INDEX IF NOT EXISTS idx_backfill_tenant ON whatsapp_backfill_jobs(tenant_id,created_at);`);
 }
 function latest(db,tenant){
-  return one(db,"select * from whatsapp_backfill_jobs where tenant_id=? order by created_at desc,id desc limit 1",[tenant]);
+  return one(db,"select * from whatsapp_backfill_jobs where tenant_id=? order by rowid desc limit 1",[tenant]);
 }
 function sinceDate(v){
   const date=String(v||"").trim();
@@ -67,6 +67,17 @@ export async function handleWhatsAppBackfillApi({db,req,res,url,user,tenant,send
     if(!job||job.status!=="running")return send(res,409,{error:"backfill_not_running"});
     run(db,"update whatsapp_backfill_jobs set status='paused',updated_at=? where id=? and tenant_id=?",[stamp(),job.id,tenant]);
     audit(db,user,"whatsapp.backfill.pause","whatsapp_backfill",job.id,{});
+    return send(res,200,{job:publicJob(latest(db,tenant))});
+  }
+  if(req.method==="POST"&&path==="/api/whatsapp/backfill/cancel"){
+    const job=latest(db,tenant);
+    if(!job||!["running","paused"].includes(job.status))
+      return send(res,409,{error:"backfill_not_active"});
+    const changed=run(db,`update whatsapp_backfill_jobs
+      set status='cancelled',lease_token=null,lease_expires=null,updated_at=?
+      where id=? and tenant_id=? and status in ('running','paused')`,[stamp(),job.id,tenant]);
+    if(!changed.changes)return send(res,409,{error:"backfill_not_active"});
+    audit(db,user,"whatsapp.backfill.cancel","whatsapp_backfill",job.id,{});
     return send(res,200,{job:publicJob(latest(db,tenant))});
   }
   if(req.method==="POST"&&path==="/api/whatsapp/backfill/resume"){
