@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Render Free: banco descartável novo a cada inicialização. Jamais apontar
 // para SQLite de cliente. Os acessos são configurados somente via Render env.
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -15,6 +16,7 @@ const directory=fs.mkdtempSync(path.join(os.tmpdir(),"novagente-free-preview-"))
 const env={...process.env,
   SALON_DB:path.join(directory,"salon.sqlite"),
   NOVAGENTE_FREE_PREVIEW_ACTIVE:"true",
+  NOVAGENTE_MFA_KEY:crypto.randomBytes(32).toString("base64"),
   NOVAGENTE_ENABLE_RECEPTIONIST_AI:"false",
   NOVAGENTE_ENABLE_WHATSAPP_AI:"false"
 };
