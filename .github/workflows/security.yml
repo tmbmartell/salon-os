@@ -37,3 +37,11 @@ jobs:
           path: artifacts/pilot-day/
           if-no-files-found: ignore
           retention-days: 14
+      - name: Guardar relatório de concorrência com contas fictícias
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: novagente-estetica-multiusuario-qa
+          path: artifacts/multiuser/
+          if-no-files-found: ignore
+          retention-days: 14

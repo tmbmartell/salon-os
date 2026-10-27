@@ -35,7 +35,7 @@ const WAHA_AGENT_ENABLED=process.env.NOVAGENTE_ENABLE_RECEPTIONIST_AI==="true";
 
 fs.mkdirSync(path.dirname(DB_PATH),{recursive:true});
 const db=new DatabaseSync(DB_PATH);
-db.exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;");
+db.exec("PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;");
 
 function id(){return crypto.randomUUID()}
 function now(){return new Date().toISOString()}
@@ -625,11 +625,22 @@ async function api(req,res,url){
     guard("clients.write");
     const b=await parseBody(req),name=safeText(b.name,120),phone=normalizePhone(b.phone);
     if(!name)return send(res,400,{error:"name_required"});
-    if(phone){const existing=one("select * from clients where tenant_id=? and phone=?",[tenant,phone]);if(existing)return send(res,409,{error:"phone_already_exists",client:clientView(existing)})}
-    const cid=id();
-    run("insert into clients(id,tenant_id,name,phone,email,birthday,instagram,facebook,referral_reference,tags,notes,source,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",[cid,tenant,name,phone,safeText(b.email,160),safeText(b.birthday,20),safeText(b.instagram,160),safeText(b.facebook,160),safeText(b.referral_reference,180),JSON.stringify(Array.isArray(b.tags)?b.tags.slice(0,20):[]),safeText(b.notes,1000),safeText(b.source||"manual",40)||"manual",now(),now()]);
-    audit(db,user,"client.create","client",cid,{});
-    return send(res,201,clientView(one("select * from clients where id=?",[cid])));
+    // Checagem e INSERT sob o mesmo lock: evita dois cadastros de telefone
+    // idêntico quando recepção e gerência usam instâncias diferentes.
+    let created,duplicate;
+    db.exec("BEGIN IMMEDIATE");
+    try{
+      duplicate=phone?one("select * from clients where tenant_id=? and phone=?",[tenant,phone]):null;
+      if(!duplicate){
+        const cid=id();
+        run("insert into clients(id,tenant_id,name,phone,email,birthday,instagram,facebook,referral_reference,tags,notes,source,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",[cid,tenant,name,phone,safeText(b.email,160),safeText(b.birthday,20),safeText(b.instagram,160),safeText(b.facebook,160),safeText(b.referral_reference,180),JSON.stringify(Array.isArray(b.tags)?b.tags.slice(0,20):[]),safeText(b.notes,1000),safeText(b.source||"manual",40)||"manual",now(),now()]);
+        created=one("select * from clients where id=? and tenant_id=?",[cid,tenant]);
+      }
+      db.exec("COMMIT");
+    }catch(error){db.exec("ROLLBACK");throw error}
+    if(duplicate)return send(res,409,{error:"phone_already_exists",client:clientView(duplicate)});
+    audit(db,user,"client.create","client",created.id,{});
+    return send(res,201,clientView(created));
   }
 
   if(req.method==="GET"&&url.pathname==="/api/professionals"){guard("team.read");return send(res,200,all("select * from professionals where tenant_id=? order by name",[tenant]).map(professionalView))}

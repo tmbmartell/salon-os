@@ -181,8 +181,18 @@ function checkout(db,tenant,user,b){
   const items=appointmentCheckoutItems(db,tenant,a),subtotal=items.reduce((sum,x)=>sum+Number(x.unit_price_cents||0)*Math.max(1,Number(x.qty||1)),0),method=txt(b.payment_method||"pix",32),discount=method==="package"?0:Math.min(subtotal,Math.max(0,money(b.discount||0)));
   if(!["pix","credit_card","debit_card","cash","voucher","package","other"].includes(method)){const e=new Error("invalid_payment_method");e.status=400;throw e}
   if(method==="package"&&(items.length>1||Number(items[0]?.qty||1)!==1)){const e=new Error("package_multi_service_not_supported");e.status=409;throw e}
-  const cash=openCash(db,tenant);if(method==="cash"&&!cash){const e=new Error("cash_session_required");e.status=409;throw e}
+  let cash=openCash(db,tenant);if(method==="cash"&&!cash){const e=new Error("cash_session_required");e.status=409;throw e}
   return transaction(db,()=>{
+    // Revalidar sob BEGIN IMMEDIATE: outro caixa/terminal pode ter finalizado ou
+    // cancelado o atendimento entre a consulta inicial e a obtenção do lock.
+    const latest=one(db,"select status from appointments where tenant_id=? and id=?",[tenant,a.id]);
+    if(!latest||["cancelled","no_show"].includes(latest.status))
+      throw Object.assign(new Error("appointment_not_billable"),{status:409});
+    if(one(db,"select id from checkout_records where tenant_id=? and appointment_id=?",[tenant,a.id]))
+      throw Object.assign(new Error("appointment_already_checked_out"),{status:409});
+    cash=openCash(db,tenant);
+    if(method==="cash"&&!cash)
+      throw Object.assign(new Error("cash_session_required"),{status:409});
     const stockPlan=plannedConsumption(db,tenant,items,b.consumption||[]);
     let packageUse=null,total=Math.max(0,subtotal-discount),financialId=null;
     if(method==="package"){packageUse=consumePackageCredit(db,tenant,a.client_id,items[0].service_id,txt(b.client_package_id,64)||null);total=Number(packageUse.allocated_unit_cents||0)}
@@ -307,18 +317,25 @@ export async function handlePhase2Api(ctx){
   if(req.method==="POST"&&url.pathname==="/api/finance/entries"){
     guard("finance.write");
     const b=await parseBody(req),kind=txt(b.kind,20),status=txt(b.status||"paid",20),description=txt(b.description,240);
-    if(!["income","expense"].includes(kind)||!["paid","pending"].includes(status)||!description)return send(res,400,{error:"invalid_finance_entry"});
+    if(!["income","expense"].includes(kind)||!["paid","pending"].includes(status)||!description)
+      return send(res,400,{error:"invalid_finance_entry"});
     let amount,method;
     try{amount=cents(b.amount);method=validPaymentMethod(b.payment_method,{allowEmpty:status==="pending"})}
     catch(e){return send(res,e.status||400,{error:e.message})}
     const supplierId=txt(b.supplier_id,64)||null;
-    if(supplierId&&!one(db,"select id from suppliers where id=? and tenant_id=?",[supplierId,tenant]))return send(res,400,{error:"invalid_supplier"});
-    const cash=openCash(db,tenant);
-    if(status==="paid"&&method==="cash"&&!cash)return send(res,409,{error:"cash_session_required"});
-    if(status==="paid"&&method==="cash"&&kind==="expense"&&amount>expectedCash(db,tenant,cash.id))return send(res,409,{error:"insufficient_cash"});
-    const fid=uid();
-    run(db,"insert into financial_entries(id,tenant_id,kind,category,description,amount_cents,payment_method,status,due_date,paid_at,cash_session_id,supplier_id,created_by,created_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-      [fid,tenant,kind,txt(b.category||"other",80),description,amount,method,status,txt(b.due_date,10)||null,status==="paid"?now():null,status==="paid"?(cash?.id||null):null,supplierId,user.id,now()]);
+    let fid;
+    try{transaction(db,()=>{
+      if(supplierId&&!one(db,"select id from suppliers where id=? and tenant_id=?",[supplierId,tenant]))
+        throw Object.assign(new Error("invalid_supplier"),{status:400});
+      const cash=openCash(db,tenant);
+      if(status==="paid"&&method==="cash"&&!cash)
+        throw Object.assign(new Error("cash_session_required"),{status:409});
+      if(status==="paid"&&method==="cash"&&kind==="expense"&&amount>expectedCash(db,tenant,cash.id))
+        throw Object.assign(new Error("insufficient_cash"),{status:409});
+      fid=uid();
+      run(db,"insert into financial_entries(id,tenant_id,kind,category,description,amount_cents,payment_method,status,due_date,paid_at,cash_session_id,supplier_id,created_by,created_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        [fid,tenant,kind,txt(b.category||"other",80),description,amount,method,status,txt(b.due_date,10)||null,status==="paid"?now():null,status==="paid"?(cash?.id||null):null,supplierId,user.id,now()]);
+    })}catch(e){return send(res,e.status||400,{error:e.message})}
     audit(db,user,"finance.entry.create","financial_entry",fid,{kind,status,amount_cents:amount,payment_method:method});
     return send(res,201,{id:fid,amount:amount/100,status});
   }
@@ -347,22 +364,22 @@ export async function handlePhase2Api(ctx){
   if(req.method==="GET"&&url.pathname==="/api/stock/movements"){guard("inventory.read");const pid=txt(url.searchParams.get("product_id")||"",64);const rows=pid?all(db,"select m.*,p.name product_name,p.unit from stock_movements m join products p on p.id=m.product_id and p.tenant_id=m.tenant_id where m.tenant_id=? and m.product_id=? order by m.created_at desc limit 300",[tenant,pid]):all(db,"select m.*,p.name product_name,p.unit from stock_movements m join products p on p.id=m.product_id and p.tenant_id=m.tenant_id where m.tenant_id=? order by m.created_at desc limit 300",[tenant]);return send(res,200,rows.map(x=>({...x,unit_cost:Number(x.unit_cost_cents||0)/100})))}
   if(req.method==="POST"&&url.pathname==="/api/stock/adjust"){
     guard("inventory.write");
-    const b=await parseBody(req),pid=txt(b.product_id,64);
-    const p=one(db,"select * from products where id=? and tenant_id=?",[pid,tenant]);
-    if(!p)return send(res,404,{error:"product_not_found"});
-    const reason=txt(b.reason,200);
+    const b=await parseBody(req),pid=txt(b.product_id,64),reason=txt(b.reason,200);
     if(!reason)return send(res,400,{error:"reason_required"});
-    let q;
-    try{q=quantity(b.qty,p.unit,{zero:false,signed:true})}
-    catch(e){return send(res,e.status||400,{error:e.message})}
-    const next=Math.round((Number(p.stock_qty)+q)*1000)/1000;
-    if(next<0)return send(res,409,{error:"insufficient_stock"});
-    transaction(db,()=>{
+    let q,next;
+    try{transaction(db,()=>{
+      // O saldo lido e o saldo alterado devem estar na MESMA transação,
+      // inclusive quando duas instâncias usam um SQLite compartilhado.
+      const p=one(db,"select * from products where id=? and tenant_id=?",[pid,tenant]);
+      if(!p)throw Object.assign(new Error("product_not_found"),{status:404});
+      q=quantity(b.qty,p.unit,{zero:false,signed:true});
+      next=Math.round((Number(p.stock_qty)+q)*1000)/1000;
+      if(next<0)throw Object.assign(new Error("insufficient_stock"),{status:409});
       run(db,"update products set stock_qty=?,updated_at=? where id=? and tenant_id=?",[next,now(),pid,tenant]);
       if(q<0)consumeLots(db,tenant,pid,-q);
       run(db,"insert into stock_movements(id,tenant_id,product_id,type,qty,unit_cost_cents,reason,created_by,created_at) values(?,?,?,?,?,?,?,?,?)",
         [uid(),tenant,pid,q>0?"adjust_in":"adjust_out",q,Number(p.avg_cost_cents||0),reason,user.id,now()]);
-    });
+    })}catch(e){return send(res,e.status||400,{error:e.message})}
     audit(db,user,"stock.adjust","product",pid,{qty:q,next,reason});
     return send(res,200,{stock_qty:next});
   }
