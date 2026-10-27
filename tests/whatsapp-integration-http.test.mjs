@@ -203,6 +203,21 @@ test("WAHA simulado: HMAC, mensagem, cliente CRM, conversa, agenda, resposta, AC
     const restarted=await expect(owner,"/api/whatsapp/backfill/start",201,{method:"POST",
       body:{from_date:"2026-04-01",page_size:10}});
     assert.equal(restarted.job.from_date,"2026-04-01");
+    const receptionInvite=await expect(owner,"/api/admin/invitations",201,{
+      method:"POST",body:{email:"reception-backfill@example.invalid",name:"Recepção Backfill",role:"reception"}
+    });
+    await expect(app.api,"/api/auth/invitations/accept",201,{
+      method:"POST",body:{token:receptionInvite.token,password:"senha-recepcao-qa-12345"}
+    });
+    const receptionLogin=await app.api("/api/auth/login",{method:"POST",body:{
+      email:"reception-backfill@example.invalid",password:"senha-recepcao-qa-12345"
+    }});
+    assert.equal(receptionLogin.status,200);
+    const reception=(p,o={})=>app.api(p,{...o,cookie:receptionLogin.cookie});
+    assert.equal((await reception("/api/whatsapp/backfill/status")).status,403);
+    assert.equal((await reception("/api/whatsapp/backfill/step",{method:"POST"})).status,403);
+    assert.equal((await reception("/api/whatsapp/backfill/cancel",{method:"POST"})).status,403);
+
 
 
     const clients=await expect(owner,"/api/clients",200);
