@@ -7,6 +7,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { installAuth, authenticate, handleAuthApi, requirePermission, audit } from "./auth.mjs";
+import { isFreePreview, provisionFreePreview } from "./free-preview.mjs";
 import { browserMutationAllowed, requestIp } from "./request-security.mjs";
 import { installWhatsAppBackfill, handleWhatsAppBackfillApi } from "./whatsapp-backfill.mjs";
 import { installWhatsApp, wahaConfigured, wahaStatus, ensureWahaSession, wahaQr, verifyWebhook, listConversations, conversationMessages, markConversationRead, sendConversationMessage, ingestWahaEvent, sendText, registerTenantSession, sessionForTenant, tenantForWahaEvent, syncWahaHistory } from "./whatsapp.mjs";
@@ -186,6 +187,7 @@ function ensureSeed(){
 }
 ensureSeed();
 installAuth(db);
+provisionFreePreview(db,DEFAULT_TENANT);
 installWhatsApp(db);
 installWhatsAppBackfill(db);
 installLlmConfig(db);
@@ -496,7 +498,8 @@ async function api(req,res,url){
     const databaseOk=!!db.prepare("select 1 ok").get()?.ok;
     return send(res,databaseOk?200:503,{
       ok:databaseOk,service:"NOVAGENTE Estética",version:"pilot-qa",
-      mode:wa.connected?"whatsapp_connected":"offline_without_whatsapp",
+      mode:isFreePreview()?"free_preview_disposable":wa.connected?"whatsapp_connected":"offline_without_whatsapp",
+      disposable_demo:isFreePreview(),
       database:{connected:databaseOk},
       optional_integrations:{jev_connected:jev,whatsapp:{configured:wa.configured,connected:wa.connected,status:wa.status}}
     });
@@ -858,7 +861,7 @@ const handler=async(req,res)=>{
     res.writeHead(200,{...baseSecurityHeaders(),"content-type":"text/html; charset=utf-8","cache-control":"no-cache"});fs.createReadStream(index).pipe(res);
   }catch(e){console.error(e);const status=Number(e.status||500);send(res,status,{error:status===401?"unauthorized":status===403?"forbidden":status===400?"bad_request":"internal_error",message:status<500?String(e.message||e):"internal_error"})}
 };
-const listenHosts=["127.0.0.1",HOST,...String(process.env.EXTRA_HOSTS||"").split(",").map(x=>x.trim()).filter(Boolean)].filter((x,i,a)=>a.indexOf(x)===i);
+const listenHosts=[HOST==="0.0.0.0"||HOST==="::"?HOST:"127.0.0.1",...(HOST==="0.0.0.0"||HOST==="::"?[]:[HOST]),...String(process.env.EXTRA_HOSTS||"").split(",").map(x=>x.trim()).filter(Boolean)].filter((x,i,a)=>a.indexOf(x)===i);
 for(const bindHost of listenHosts){
   const server=http.createServer(handler);
   server.listen(PORT,bindHost,()=>console.log(`Salon OS listening on http://${bindHost}:${PORT}`));

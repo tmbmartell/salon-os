@@ -18,6 +18,10 @@ export function requestIp(req){
 }
 export function requestIsSecure(req){
   if(req.socket?.encrypted)return true;
+  // Origem HTTPS declarada pela própria plataforma para a demonstração
+  // descartável; não utilizar headers X-Forwarded-* de visitantes anônimos.
+  if(process.env.NOVAGENTE_FREE_PREVIEW_ACTIVE==="true"&&
+     /^https:\/\/[^/]+$/i.test(String(process.env.RENDER_EXTERNAL_URL||"")))return true;
   return trustedProxy(req)&&String(req.headers["x-forwarded-proto"]||"").split(",")[0].trim().toLowerCase()==="https";
 }
 export function browserMutationAllowed(req,url){
@@ -26,7 +30,7 @@ export function browserMutationAllowed(req,url){
   const fetchSite=String(req.headers["sec-fetch-site"]||"").toLowerCase();
   if(fetchSite==="cross-site"||fetchSite==="same-site")return false;
   const origin=req.headers.origin;
-  const definedOrigin=process.env.NOVAGENTE_PUBLIC_ORIGIN;
+  const definedOrigin=process.env.NOVAGENTE_PUBLIC_ORIGIN||(process.env.NOVAGENTE_FREE_PREVIEW_ACTIVE==="true"?process.env.RENDER_EXTERNAL_URL:"");
   if(origin){
     let parsed;try{parsed=new URL(String(origin))}catch{return false}
     if(!validProtocol.has(parsed.protocol)||parsed.username||parsed.password||parsed.pathname!=="/"||parsed.search||parsed.hash)
