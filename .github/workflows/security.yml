@@ -25,5 +25,15 @@ jobs:
           node-version: "22"
       - name: Sintaxe
         run: npm run check
-      - name: Testes de segurança
+      - name: Testes de segurança e dia operacional
         run: npm test
+        env:
+          NOVAGENTE_PILOT_REPORT: "1"
+      - name: Guardar relatório sintético da simulação
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: novagente-estetica-dia-salao-qa
+          path: artifacts/pilot-day/
+          if-no-files-found: ignore
+          retention-days: 14
