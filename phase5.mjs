@@ -80,6 +80,25 @@ export async function handlePhase5Api({req,res,url,db,user,tenant,send,parseBody
     const security=all(db,"select * from security_events where tenant_id=? order by created_at desc limit 100",[tenant]).map(x=>({...x,details:JSON.parse(x.details||"{}")}));
     return send(res,200,{users,audits,security,backup:backupStatus(),restore:restoreStatus(),database:dbStats(db),system:systemInfo()});
   }
+  if(req.method==="GET"&&url.pathname==="/api/admin/pilot-checks"){
+    guard("admin.read");
+    if(!["owner","manager"].includes(user.role))return send(res,403,{error:"management_only"});
+    const dbCheck=dbStats(db),backup=backupStatus(),restore=restoreStatus();
+    const flags=[
+      {id:"sqlite",title:"Banco de dados",status:dbCheck.integrity==="ok"?"passed":"needs_attention",
+        explanation:dbCheck.integrity==="ok"?"Integridade SQLite verificada.":"É necessário verificar a integridade do banco."},
+      {id:"backup",title:"Cópia cifrada",status:backup.count>0?"passed":"needs_attention",
+        explanation:backup.count>0?"Há cópia cifrada local identificada.":"Ainda não foi encontrada cópia cifrada neste ambiente."},
+      {id:"restore",title:"Teste de restauração",status:restore.ok?"passed":"needs_attention",
+        explanation:restore.ok?"Foi registrada restauração em pasta isolada.":"A restauração em pasta isolada ainda não foi comprovada."},
+      {id:"whatsapp",title:"WhatsApp real",status:"deferred",
+        explanation:"Conexão real adiada. CRM, agenda, caixa e estoque podem ser testados sem WAHA."},
+      {id:"security",title:"Revisão de segurança e LGPD",status:"needs_review",
+        explanation:"MFA, CSRF completo, permissões e retenção exigem homologação antes de produção."}
+    ];
+    return send(res,200,{mode:"pilot_offline",production_ready:false,
+      offline_pilot_checks_passed:flags.filter(f=>f.status==="needs_attention").length===0,checks:flags});
+  }
   if(req.method==="GET"&&url.pathname==="/api/admin/audit"){
     guard("admin.read");
     const limit=Math.min(500,Math.max(1,Number(url.searchParams.get("limit")||200)));
