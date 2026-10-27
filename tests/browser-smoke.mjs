@@ -72,6 +72,12 @@ try{
     await sleep(300);
     assert.equal(errors.length,0,"Erro JS após abrir "+view+": "+errors.join(" | "));
   }
+  await open("inbox");
+  await page.locator("#syncWhatsappHistory").click();
+  await page.locator("#whatsappBackfillDetails[open]").waitFor();
+  await page.locator("#neBackfillStatus").getByText("Nenhuma importação iniciada.").waitFor({timeout:12000});
+  assert.equal(await page.locator("#neBackfillDate").inputValue(),"2026-04-01");
+  await page.screenshot({path:path.join(artifact,"07-importacao-whatsapp-desktop.png"),fullPage:true});
   await open("agenda");
   assert.ok(await page.locator("#agendaList").count()>0);
   await open("inventory");
