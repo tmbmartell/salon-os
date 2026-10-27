@@ -7,6 +7,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { installAuth, authenticate, handleAuthApi, requirePermission, audit } from "./auth.mjs";
+import { browserMutationAllowed, requestIp } from "./request-security.mjs";
 import { installWhatsAppBackfill, handleWhatsAppBackfillApi } from "./whatsapp-backfill.mjs";
 import { installWhatsApp, wahaConfigured, wahaStatus, ensureWahaSession, wahaQr, verifyWebhook, listConversations, conversationMessages, markConversationRead, sendConversationMessage, ingestWahaEvent, sendText, registerTenantSession, sessionForTenant, tenantForWahaEvent, syncWahaHistory } from "./whatsapp.mjs";
 import { installPhase2, handlePhase2Api } from "./phase2.mjs";
@@ -67,7 +68,7 @@ function parseBody(req,maxBytes=1_000_000){
 function safeText(v,max=500){return String(v??"").trim().slice(0,max)}
 function csvCell(v){const s=String(v??"").replace(/\r?\n/g," ");return /[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
 const trafficBuckets=new Map();
-function clientIp(req){return safeText(String(req.headers["x-forwarded-for"]||req.socket?.remoteAddress||"unknown").split(",")[0],120)}
+function clientIp(req){return requestIp(req)}
 function trafficLimit(req,url){
   const publicAuth=url.pathname.startsWith("/api/auth/");
   const windowMs=publicAuth?15*60*1000:60*1000,limit=publicAuth?60:600,nowMs=Date.now();
@@ -838,17 +839,8 @@ async function api(req,res,url){
 const MIME={".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".svg":"image/svg+xml",".png":"image/png",".json":"application/json; charset=utf-8",".webmanifest":"application/manifest+json; charset=utf-8"};
 // Proteção de origem em operações mutáveis de navegadores.
 // O webhook WAHA usa autenticação HMAC própria e é tratado separadamente.
-function sameOriginMutation(req,url){
-  if(["GET","HEAD","OPTIONS"].includes(req.method||"GET"))return true;
-  if(url.pathname==="/api/whatsapp/waha/webhook")return true;
-  if(req.headers["sec-fetch-site"]==="cross-site")return false;
-  const origin=req.headers.origin;
-  if(!origin)return true; // integrações de servidor sem Origin continuam permitidas
-  try{
-    const u=new URL(String(origin));
-    return u.host===String(req.headers.host||"") && ["http:","https:"].includes(u.protocol);
-  }catch{return false}
-}
+function sameOriginMutation(req,url){return browserMutationAllowed(req,url)}
+
 const handler=async(req,res)=>{
   try{
     const url=new URL(req.url||"/","http://localhost");
