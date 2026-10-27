@@ -188,6 +188,22 @@ test("WAHA simulado: HMAC, mensagem, cliente CRM, conversa, agenda, resposta, AC
     const current=await expect(owner,"/api/whatsapp/backfill/status",200);
     assert.equal(current.job.status,"completed");
     assert.equal(app.waha.received.length,0,"paginação e retomada nunca enviam mensagens");
+    const newJob=await expect(owner,"/api/whatsapp/backfill/start",201,{method:"POST",
+      body:{from_date:"2026-04-02",page_size:2}});
+    assert.notEqual(newJob.job.id,started.job.id);
+    const cancelled=await expect(owner,"/api/whatsapp/backfill/cancel",200,{method:"POST"});
+    assert.equal(cancelled.job.status,"cancelled");
+    assert.equal((await owner("/api/whatsapp/backfill/step",{method:"POST"})).status,409);
+    const wrongDate=await owner("/api/whatsapp/backfill/start",{method:"POST",
+      body:{from_date:"2026-02-31"}});
+    assert.equal(wrongDate.status,400);
+    const wrongLimit=await owner("/api/whatsapp/backfill/start",{method:"POST",
+      body:{from_date:"2026-04-01",page_size:1000}});
+    assert.equal(wrongLimit.status,400);
+    const restarted=await expect(owner,"/api/whatsapp/backfill/start",201,{method:"POST",
+      body:{from_date:"2026-04-01",page_size:10}});
+    assert.equal(restarted.job.from_date,"2026-04-01");
+
 
     const clients=await expect(owner,"/api/clients",200);
     assert.ok(clients.some(c=>c.name==="Contato Histórico"));
