@@ -20,13 +20,14 @@ async function freePort(){
   return port;
 }
 async function mockWaha(){
-  const received=[];const sessions=new Map([["qa-only",{status:"WORKING"}],["qa-second",{status:"WORKING"}]]);
+  const received=[];let statusRequests=0;const sessions=new Map([["qa-only",{status:"WORKING"}],["qa-second",{status:"WORKING"}]]);
   const server=createServer(async(req,res)=>{
     let body="";for await(const c of req)body+=c.toString();
     const url=new URL(req.url,"http://127.0.0.1");
     const respond=(status,j)=>{res.writeHead(status,{"content-type":"application/json"});res.end(JSON.stringify(j))};
     if(req.headers["x-api-key"]!=="qa-waha-key")return respond(401,{error:"unauthorized_mock"});
     if(req.method==="GET"&&url.pathname.startsWith("/api/sessions/")){
+      statusRequests++;
       const name=decodeURIComponent(url.pathname.slice("/api/sessions/".length));
       return sessions.has(name)?respond(200,{name,...sessions.get(name)}):respond(404,{error:"missing"});
     }
@@ -55,7 +56,7 @@ async function mockWaha(){
     return respond(404,{error:"mock_not_implemented",path:url.pathname});
   });
   await new Promise(ok=>server.listen(0,"127.0.0.1",ok));
-  return {server,received,base:"http://127.0.0.1:"+server.address().port};
+  return {server,received,get statusRequests(){return statusRequests},base:"http://127.0.0.1:"+server.address().port};
 }
 async function environment(){
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),"ne-waha-qa-")),dbPath=path.join(dir,"qa.sqlite"),port=await freePort();
@@ -124,11 +125,13 @@ test("WAHA simulado: HMAC, mensagem, cliente CRM, conversa, agenda, resposta, AC
     assert.equal(status.session,"qa-only");
     assert.equal(status.connected,true);
     assert.equal(status.ai_enabled,false);
+    const beforeInvalid=app.waha.statusRequests;
     const text={event:"message",session:"qa-only",payload:{
       id:"qa-received-001",from:"556999988776@c.us",fromMe:false,body:"Olá, quanto custa uma coloração?",pushName:"Cliente Piloto",hasMedia:false
     }};
     assert.equal((await app.webhook(text,{sign:false})).status,401);
     assert.equal((await app.webhook(text,{algorithm:"sha256"})).status,401);
+    assert.equal(app.waha.statusRequests,beforeInvalid,"HMAC incorreto não consulta WAHA");
     const unknown=await app.webhook({...text,session:"unassigned"});
     assert.equal(unknown.status,200);
     assert.equal(unknown.data.accepted,false);
