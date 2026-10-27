@@ -36,7 +36,7 @@ export function evaluateRelease({directory=root,environment=process.env,nodeVers
   check("complete_source_tree",missing.length===0,missing.length?"Arquivos faltantes: "+missing.join(", "):
     "API, módulos, interface, documentação e workflows presentes");
   let pkg;
-  try{pkg=JSON.parse(fs.readFileSync(path.join(directory,"package.json"),"utf8")))}
+  try{pkg=JSON.parse(fs.readFileSync(path.join(directory,"package.json"),"utf8"))}
   catch{pkg=null}
   check("package_scripts",!!pkg&&["check","test","release:preflight"].every(k=>typeof pkg.scripts?.[k]==="string"),
     "Scripts de sintaxe, regressão e pré-validação disponíveis");
