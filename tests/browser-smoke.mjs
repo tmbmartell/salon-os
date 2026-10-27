@@ -102,6 +102,12 @@ try{
   await page.screenshot({path:path.join(artifact,"04-olho-do-dono-desktop.png"),fullPage:true});
   await open("admin");
   await page.locator("#admin .ne-stage8-grid").first().waitFor();
+  await page.locator('#admin [data-ne-tab="security"]').click();
+  await page.locator("#admin .ne-pilot-readiness summary").click();
+  await page.locator("#admin .ne-pilot-check").first().waitFor({timeout:14000});
+  assert.ok((await page.locator("#admin .ne-pilot-readiness").textContent()).includes("WhatsApp"));
+  await page.screenshot({path:path.join(artifact,"08-diagnostico-piloto-sem-whatsapp.png"),fullPage:true});
+
   await page.screenshot({path:path.join(artifact,"05-administracao-desktop.png"),fullPage:true});
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:path.join(artifact,"06-administracao-mobile.png"),fullPage:true});
