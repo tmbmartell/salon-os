@@ -38,3 +38,19 @@
  #dashboard .ne-module{min-height:118px}
 }
 @media(max-width:900px){#dashboard .ne-card-grid{gap:10px}#dashboard .ne-module{min-height:125px}}
+
+/* Etapa 22.4: container ocupa a área útil e marca não se repete */
+@media(min-width:901px){
+ main{min-width:0;width:100%}
+ main>.topbar{max-width:none;width:100%;margin:0;padding-left:24px;padding-right:24px}
+ #dashboard.active{box-sizing:border-box;max-width:none;width:calc(100% - 32px);margin:0 16px 20px;padding:20px 23px 30px}
+ #dashboard .ne-experience{max-width:none;width:100%;margin:0}
+ #dashboard .ne-card-grid{width:100%}
+}
+@media(min-width:901px) and (max-width:1220px){
+ #dashboard.active{width:calc(100% - 24px);margin:0 12px 20px;padding:18px}
+}
+@media(max-width:900px){
+ #dashboard.active{width:auto;max-width:none}
+ #dashboard .ne-experience{max-width:none}
+}
