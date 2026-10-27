@@ -55,9 +55,17 @@ function restoreStatus(){
     const verified=JSON.parse(fs.readFileSync(receipt,"utf8"));
     if(verified.ok===true&&verified.sqlite_integrity==="ok"&&
       typeof verified.backup_sha256==="string"&&
-      /^[a-f0-9]{64}$/.test(verified.backup_sha256))
-      return {ok:true,checked_at:verified.checked_at,
-        asset_count:verified.asset_count,warning:"Restauração verificada em diretório separado."};
+      /^[a-f0-9]{64}$/.test(verified.backup_sha256)&&
+      typeof verified.archive_name==="string"&&
+      /^[a-zA-Z0-9._-]+\\.nebak$/.test(verified.archive_name)){
+      const archive=path.join(backupDir,verified.archive_name);
+      if(fs.existsSync(archive)){
+        const actual=crypto.createHash("sha256").update(fs.readFileSync(archive)).digest("hex");
+        if(actual===verified.backup_sha256)
+          return {ok:true,checked_at:verified.checked_at,
+            asset_count:verified.asset_count,warning:"Restauração verificada em diretório separado."};
+      }
+    }
   }catch{}
   return {ok:false,checked_at:null,error:"restore_not_verified"};
 }
