@@ -6,6 +6,7 @@ on:
       - 'public/**'
       - 'server.mjs'
       - 'auth.mjs'
+      - 'mfa.mjs'
       - 'phase5.mjs'
       - 'request-security.mjs'
       - 'tests/browser-smoke.mjs'

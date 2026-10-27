@@ -7,6 +7,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
+import {totpAt} from "../mfa.mjs";
 const sleep=t=>new Promise(r=>setTimeout(r,t));
 const root=process.cwd(),artifact=path.join(root,"artifacts","browser");
 fs.mkdirSync(artifact,{recursive:true});
@@ -20,7 +22,7 @@ async function availablePort(){
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),"novagente-browser-")),port=await availablePort();
 const base="http://127.0.0.1:"+port,server=spawn(process.execPath,["server.mjs"],{
   cwd:root,env:{...process.env,HOST:"127.0.0.1",PORT:String(port),SALON_DB:path.join(temp,"qa.sqlite"),
-    NOVAGENTE_ENABLE_RECEPTIONIST_AI:"false",JEV_CONTROL_PLANE_URL:"http://127.0.0.1:1"},stdio:["ignore","pipe","pipe"]
+    NOVAGENTE_ENABLE_RECEPTIONIST_AI:"false",NOVAGENTE_MFA_KEY:crypto.createHash("sha256").update("qa-browser-mfa-key").digest("base64"),JEV_CONTROL_PLANE_URL:"http://127.0.0.1:1"},stdio:["ignore","pipe","pipe"]
 });
 let output="",browser=null,page=null;
 for(const stream of [server.stdout,server.stderr])stream.on("data",c=>{output=(output+c.toString()).slice(-8000)});
@@ -111,6 +113,30 @@ try{
   await page.screenshot({path:path.join(artifact,"05-administracao-desktop.png"),fullPage:true});
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:path.join(artifact,"06-administracao-mobile.png"),fullPage:true});
+  // O fluxo MFA é feito por interface real, sem QR/conta externa.
+  await page.setViewportSize({width:1440,height:900});
+  const mfaBox=page.locator("#admin .ne-mfa-box");
+  await mfaBox.locator("summary").click();
+  await mfaBox.locator("input[type=password]").fill("QA-browser-senha-123456!");
+  await mfaBox.getByRole("button",{name:"Gerar chave do autenticador"}).click();
+  const secret=(await mfaBox.locator(".ne-mfa-secret").textContent()).trim();
+  assert.match(secret,/^[A-Z2-7]{32}$/);
+  await mfaBox.locator('input[autocomplete="one-time-code"]').fill(totpAt(secret));
+  await mfaBox.getByRole("button",{name:"Confirmar e ativar MFA"}).click();
+  await mfaBox.getByText("Códigos de recuperação",{exact:true}).waitFor();
+  const recovery=(await mfaBox.locator(".ne-mfa-codes").textContent()).trim().split(/\r?\n/)[0];
+  assert.match(recovery,/^[0-9A-F]{32}$/);
+  // Não armazenar o código em arquivos, logs ou screenshots.
+  await page.locator("#logoutBtn").click();
+  await page.locator("#loginPanel:not(.hidden)").waitFor();
+  await page.locator("#loginForm [name=password]").fill("QA-browser-senha-123456!");
+  await page.locator("#loginForm button").click();
+  await page.locator("#mfaPanel:not(.hidden)").waitFor();
+  assert.equal(await page.locator("#authGate").isVisible(),true);
+  await page.locator("#mfaLoginForm [name=code]").fill(recovery);
+  await page.locator("#mfaLoginForm button[type=submit]").click();
+  await page.locator("#authGate").waitFor({state:"hidden",timeout:20000});
+  assert.equal(errors.length,0,"Erros JS no fluxo MFA: "+errors.join(" | "));
   assert.equal(errors.length,0,"Erros não tratados no navegador: "+errors.join(" | "));
   console.log("QA VISUAL APROVADA: primeiro acesso, login, dashboard, agenda, estoque, financeiro, marketing, gerência e admin.");
   console.log("Capturas de tela: "+artifact);

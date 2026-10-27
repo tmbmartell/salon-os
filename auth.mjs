@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { requestIsSecure } from "./request-security.mjs";
+import { installMfa, mfaEnabled, beginMfaLogin, completeMfaLogin, mfaStatus, enrollMfa, confirmMfa, disableMfa } from "./mfa.mjs";
 
 const SESSION_COOKIE="salon_session";
 const DAY=86400000;
@@ -48,6 +49,7 @@ export function installAuth(db){
       metadata TEXT NOT NULL DEFAULT '{}',created_at TEXT NOT NULL
     );
   `);
+  installMfa(db);
   const sessionCols=db.prepare("pragma table_info(auth_sessions)").all().map(x=>x.name);
   if(!sessionCols.includes("device_label"))db.exec("alter table auth_sessions add column device_label TEXT NOT NULL DEFAULT 'Dispositivo não identificado'");
 }
@@ -218,6 +220,10 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
         send(res,429,{error:"login_temporarily_blocked"},{"retry-after":"900"}):
         send(res,401,{error:"invalid_credentials"})};
     }
+    if(mfaEnabled(db,u.id,u.tenant_id)){
+      const challenge=beginMfaLogin(db,u,attemptKey);
+      return {handled:true,result:send(res,202,challenge)};
+    }
     db.prepare("delete from auth_login_attempts where attempt_key=?").run(attemptKey);
     const token=crypto.randomBytes(32).toString("base64url"),ts=new Date(),expires=new Date(ts.getTime()+7*DAY);
     db.prepare("delete from auth_sessions where datetime(expires_at)<=datetime('now')").run();
@@ -227,6 +233,46 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
     const user={id:u.id,tenantId:u.tenant_id,name:u.name,email:u.email,role:u.role};
     audit(db,user,"auth.login","user",u.id,{});
     return {handled:true,result:send(res,200,{ok:true,user},{"set-cookie":sessionCookie(req,token,7*24*3600)})};
+  }
+  if(url.pathname==="/api/auth/mfa/verify"&&req.method==="POST"){
+    const b=await parseBody(req);
+    let result;
+    try{result=completeMfaLogin(db,String(b.challenge||""),String(b.code||""))}
+    catch(e){return {handled:true,result:send(res,e.status||400,{error:e.message})}}
+    if(result.error){
+      const locked=result.attempt_key?loginFailure(db,result.attempt_key,Date.now()):false;
+      const status=locked?429:result.status;
+      return {handled:true,result:send(res,status,{error:locked?"login_temporarily_blocked":result.error})};
+    }
+    const u=result.user,token=crypto.randomBytes(32).toString("base64url"),
+      ts=new Date(),expires=new Date(ts.getTime()+7*DAY);
+    const label=String(req.headers["user-agent"]||"Dispositivo não identificado").slice(0,180);
+    db.prepare("delete from auth_sessions where datetime(expires_at)<=datetime('now')").run();
+    db.prepare("insert into auth_sessions(id,tenant_id,user_id,token_hash,expires_at,created_at,last_seen_at,device_label) values(?,?,?,?,?,?,?,?)")
+      .run(crypto.randomUUID(),u.tenant_id,u.id,sha(token),expires.toISOString(),ts.toISOString(),ts.toISOString(),label);
+    const user={id:u.id,tenantId:u.tenant_id,name:u.name,email:u.email,role:u.role};
+    if(result.attempt_key)db.prepare("delete from auth_login_attempts where attempt_key=?").run(result.attempt_key);
+    audit(db,user,"auth.login.mfa","user",u.id,{});
+    return {handled:true,result:send(res,200,{ok:true,user},{"set-cookie":sessionCookie(req,token,7*24*3600)})};
+  }
+  if(url.pathname.startsWith("/api/auth/mfa/")){
+    const user=authenticate(req,db);
+    if(!user)return {handled:true,result:send(res,401,{error:"unauthorized"})};
+    if(!["owner","manager"].includes(user.role))return {handled:true,result:send(res,403,{error:"mfa_management_only"})};
+    const p=url.pathname;
+    if(req.method==="GET"&&p==="/api/auth/mfa/status")
+      return {handled:true,result:send(res,200,mfaStatus(db,user))};
+    if(req.method==="POST"&&["/api/auth/mfa/enroll","/api/auth/mfa/confirm","/api/auth/mfa/disable"].includes(p)){
+      const b=await parseBody(req);
+      try{
+        const out=p.endsWith("enroll")?enrollMfa(db,user,b.password,verifyPassword):
+          p.endsWith("confirm")?confirmMfa(db,user,b.code):
+          disableMfa(db,user,{password:b.password,code:b.code},verifyPassword);
+        audit(db,user,"auth.mfa."+p.split("/").at(-1),"user",user.id,{});
+        return {handled:true,result:send(res,200,out)};
+      }catch(e){return {handled:true,result:send(res,e.status||400,{error:e.message})}}
+    }
+    return {handled:true,result:send(res,404,{error:"not_found"})};
   }
   if(url.pathname==="/api/auth/sessions"&&req.method==="GET"){
     const user=authenticate(req,db);
