@@ -7,19 +7,48 @@ function toast(text){const t=$("#toast");t.textContent=text;t.classList.add("sho
 function esc(v=""){return String(v??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 function initials(n=""){return n.split(/\s+/).slice(0,2).map(x=>x[0]).join("").toUpperCase()}
 function statusLabel(s){return ({scheduled:"Agendado",confirmed:"Confirmado",arrived:"Chegou",in_service:"Em atendimento",completed:"Finalizado",cancelled:"Cancelado",no_show:"Não compareceu"})[s]||s}
-function activate(view){
+function activate(view,{skipTechnicalLoad=false}={}){
   $$(".view").forEach(v=>v.classList.toggle("active",v.id===view));$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
   const cfg={dashboard:["Visão geral","O que precisa da sua atenção hoje."],inbox:["Atendimento","WhatsApp, cliente e próxima ação no mesmo lugar."],agenda:["Agenda","O fluxo de atendimento sem conflito de pessoa ou recurso."],clients:["Clientes","Relacionamento e histórico em um só lugar."],people:["Gente","Clientes, equipe, relacionamento e agentes em um só lugar."],productsHub:["Produtos","Venda, estoque, serviços, pacotes e compras conectados."],marketing:["Marketing & Relacionamento","Captação, canais, campanhas e oportunidades de retorno."],technical:["Ficha Técnica","Fórmulas, procedimento e memória clínica da cliente."],team:["Equipe","Quem atende, quando e em quê."],services:["Serviços","Preço, tempo e comissão organizados."],packages:["Pacotes","Venda antecipada com créditos e validade."],retail:["PDV · Produtos","Venda de produtos integrada ao estoque e financeiro."],resources:["Recursos","Cadeiras, salas e equipamentos disponíveis."],finance:["Financeiro & Caixa","Dinheiro entrando e saindo, sem depender de planilha."],inventory:["Estoque & Consumo","Produto real, custo real e alerta antes de faltar."],suppliers:["Fornecedores","Quem vende, quanto demora e como comprar melhor."],retention:["Fidelização & Relacionamento","Pontos, indicações, aniversários e pós-atendimento."],ownerEye:["Olho do Dono","Inteligência prática para decidir antes do problema aparecer."],agents:["Funcionários Artificiais","Recepção, vendas, gestão, financeiro, compras e análise."],admin:["Administração","Backup, segurança, usuários e auditoria."],reports:["Relatórios & Exportação","Período, resultado e arquivos prontos para análise."],intelligence:["JEV · Inteligência","Decisões rápidas com custo controlado."]}[view]||["Salon OS",""];
-  $("#pageTitle").textContent=cfg[0];$("#pageSub").textContent=cfg[1];if(view==="agenda"){loadAgendaPhase2();loadWaitlist()}if(view==="team")loadStaff();if(view==="clients")loadClients();if(view==="technical")loadTechnical();if(view==="intelligence")loadReceipts();if(view==="inbox")loadInbox();if(view==="finance")loadFinance();if(view==="inventory")loadInventory();if(view==="suppliers")loadSuppliers();if(view==="packages")loadPackages();if(view==="retail")loadRetail();if(view==="retention")loadRetention();if(view==="ownerEye")loadOwnerEye();if(view==="agents")loadAgents();if(view==="admin")loadAdmin();if(view==="reports")loadReports();
+  $("#pageTitle").textContent=cfg[0];$("#pageSub").textContent=cfg[1];if(view==="agenda"){loadAgendaPhase2();loadWaitlist()}if(view==="team")loadStaff();if(view==="clients")loadClients();if(view==="technical"&&!skipTechnicalLoad)loadTechnical();if(view==="intelligence")loadReceipts();if(view==="inbox")loadInbox();if(view==="finance")loadFinance();if(view==="inventory")loadInventory();if(view==="suppliers")loadSuppliers();if(view==="packages")loadPackages();if(view==="retail")loadRetail();if(view==="retention")loadRetention();if(view==="ownerEye")loadOwnerEye();if(view==="agents")loadAgents();if(view==="admin")loadAdmin();if(view==="reports")loadReports();if(view==="marketing")window.dispatchEvent(new CustomEvent("ne:marketing-open"));
 }
 $$("[data-view]").forEach(b=>b.onclick=()=>activate(b.dataset.view));$$("[data-jump]").forEach(b=>b.onclick=()=>activate(b.dataset.jump));$$("[data-open]").forEach(b=>b.onclick=()=>$("#"+b.dataset.open).showModal());$$("[data-close]").forEach(b=>b.onclick=()=>b.closest("dialog").close());$("#quickAppointment").onclick=()=>$("#appointmentModal").showModal();
-async function bootstrap(){const [boot,health]=await Promise.all([api("/api/bootstrap"),api("/api/health")]);state.health=health;state.user=boot.user;state.professionals=boot.professionals;state.services=boot.services;state.resources=boot.resources||[];state.dashboard=boot.dashboard;state.whatsapp=boot.whatsapp;$("#health").textContent=health.jev?"Sistema + JEV online":"Sistema online · JEV fallback";$("#jevState").textContent=health.jev?"JEV online":"fallback ativo";renderDashboard();renderTeam();renderServices();renderResources();await loadClients();fillSelects();updateWahaUi()}
+async function bootstrap(){const [boot,health]=await Promise.all([api("/api/bootstrap"),api("/api/health")]);state.health=health;state.user=boot.user;const allowClientsExport=["owner","manager"].includes(state.user?.role);["#exportClients","#marketingExportClients"].forEach(sel=>{const el=$(sel);if(el)el.hidden=!allowClientsExport;});$$(`[data-view="ownerEye"],[data-jump="ownerEye"]`).forEach(el=>{el.hidden=!["owner","manager"].includes(state.user?.role)});state.professionals=boot.professionals;state.services=boot.services;state.resources=boot.resources||[];state.dashboard=boot.dashboard;state.whatsapp=boot.whatsapp;$("#health").textContent=health.jev?"Sistema + JEV online":"Sistema online · JEV fallback";$("#jevState").textContent=health.jev?"JEV online":"fallback ativo";renderDashboard();renderTeam();renderServices();renderResources();await loadClients();fillSelects();updateWahaUi()}
 function renderDashboard(){const d=state.dashboard;$("#mAppointments").textContent=d.todayAppointments;$("#mForecast").textContent=fmt.format(d.forecast);$("#mClients").textContent=d.clientCount;$("#mPros").textContent=d.profCount;$("#todayList").innerHTML=d.appointments.length?d.appointments.map(a=>`<div class="row"><div class="who"><span class="avatar">${initials(a.client_name)}</span><div><strong>${a.client_name}</strong><small>${a.service_summary||a.service_name} · ${a.professional_summary||a.professional_name}</small></div></div><div><div class="time">${new Date(a.start_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div><span class="status ${a.status}">${statusLabel(a.status)}</span></div></div>`).join(""):`<div class="muted">Nenhum atendimento hoje.</div>`}
 async function loadClients(q=""){state.clients=await api("/api/clients"+(q?`?q=${encodeURIComponent(q)}`:""));$("#clientCount").textContent=`${state.clients.length} encontrados`;$("#clientList").innerHTML=state.clients.map(c=>{const socials=[c.instagram?`Instagram: ${esc(c.instagram)}`:"",c.facebook?`Facebook: ${esc(c.facebook)}`:""].filter(Boolean).join(" · ");const ref=c.referral_reference?`Referência: ${esc(c.referral_reference)}`:"";const birthday=c.birthday?`Aniversário: ${esc(c.birthday.split("-").reverse().join("/"))}`:"";return `<article><div class="who"><span class="avatar">${initials(c.name)}</span><div><h3>${esc(c.name)}</h3><p>${esc(c.phone||"Sem WhatsApp")}</p></div></div><div class="clientMeta">${birthday?`<small>${birthday}</small>`:""}${socials?`<small>${socials}</small>`:""}${ref?`<small>${ref}</small>`:""}</div>${c.notes?`<p>${esc(c.notes)}</p>`:""}<div class="tags">${(c.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div></article>`}).join("")||`<p class="muted">Nenhum cliente encontrado.</p>`;fillSelects();fillWaitlistSelects()}
 let searchTimer;$("#clientSearch").oninput=e=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadClients(e.target.value),220)};
-function downloadClientBase(){const a=document.createElement("a");a.href="/api/clients/export";a.download="";document.body.appendChild(a);a.click();a.remove()}$("#exportClients").onclick=downloadClientBase;$("#marketingExportClients").onclick=downloadClientBase;
+function downloadClientBase(){const a=document.createElement("a");a.href="/api/clients/export";a.download="";document.body.appendChild(a);a.click();a.remove()}$("#exportClients").onclick=downloadClientBase;if($("#marketingExportClients"))$("#marketingExportClients").onclick=downloadClientBase;
 function renderTeam(){$("#teamList").innerHTML=state.professionals.map(p=>`<article><span class="avatar">${initials(p.name)}</span><h3>${p.name}</h3><p>${p.role}</p><p>${p.work_start}–${p.work_end}</p><div class="tags">${(p.specialties||[]).map(x=>`<span class="tag">${x}</span>`).join("")}</div></article>`).join("")}
-function renderServices(){$("#serviceList").innerHTML=state.services.map(s=>`<article><span class="chip">${s.category||"Geral"}</span><h3>${s.name}</h3><p>${s.duration_min} min · comissão ${Number(s.commission_pct||0)}%</p><strong>${fmt.format(s.price)}</strong></article>`).join("")}
+function renderServices(){
+  const list=$("#serviceList"),filters=$("#neServiceFilters"),counter=$("#neServiceCount");
+  if(!list)return;
+  const categories=[...new Set(state.services.map(s=>s.category||"Geral"))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  if(!["Todos",...categories].includes(state.serviceCategory))state.serviceCategory="Todos";
+  const current=state.serviceCategory||"Todos";
+  if(filters){
+    filters.innerHTML=["Todos",...categories].map(cat=>'<button type="button" data-ne-category="'+encodeURIComponent(cat)+'" aria-pressed="'+String(cat===current)+'" class="'+(cat===current?"active":"")+'">'+esc(cat)+'</button>').join("");
+    $$("[data-ne-category]",filters).forEach(btn=>btn.onclick=()=>{state.serviceCategory=decodeURIComponent(btn.dataset.neCategory);renderServices()});
+  }
+  const visible=state.services.filter(s=>current==="Todos"||(s.category||"Geral")===current);
+  if(counter)counter.textContent=visible.length+" "+(visible.length===1?"serviço":"serviços");
+  const showCommission=["owner","manager"].includes(state.user?.role);
+  list.innerHTML=visible.map(s=>{
+    const name=esc(s.name),id=esc(s.id),category=esc(s.category||"Geral");
+    return '<details class="ne-service-card"><summary><span class="ne-service-symbol" aria-hidden="true">✦</span><span class="ne-service-title"><small>'+category+'</small><strong>'+name+'</strong><span>'+Number(s.duration_min||0)+' min · '+fmt.format(s.price)+'</span></span><span class="ne-service-arrow" aria-hidden="true">⌄</span></summary>'+
+      '<div class="ne-service-details"><div class="ne-service-facts"><span>Duração <strong>'+Number(s.duration_min||0)+' min</strong></span><span>Valor <strong>'+fmt.format(s.price)+'</strong></span>'+
+      (showCommission?'<span>Comissão <strong>'+Number(s.commission_pct||0).toLocaleString("pt-BR")+'%</strong></span>':"")+'</div>'+
+      '<div class="ne-service-actions"><button type="button" class="primary" data-ne-book-service="'+id+'">Agendar serviço</button><button type="button" class="secondary" data-ne-service-tech="'+id+'">Fichas técnicas</button></div></div></details>';
+  }).join("")||'<p class="muted">Nenhum serviço nesta categoria.</p>';
+  $$("[data-ne-book-service]",list).forEach(btn=>btn.onclick=()=>{
+    $("#apService").value=btn.dataset.neBookService;
+    appointmentUi.refreshSuggestions();
+    appointmentUi.refreshSummary();
+    $("#appointmentModal").showModal();
+  });
+  $$("[data-ne-service-tech]",list).forEach(btn=>btn.onclick=()=>{
+    activate("technical");
+  });
+}
 function renderResources(){$("#resourceList").innerHTML=state.resources.map(r=>`<article><span class="chip">${({chair:"Cadeira",washbasin:"Lavatório",room:"Sala",equipment:"Equipamento",other:"Outro"})[r.type]||r.type}</span><h3>${r.name}</h3><p>Entra no cálculo de disponibilidade da agenda.</p></article>`).join("")||`<p class="muted">Nenhum recurso cadastrado.</p>`}
 function fillSelects(){const c=$("#apClient"),p=$("#apProfessional"),s=$("#apService"),r=$("#apResource");if(!c||!p||!s||!r)return;c.innerHTML='<option value="">Selecione…</option>'+state.clients.map(x=>`<option value="${x.id}">${x.name}</option>`).join("");p.innerHTML='<option value="">Selecione…</option>'+state.professionals.map(x=>`<option value="${x.id}">${x.name}</option>`).join("");s.innerHTML='<option value="">Selecione…</option>'+state.services.map(x=>`<option value="${x.id}">${x.name} · ${fmt.format(x.price)}</option>`).join("");r.innerHTML='<option value="">Sem recurso específico</option>'+state.resources.map(x=>`<option value="${x.id}">${x.name}</option>`).join("")}
 const appointmentUi=setupAppointmentUi({getState:()=>state,api,esc,fmt,$,$$});
@@ -37,7 +66,89 @@ async function loadWaitlist(){
 }
 $("#waitlistForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/waitlist",{method:"POST",body:JSON.stringify(b)});$("#waitlistModal").close();e.target.reset();await loadWaitlist();toast("Cliente adicionado à lista de espera")}catch{toast("Não foi possível adicionar à lista de espera")}};
 
-async function loadAgenda(){const data=await api("/api/appointments"),by={};data.forEach(a=>{const k=new Date(a.start_at).toISOString().slice(0,10);(by[k]??=[]).push(a)});$("#agendaList").innerHTML=Object.entries(by).map(([k,items])=>`<div class="agendaDay">${dayFmt.format(new Date(k+"T12:00:00"))}</div>${items.map(a=>`<div class="agendaItem"><div class="time">${new Date(a.start_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div><div><h3>${a.client_name} · ${a.service_summary||a.service_name}</h3><p>${a.professional_summary||a.professional_name} · ${fmt.format(a.price)}</p></div><select data-status="${a.id}">${["scheduled","confirmed","arrived","in_service","completed","cancelled","no_show"].map(s=>`<option value="${s}" ${s===a.status?"selected":""}>${statusLabel(s)}</option>`).join("")}</select></div>`).join("")}`).join("")||`<p class="muted">Sem agendamentos nos próximos dias.</p>`;$$("[data-status]").forEach(sel=>sel.onchange=async()=>{try{await api(`/api/appointments/${sel.dataset.status}/status`,{method:"PATCH",body:JSON.stringify({status:sel.value})});toast("Status atualizado");state.dashboard=await api("/api/dashboard");renderDashboard()}catch{toast("Não foi possível atualizar")}})}
+const neAgendaStatusOptions={
+  scheduled:["confirmed","arrived","in_service","cancelled","no_show"],
+  confirmed:["arrived","in_service","cancelled","no_show"],
+  arrived:["in_service","cancelled"],
+  in_service:[],completed:[],cancelled:[],no_show:[]
+};
+const neAgendaQuickActions={
+  scheduled:{status:"confirmed",label:"Confirmar horário"},
+  confirmed:{status:"arrived",label:"Cliente chegou"},
+  arrived:{status:"in_service",label:"Iniciar atendimento"}
+};
+function renderAgendaCards(){
+  const all=Array.isArray(state.agendaAppointments)?state.agendaAppointments:[];
+  const select=$("#neAgendaProfessional"),profId=state.neAgendaProfessional||"";
+  if(select){
+    const selected=profId;
+    select.innerHTML='<option value="">Todos os profissionais</option>'+state.professionals.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join("");
+    select.value=selected;
+  }
+  const filter=state.neAgendaFilter||"today";
+  const day=new Date(),dayStart=new Date(day.getFullYear(),day.getMonth(),day.getDate()).getTime();
+  const tomorrow=dayStart+24*60*60*1000;
+  const closed=new Set(["completed","cancelled","no_show"]);
+  const visible=all.filter(a=>{
+    const start=new Date(a.start_at).getTime();
+    if(!Number.isFinite(start))return false;
+    if(profId&&a.professional_id!==profId)return false;
+    if(filter==="today")return start>=dayStart&&start<tomorrow;
+    if(filter==="upcoming")return start>=tomorrow&&!closed.has(a.status);
+    if(filter==="closed")return closed.has(a.status);
+    return true;
+  });
+  $$("[data-ne-agenda-filter]").forEach(b=>{
+    const active=b.dataset.neAgendaFilter===filter;
+    b.classList.toggle("active",active);
+    b.setAttribute("aria-pressed",String(active));
+  });
+  const count=$("#neAgendaCount");if(count)count.textContent=visible.length+" "+(visible.length===1?"compromisso":"compromissos")+" nesta visão";
+  $("#agendaList").innerHTML=visible.map(a=>{
+    const d=new Date(a.start_at),time=d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+    const date=d.toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"2-digit"});
+    const opts=[a.status,...(neAgendaStatusOptions[a.status]||[])];
+    const controls=opts.map(status=>'<option value="'+esc(status)+'" '+(a.status===status?'selected':'')+'>'+esc(statusLabel(status))+'</option>').join("");
+    const action=neAgendaQuickActions[a.status];
+    const fast=action?'<button type="button" class="primary" data-ne-agenda-next="'+esc(a.id)+'" data-next-status="'+action.status+'">'+action.label+'</button>':"";
+    return '<details class="ne-agenda-card"><summary><span class="ne-agenda-time">'+time+'<small>'+esc(date)+'</small></span><span class="ne-agenda-summary"><strong>'+esc(a.client_name||"Cliente")+'</strong><small>'+esc(a.service_summary||a.service_name||"Serviço")+' · '+esc(a.professional_summary||a.professional_name||"Profissional")+'</small></span><span class="ne-agenda-status">'+esc(statusLabel(a.status))+'</span><span class="ne-agenda-chevron" aria-hidden="true">⌄</span></summary>'+
+      '<div class="ne-agenda-details"><div class="ne-agenda-meta"><span>Serviço <strong>'+esc(a.service_summary||a.service_name||"—")+'</strong></span><span>Valor <strong>'+fmt.format(a.price)+'</strong></span>'+(a.resource_name?'<span>Recurso <strong>'+esc(a.resource_name)+'</strong></span>':"")+'</div>'+
+      '<div class="ne-agenda-controls"><label for="ne-ag-status-'+esc(a.id)+'">Situação</label><select id="ne-ag-status-'+esc(a.id)+'" data-status="'+esc(a.id)+'" '+(opts.length===1?'disabled':'')+'>'+controls+'</select>'+fast+
+      '<button type="button" class="secondary" data-ne-technical="'+esc(a.id)+'">Ficha técnica</button></div></div></details>';
+  }).join("")||'<div class="ne-empty-view"><strong>Nenhum atendimento nesta visão.</strong><p>Escolha outro filtro ou abra um novo agendamento.</p></div>';
+  $$("[data-status]",$("#agendaList")).forEach(sel=>sel.onchange=()=>changeAgendaStatus(sel.dataset.status,sel.value));
+  $$("[data-ne-agenda-next]",$("#agendaList")).forEach(btn=>btn.onclick=()=>changeAgendaStatus(btn.dataset.neAgendaNext,btn.dataset.nextStatus));
+  $$("[data-ne-technical]",$("#agendaList")).forEach(btn=>btn.onclick=async()=>{
+    const a=state.agendaAppointments?.find(x=>x.id===btn.dataset.neTechnical);
+    if(!a)return;
+    activate("technical",{skipTechnicalLoad:true});
+    await loadTechnical(a.client_id);
+    const hidden=$("#neTechnicalAppointmentId");if(hidden)hidden.value=a.id;
+    const client=$("#technicalFormClient"),service=$("#technicalService"),pro=$("#technicalProfessional");
+    if(client)client.value=a.client_id;
+    if(service)service.value=a.service_id;
+    if(pro)pro.value=a.professional_id;
+  });
+}
+async function changeAgendaStatus(id,status){
+  try{
+    await api("/api/appointments/"+encodeURIComponent(id)+"/status",{method:"PATCH",body:JSON.stringify({status})});
+    toast("Atendimento atualizado");
+    await loadAgendaPhase2();
+    state.dashboard=await api("/api/dashboard");renderDashboard();
+  }catch(err){
+    toast(err.data?.error==="checkout_required"?"Finalize e receba pelo caixa":err.status===409?"A situação mudou. Recarregando agenda.":"Não foi possível atualizar o atendimento");
+    await loadAgendaPhase2().catch(()=>{});
+  }
+}
+async function loadAgenda(){
+  const from=new Date(Date.now()-30*86400000).toISOString(),to=new Date(Date.now()+30*86400000).toISOString();
+  state.agendaAppointments=await api("/api/appointments?from="+encodeURIComponent(from)+"&to="+encodeURIComponent(to));
+  renderAgendaCards();
+}
+$$("[data-ne-agenda-filter]").forEach(btn=>btn.onclick=()=>{state.neAgendaFilter=btn.dataset.neAgendaFilter;renderAgendaCards();decorateAgendaCheckout()});
+$("#neAgendaProfessional").onchange=e=>{state.neAgendaProfessional=e.target.value;renderAgendaCards();decorateAgendaCheckout()};
+$("[data-ne-show-waitlist]").onclick=()=>$("#agenda .ne-waitlist-panel")?.scrollIntoView({behavior:"smooth",block:"start"});
 async function loadReceipts(){const rows=await api("/api/jev/receipts");$("#receiptList").innerHTML=rows.map(r=>`<div class="row"><div><strong>${r.local_route}</strong><small>${r.input_excerpt}</small></div><div style="text-align:right"><span class="status">${r.jev_trace_id?"JEV":"local"}</span><small>${r.latency_ms?`${r.latency_ms} ms`:"sem chamada JEV"}</small></div></div>`).join("")||`<p class="muted">Ainda não há decisões.</p>`}
 $("#commandForm").onsubmit=async e=>{e.preventDefault();const text=$("#commandText").value.trim();if(!text)return;$("#commandResult").textContent="Analisando…";try{const r=await api("/api/assistant/interpret",{method:"POST",body:JSON.stringify({text})}),used=r.route==="ambiguous"&&r.jev;let html="<strong>Rota:</strong> "+r.route+"<br><strong>Fonte:</strong> "+(used?"JEV ("+Math.round((r.jev.probability||0)*100)+"%)":"regra local · zero chamada JEV");if(r.booking){if(r.booking.service)html+="<br><strong>Serviço:</strong> "+r.booking.service.name;if(r.booking.professional)html+=" · "+r.booking.professional.name;if(r.booking.date)html+="<br><strong>Data:</strong> "+r.booking.date;if(r.booking.slots?.length)html+="<div class=\"slotList\">"+r.booking.slots.map(s=>"<button type=\"button\" class=\"slotChip\" data-slot=\""+s.start_at+"\" data-prof=\""+s.professional_id+"\" data-service=\""+s.service_id+"\">"+s.local_time+" · "+s.professional_name+"</button>").join("")+"</div>";else if(r.booking.missing?.length)html+="<br><small>Falta informar: "+r.booking.missing.join(", ")+"</small>";else html+="<br><small>Nenhum horário livre encontrado.</small>"}$("#commandResult").innerHTML=html;$$("[data-slot]").forEach(b=>b.onclick=()=>{$("#apProfessional").value=b.dataset.prof;$("#apService").value=b.dataset.service;const d=new Date(b.dataset.slot);const local=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);$("#appointmentForm").elements.start_at.value=local;appointmentUi.refreshSuggestions();appointmentUi.refreshSummary();$("#appointmentModal").showModal()})}catch{$("#commandResult").textContent="Falha ao interpretar."}};
 $("#clientForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/clients",{method:"POST",body:JSON.stringify(b)});e.target.reset();$("#clientModal").close();await loadClients();state.dashboard=await api("/api/dashboard");renderDashboard();toast("Cliente cadastrado")}catch(err){toast(err.data?.error==="phone_already_exists"?"Esse WhatsApp já está cadastrado":"Erro ao cadastrar")}};
@@ -46,10 +157,10 @@ $("#serviceForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntri
 $("#appointmentForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));b.tags=appointmentUi.tags();b.items=appointmentUi.items();try{await api("/api/appointments",{method:"POST",body:JSON.stringify(b)});$("#appointmentModal").close();e.target.reset();appointmentUi.reset();fillSelects();await loadAgendaPhase2();state.dashboard=await api("/api/dashboard");renderDashboard();toast("Agendamento criado")}catch(err){const c=err.data?.error;toast(c==="professional_time_conflict"?(err.data?.professional||"Esse profissional")+" já está ocupado":c==="resource_time_conflict"?(err.data.resource||"Esse recurso")+" já está ocupado":c==="invalid_custom_service"?"Preencha nome, duração e valor do serviço avulso":"Erro ao agendar")}};
 
 function updateWahaUi(){
-  const w=state.whatsapp||{},label=w.connected?"WhatsApp conectado":w.configured?(w.status||"WAHA pronto"):"WAHA aguardando configuração";
+  const w=state.whatsapp||{},label=w.connected?"WhatsApp conectado":w.status==="UNASSIGNED"?"Vincule o WhatsApp":w.configured?(w.status||"WAHA aguardando QR"):"WAHA sem configuração";
   $("#whatsappBadge").textContent=label;$("#whatsappBadge").classList.toggle("ok",!!w.connected);
-  $("#waSetupText").textContent=w.connected?"Sessão "+(w.session||"salon-os")+" conectada e pronta para atendimento.":w.configured?"Sessão "+(w.session||"salon-os")+" encontrada. Prepare e escaneie o QR se necessário.":"O adaptador está pronto, mas a chave/sessão do WAHA ainda não foi vinculada ao Salon OS.";
-  $("#prepareWaha").disabled=!w.configured;$("#showQr").disabled=!w.configured;
+  $("#waSetupText").textContent=w.connected?"Sessão "+w.session+" conectada. Atendimento humano disponível.":w.status==="UNASSIGNED"?"É necessário vincular uma sessão exclusiva a este salão.":w.configured?"Sessão "+w.session+" cadastrada. Prepare a conexão e escaneie o QR Code.":"Conectividade WAHA indisponível ou credenciais não configuradas.";
+  $("#prepareWaha").disabled=!w.configured||!w.session||!["owner","manager"].includes(state.user?.role);$("#showQr").disabled=!w.configured||!w.session||!["owner","manager"].includes(state.user?.role);
 }
 const convStatusName={open:"Aberta",pending:"Pendente",resolved:"Resolvida"};
 const convPriorityName={normal:"Normal",high:"Alta",urgent:"Urgente"};
@@ -77,11 +188,12 @@ function renderConversationList(){
       '<small>'+esc(c.last_message||c.client_phone||"Sem mensagens")+'</small><span class="conversationLabels">'+labels+(c.category&&c.category!=="general"?'<span class="miniLabel category">'+esc(convCategoryName[c.category]||c.category)+'</span>':"")+'</span></span>'+
       (Number(c.unread_count)>0?'<b class="unreadBadge">'+c.unread_count+'</b>':"")+'</button>';
   }).join("")||'<div class="muted emptyPad">Nenhuma conversa com esses filtros.</div>';
+  if(window.organizeBeautyInbox)window.organizeBeautyInbox(convs);
   $$("[data-conversation]").forEach(b=>b.onclick=()=>openConversation(b.dataset.conversation));
 }
 function updateChatModeButton(){
   const b=$("#chatModeButton"),co=state.selectedConversation;if(!b||!co)return;
-  const ai=co.handling_mode==="ai";b.textContent=ai?"Recepcionista IA":"Humano";b.classList.toggle("aiOn",ai);
+  const ai=co.handling_mode==="ai";b.textContent=state.whatsapp?.ai_enabled===true?(ai?"Recepcionista IA":"Humano"):"Atendimento humano";b.disabled=state.whatsapp?.ai_enabled!==true;b.title=b.disabled?"Agente de atendimento será habilitado em uma etapa futura.":"";b.classList.toggle("aiOn",ai);
 }
 function renderConversationDetail(){
   const co=state.selectedConversation;
@@ -109,9 +221,38 @@ async function openConversation(cid){
   const msgs=await api("/api/conversations/"+cid+"/messages");co.unread_count=0;renderConversationList();
   $("#messageList").innerHTML=msgs.map(m=>'<div class="message '+(m.direction==="out"?"out":"in")+'"><div>'+esc(m.body).replace(/\n/g,"<br>")+'</div><small>'+new Date(m.created_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+(m.direction==="out"?" · "+esc(m.delivery_status):"")+'</small></div>').join("")||'<div class="muted">Conversa sem mensagens.</div>';
   $("#messageList").scrollTop=$("#messageList").scrollHeight;
+  loadConversationClientContext(cid);
 }
+async function loadConversationClientContext(cid){
+  const area=$("#neClientContext");if(!area)return;
+  area.replaceChildren();
+  try{
+    const data=await api("/api/conversations/"+encodeURIComponent(cid)+"/client-context");
+    if(state.selectedConversation?.id!==cid)return;
+    const heading=document.createElement("strong");heading.textContent="Atendimentos anteriores";
+    area.append(heading);
+    const appts=Array.isArray(data.appointments)?data.appointments:[];
+    if(!appts.length){const p=document.createElement("p");p.textContent="Esta cliente ainda não possui atendimentos registrados.";area.append(p);return}
+    for(const ap of appts){
+      const item=document.createElement("div");item.className="ne-client-appointment";
+      const title=document.createElement("strong");title.textContent=ap.service_name||"Serviço";
+      const detail=document.createElement("small");const dt=new Date(ap.start_at);
+      detail.textContent=(Number.isNaN(dt.valueOf())?"Data não disponível":dt.toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}))+" · "+(ap.professional_name||"Sem profissional")+" · "+(ap.status||"");
+      item.append(title,detail);area.append(item);
+    }
+  }catch{if(state.selectedConversation?.id===cid)area.textContent="Não foi possível consultar o histórico desta cliente."}
+}
+$("#scheduleFromChat").onclick=async()=>{
+  const co=state.selectedConversation;if(!co?.client_id){toast("Associe esta conversa a uma cliente para agendar");return}
+  const sel=$("#apClient");if(!sel)return;
+  const clientLabel=co.client_name||"Cliente";
+  if(![...sel.options].some(o=>o.value===co.client_id))sel.add(new Option(clientLabel,co.client_id));
+  sel.value=co.client_id;
+  sel.dispatchEvent(new Event("change",{bubbles:true}));
+  $("#appointmentModal").showModal();
+};
 $("#refreshInbox").onclick=loadInbox;
-$("#syncWhatsappHistory").onclick=async()=>{const b=$("#syncWhatsappHistory");b.disabled=true;b.textContent="Sincronizando…";try{const out=await api("/api/whatsapp/sync",{method:"POST",body:JSON.stringify({chat_limit:40,message_limit:80})});await loadInbox();toast("Sincronizado · "+out.chats_imported+" conversas · "+out.messages_imported+" mensagens")}catch{toast("Não foi possível sincronizar o histórico")}finally{b.disabled=false;b.textContent="Sincronizar histórico"}};
+$("#syncWhatsappHistory").onclick=()=>{$("#whatsappBackfillDetails").open=true;window.dispatchEvent(new Event("ne:backfill-open"))};
 ["conversationSearch","conversationStatusFilter","conversationPriorityFilter","conversationUnreadFilter"].forEach(id=>$("#"+id).addEventListener(id==="conversationSearch"?"input":"change",renderConversationList));
 $("#saveConversationMeta").onclick=async()=>{
   const co=state.selectedConversation;if(!co)return;
@@ -128,42 +269,160 @@ $("#showQr").onclick=()=>{$("#waQrImage").src="/api/whatsapp/session/qr?t="+Date
 $("#openClientFromChat").onclick=async()=>{const p=state.selectedConversation?.client_phone||"";activate("clients");$("#clientSearch").value=p;await loadClients(p)};
 $("#resourceForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{const x=await api("/api/resources",{method:"POST",body:JSON.stringify(b)});state.resources.push(x);renderResources();fillSelects();$("#resourceModal").close();e.target.reset();toast("Recurso cadastrado")}catch{toast("Erro ao salvar recurso")}};
 
-function showAuth(mode,name=""){const gate=$("#authGate");gate.classList.remove("hidden");$("#setupPanel").classList.toggle("hidden",mode!=="setup");$("#loginPanel").classList.toggle("hidden",mode!=="login");$("#resetPanel").classList.toggle("hidden",mode!=="reset");$("#authError").textContent="";if(name)$("#loginTenant").textContent="Acesso a "+name+"."}
+function showAuth(mode,name=""){const gate=$("#authGate");gate.classList.remove("hidden");$("#setupPanel").classList.toggle("hidden",mode!=="setup");$("#loginPanel").classList.toggle("hidden",mode!=="login");$("#resetPanel").classList.toggle("hidden",mode!=="reset");$("#mfaPanel").classList.toggle("hidden",mode!=="mfa");$("#authError").textContent="";if(name)$("#loginTenant").textContent="Acesso a "+name+"."}
 function hideAuth(){$("#authGate").classList.add("hidden")}
 async function initAuth(){const resetToken=new URLSearchParams(location.search).get("reset");if(resetToken){try{const info=await api("/api/auth/reset?token="+encodeURIComponent(resetToken));showAuth("reset");$("#resetIdentity").textContent="Redefinindo o acesso de "+info.email+".";return}catch{showAuth("login");$("#authError").textContent="Este link de redefinição expirou ou já foi usado.";return}}try{const s=await api("/api/auth/state");if(!s.claimed){showAuth("setup",s.tenant?.name);return}try{const me=await api("/api/auth/me");state.user=me.user;hideAuth();await bootstrap()}catch{showAuth("login",s.tenant?.name)}}catch{showAuth("login");$("#authError").textContent="Não foi possível verificar o acesso."}}
 $("#setupForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/auth/setup",{method:"POST",body:JSON.stringify(b)});showAuth("login");$("#loginForm").elements.email.value=b.email;toast("Acesso criado. Agora entre com sua senha.")}catch(err){$("#authError").textContent=err.data?.error==="password_too_short"?"Use uma senha com pelo menos 10 caracteres.":"Não foi possível criar o acesso."}};
 $("#resetForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target)),token=new URLSearchParams(location.search).get("reset");if(b.password!==b.confirm_password){$("#authError").textContent="As duas senhas precisam ser iguais.";return}try{await api("/api/auth/reset",{method:"POST",body:JSON.stringify({token,password:b.password})});history.replaceState({},document.title,location.pathname);showAuth("login");$("#authError").textContent="Senha redefinida. Entre com a nova senha."}catch(err){$("#authError").textContent=err.data?.error==="password_too_short"?"Use uma senha com pelo menos 10 caracteres.":"Não foi possível redefinir. Gere um novo link."}};
-$("#loginForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{const out=await api("/api/auth/login",{method:"POST",body:JSON.stringify(b)});state.user=out.user;hideAuth();await bootstrap()}catch(err){if(err.data?.error==="workspace_required"){$("#workspaceLoginField").classList.remove("hidden");$("#authError").textContent="Este e-mail existe em mais de um salão. Informe o identificador da empresa."}else $("#authError").textContent="E-mail ou senha incorretos."}};
+let mfaLoginChallenge=null;
+$("#loginForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{
+  const out=await api("/api/auth/login",{method:"POST",body:JSON.stringify(b)});
+  if(out.mfa_required){
+    mfaLoginChallenge=out.challenge;showAuth("mfa");
+    $("#mfaLoginForm").reset();$("#mfaLoginForm").elements.code.focus();return;
+  }
+  state.user=out.user;hideAuth();await bootstrap();
+}catch(err){
+  if(err.data?.error==="workspace_required"){$("#workspaceLoginField").classList.remove("hidden");$("#authError").textContent="Este e-mail existe em mais de um salão. Informe o identificador da empresa."}
+  else if(err.data?.error==="login_temporarily_blocked")$("#authError").textContent="Muitas tentativas. Aguarde 15 minutos e tente novamente.";
+  else $("#authError").textContent="E-mail ou senha incorretos.";
+}};
+$("#mfaLoginForm").onsubmit=async e=>{
+  e.preventDefault();if(!mfaLoginChallenge)return showAuth("login");
+  const code=String(e.target.elements.code.value||"").trim();
+  try{
+    const out=await api("/api/auth/mfa/verify",{method:"POST",body:JSON.stringify({challenge:mfaLoginChallenge,code})});
+    mfaLoginChallenge=null;e.target.reset();state.user=out.user;hideAuth();await bootstrap();
+  }catch(err){
+    $("#authError").textContent=err.status===429?"Limite de tentativas atingido. Volte ao login.":"Código inválido ou expirado.";
+    e.target.elements.code.value="";
+  }
+};
+$("#mfaCancelLogin").onclick=()=>{mfaLoginChallenge=null;$("#mfaLoginForm").reset();showAuth("login")};
 $("#logoutBtn").onclick=async()=>{try{await api("/api/auth/logout",{method:"POST",body:"{}"})}catch{}showAuth("login")};
 
 initAuth().catch(e=>{console.error(e);$("#health").textContent="Falha ao carregar";toast("Não foi possível carregar o sistema")});
 
 function moneyBR(v){return fmt.format(Number(v||0))}
 function dateTimeBR(v){if(!v)return "—";return new Date(v).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}
-async function loadFinance(){
-  try{
-    const data=await Promise.all([api("/api/phase2/dashboard"),api("/api/finance/entries"),api("/api/commissions"),api("/api/services/costs")]);
-    const d=data[0],entries=data[1],comm=data[2],costs=data[3];state.phase2=d;
-    $("#fIncome").textContent=moneyBR(d.todayIncome);$("#fExpense").textContent=moneyBR(d.todayExpense);$("#fNet").textContent=moneyBR(d.todayNet);$("#fCommission").textContent=moneyBR(d.pendingCommissions);$("#fCommissionCount").textContent=d.pendingCommissionsCount+" lançamentos";$("#fPayable").textContent=moneyBR(d.accountsPayable);$("#fPayableCount").textContent=d.accountsPayableCount+" pendências";
-    const cash=d.cash;$("#cashBadge").textContent=cash?"ABERTO":"FECHADO";$("#cashBadge").classList.toggle("ok",!!cash);
-    $("#cashStatusText").textContent=cash?"Aberto desde "+dateTimeBR(cash.opened_at):"Nenhum caixa aberto.";
-    $("#cashBody").innerHTML=cash?'<div class="cashNumber"><span>Esperado em dinheiro</span><strong>'+moneyBR(cash.expected)+'</strong></div><button class="primary" id="closeCashBtn">Fechar caixa</button>':'<p class="muted">Abra o caixa antes de receber pagamentos em dinheiro.</p><button class="primary" id="openCashBtn">Abrir caixa</button>';
-    if($("#openCashBtn"))$("#openCashBtn").onclick=()=>$("#cashOpenModal").showModal();
-    if($("#closeCashBtn"))$("#closeCashBtn").onclick=()=>{$("#cashCloseForm").elements.actual.value=Number(cash.expected||0).toFixed(2);$("#cashCloseModal").showModal()};
-    $("#financeList").innerHTML=entries.slice(0,30).map(x=>'<div class="tableRow"><div><strong>'+x.description+'</strong><small>'+x.category+' · '+(x.payment_method||"sem forma")+' · '+dateTimeBR(x.created_at)+'</small></div><div class="money '+x.kind+'">'+(x.kind==="expense"?"− ":"+ ")+moneyBR(x.amount)+'</div>'+(x.status==="paid"?'<span class="status paid">pago</span>':'<button type="button" class="secondary smallBtn" data-pay-entry="'+x.id+'">Pagar</button>')+'</div>').join("")||'<p class="muted">Sem movimentações ainda.</p>';
-    $$("[data-pay-entry]").forEach(b=>b.onclick=()=>payFinanceEntry(b.dataset.payEntry));
-    $("#commissionList").innerHTML=comm.slice(0,30).map(x=>'<div class="tableRow"><div><strong>'+x.professional_name+'</strong><small>'+x.client_name+' · '+x.service_name+'</small></div><div class="money">'+moneyBR(x.amount)+'</div><span class="status '+x.status+'">'+(x.status==="pending"?"pendente":"paga")+'</span></div>').join("")||'<p class="muted">Nenhuma comissão gerada ainda.</p>';
-    $("#payPendingCommissions").disabled=!comm.some(x=>x.status==="pending");$("#payPendingCommissions").dataset.ids=comm.filter(x=>x.status==="pending").map(x=>x.id).join(",");
-    $("#serviceCostList").innerHTML=costs.slice(0,8).map(x=>'<div class="row"><div><strong>'+x.service_name+'</strong><small>produto '+moneyBR(x.product_cost)+' · comissão '+moneyBR(x.commission)+'</small></div><div style="text-align:right"><strong>'+moneyBR(x.gross_margin)+'</strong><small>'+Number(x.gross_margin_pct||0).toFixed(1)+'% margem direta</small></div></div>').join("")||'<p class="muted">Configure produtos para calcular custo real.</p>';
-    await loadDre();
-  }catch(err){if(err.status!==403&&err.status!==401)toast("Não foi possível carregar o financeiro")}
+const neFinanceIcons={pix:"Pix",cash:"Dinheiro",credit_card:"Crédito",debit_card:"Débito",voucher:"Voucher",other:"Outro"};
+function setFinanceTab(tab){
+  const allowed=["cash","entries","commissions","results"],active=allowed.includes(tab)?tab:"cash";
+  $$("[data-ne-finance-tab]").forEach(b=>{const yes=b.dataset.neFinanceTab===active;b.classList.toggle("is-active",yes);b.setAttribute("aria-pressed",String(yes))});
+  $$("[data-ne-finance-panel]").forEach(panel=>panel.classList.toggle("hidden",panel.dataset.neFinancePanel!==active));
+  if(active==="results")loadDre().catch(()=>{});
 }
+$$("[data-ne-finance-tab]").forEach(b=>b.addEventListener("click",()=>setFinanceTab(b.dataset.neFinanceTab)));
+$$("[data-ne-finance-action]").forEach(b=>b.addEventListener("click",()=>{
+  const kind=b.dataset.neFinanceAction;
+  const form=$("#financeEntryForm");
+  form.reset();form.elements.kind.value=kind;
+  form.elements.status.value="paid";
+  $("#financeEntryModal").showModal();
+}));
+function cashMethodCards(data){
+  const grouped=new Map();
+  for(const row of data.by_method||[]){
+    const key=row.payment_method||"other",record=grouped.get(key)||{in:0,out:0};
+    if(row.kind==="income")record.in+=Number(row.total||0);
+    else record.out+=Number(row.total||0);
+    grouped.set(key,record);
+  }
+  $("#neCashMethods").innerHTML=grouped.size?
+    [...grouped.entries()].map(([method,amount])=>'<div class="ne-cash-method"><small>'+esc(neFinanceIcons[method]||method)+'</small><strong>'+moneyBR(amount.in-amount.out)+'</strong><span>'+moneyBR(amount.in)+' entradas · '+moneyBR(amount.out)+' saídas</span></div>').join(""):
+    '<p class="muted">Nenhum recebimento ou pagamento associado a este caixa.</p>';
+}
+function showCashClose(cash){
+  state.neCashExpected=Number(cash?.expected||0);
+  $("#neCashCloseExpected").textContent="Saldo esperado em dinheiro: "+moneyBR(state.neCashExpected)+". Conte o dinheiro físico.";
+  const form=$("#cashCloseForm");form.reset();form.elements.actual.value="";
+  $("#neCashDifferencePreview").textContent="Informe o dinheiro contado para conferir a diferença.";
+  $("#cashCloseModal").showModal();
+}
+$("#cashCloseForm").elements.actual.addEventListener("input",e=>{
+  const v=e.target.value;
+  $("#neCashDifferencePreview").textContent=v.trim()===""?"Informe o valor realmente contado.":
+    "Diferença em relação ao esperado: "+moneyBR(Math.round((Number(v)-Number(state.neCashExpected||0))*100)/100)+
+    (Math.round((Number(v)-Number(state.neCashExpected||0))*100)!==0?" · justificativa obrigatória":" · valores conferem");
+});
+async function showCashHistory(){
+  const target=$("#neCashHistory");
+  if(!target.classList.contains("hidden")){target.classList.add("hidden");return}
+  target.classList.remove("hidden");
+  target.textContent="Consultando histórico...";
+  try{
+    const rows=await api("/api/cash/history");
+    target.innerHTML=rows.length?rows.map(x=>'<div class="ne-cash-history-row"><div><strong>'+esc(x.status==="open"?"Caixa aberto":"Fechamento")+'</strong><small>'+esc(dateTimeBR(x.opened_at))+' · '+(x.closed_at?esc(dateTimeBR(x.closed_at)):"em operação")+'</small></div><div><strong>'+(x.actual==null?"—":moneyBR(x.actual))+'</strong><small>'+(x.difference==null?"sem conferência":"diferença "+moneyBR(x.difference))+'</small></div></div>').join(""):'<p>Sem sessões registradas.</p>';
+  }catch{target.textContent="Não foi possível consultar o histórico."}
+}
+$("#neCashHistoryToggle").onclick=showCashHistory;
+async function loadFinance(){
+  const [dash,entries,comm,costs,cashInfo]=await Promise.all([
+    api("/api/phase2/dashboard").catch(()=>null),api("/api/finance/entries").catch(()=>null),
+    api("/api/commissions").catch(()=>null),api("/api/services/costs").catch(()=>null),
+    api("/api/cash/overview").catch(()=>null)
+  ]);
+  state.financeEntries=Array.isArray(entries)?entries:[];
+  state.phase2=dash;
+  if(dash){
+    $("#fIncome").textContent=moneyBR(dash.todayIncome);
+    $("#fExpense").textContent=moneyBR(dash.todayExpense);
+    $("#fNet").textContent=moneyBR(dash.todayNet);
+    $("#fCommission").textContent=moneyBR(dash.pendingCommissions);
+    $("#fCommissionCount").textContent=dash.pendingCommissionsCount+" lançamentos";
+    $("#fPayable").textContent=moneyBR(dash.accountsPayable);
+    $("#fPayableCount").textContent=dash.accountsPayableCount+" pendências";
+  }
+  const cash=cashInfo?.status==="open"?cashInfo:null;
+  $("#cashBadge").textContent=cash?"ABERTO":cashInfo?"FECHADO":"SEM ACESSO";
+  $("#cashBadge").classList.toggle("ok",!!cash);
+  $("#cashStatusText").textContent=cash?"Aberto desde "+dateTimeBR(cash.session.opened_at):cashInfo?"Nenhum caixa aberto.":"Acesso ao caixa indisponível.";
+  $("#cashBody").innerHTML=cash?'<div class="cashNumber"><span>Esperado em dinheiro</span><strong>'+moneyBR(cash.expected)+'</strong></div><button class="primary" id="closeCashBtn">Fechar caixa</button>':
+    '<p class="muted">Abra o caixa para registrar dinheiro físico.</p><button class="primary" id="openCashBtn" '+(cashInfo?"":"disabled")+'>Abrir caixa</button>';
+  if($("#openCashBtn"))$("#openCashBtn").onclick=()=>{$("#cashOpenForm").reset();$("#cashOpenModal").showModal()};
+  if($("#closeCashBtn"))$("#closeCashBtn").onclick=()=>showCashClose(cash);
+  $("#neCashWithdraw").disabled=!cash;
+  cashMethodCards(cash||{by_method:[]});
+  if(Array.isArray(entries)){
+    $("#financeList").innerHTML=entries.slice(0,45).map(x=>'<div class="tableRow"><div><strong>'+esc(x.description)+'</strong><small>'+esc(x.category||"outras")+' · '+esc(neFinanceIcons[x.payment_method]||"sem forma")+' · '+esc(dateTimeBR(x.created_at))+'</small></div><div class="money '+(x.kind==="expense"?"expense":"income")+'">'+(x.kind==="expense"?"− ":"+ ")+moneyBR(x.amount)+'</div>'+(x.status==="paid"?'<span class="status paid">pago</span>':'<button type="button" class="secondary smallBtn" data-pay-entry="'+esc(x.id)+'">Dar baixa</button>')+'</div>').join("")||'<p class="muted">Sem movimentações ainda.</p>';
+    $$("[data-pay-entry]",$("#financeList")).forEach(b=>b.onclick=()=>payFinanceEntry(b.dataset.payEntry));
+  }else $("#financeList").textContent="Sem permissão para consultar movimentações.";
+  if(Array.isArray(comm)){
+    $("#commissionList").innerHTML=comm.slice(0,40).map(x=>'<div class="tableRow"><div><strong>'+esc(x.professional_name||"Profissional")+'</strong><small>'+esc(x.client_name||"Cliente")+' · '+esc(x.service_name||"Serviço")+'</small></div><div class="money">'+moneyBR(x.amount)+'</div><span class="status '+(x.status==="pending"?"pending":"paid")+'">'+(x.status==="pending"?"pendente":"paga")+'</span></div>').join("")||'<p class="muted">Nenhuma comissão gerada.</p>';
+    const pending=comm.filter(x=>x.status==="pending");
+    $("#payPendingCommissions").disabled=!pending.length;
+    $("#payPendingCommissions").dataset.ids=pending.map(x=>x.id).join(",");
+    $("#payPendingCommissions").dataset.total=pending.reduce((a,x)=>a+Number(x.amount||0),0).toFixed(2);
+  }else{
+    $("#commissionList").textContent="Sem permissão para consultar comissões.";
+    $("#payPendingCommissions").disabled=true;
+  }
+  if(Array.isArray(costs)){
+    $("#serviceCostList").innerHTML=costs.slice(0,15).map(x=>'<div class="row"><div><strong>'+esc(x.service_name)+'</strong><small>Produto '+moneyBR(x.product_cost)+' · comissão '+moneyBR(x.commission)+'</small></div><div style="text-align:right"><strong>'+moneyBR(x.gross_margin)+'</strong><small>'+Number(x.gross_margin_pct||0).toFixed(1)+'% margem direta</small></div></div>').join("")||'<p class="muted">Configure produtos para calcular custo real.</p>';
+  }else $("#serviceCostList").textContent="Sem acesso aos custos financeiros.";
+}
+function showStockTab(type,id){
+  const prefix=type==="inventory"?"stock":"purchase",other=prefix==="stock"?"products":"suppliers";
+  const active=id||other;
+  $$("[data-ne-"+prefix+"-tab]").forEach(button=>{
+    const yes=button.dataset["ne"+prefix[0].toUpperCase()+prefix.slice(1)+"Tab"]===active;
+    button.classList.toggle("is-active",yes);button.setAttribute("aria-pressed",String(yes));
+  });
+  $$("[data-ne-"+prefix+"-panel]").forEach(panel=>panel.classList.toggle("hidden",panel.dataset["ne"+prefix[0].toUpperCase()+prefix.slice(1)+"Panel"]!==active));
+}
+$$("[data-ne-stock-tab]").forEach(button=>button.addEventListener("click",()=>showStockTab("inventory",button.dataset.neStockTab)));
+$$("[data-ne-purchase-tab]").forEach(button=>button.addEventListener("click",()=>showStockTab("purchase",button.dataset.nePurchaseTab)));
 async function loadInventory(){
   try{
-    const data=await Promise.all([api("/api/products"),api("/api/services/costs"),api("/api/suppliers"),api("/api/stock/movements"),api("/api/stock/lots")]);state.products=data[0];state.suppliers=data[2];const costs=data[1],movements=data[3],lots=data[4];
-    $("#iProducts").textContent=state.products.length;$("#iLow").textContent=state.products.filter(x=>x.low_stock).length;$("#iRecipes").textContent=costs.filter(x=>Number(x.product_cost)>0).length;
-    $("#productList").innerHTML=state.products.map(p=>'<article class="'+(p.low_stock?'lowStock':'')+'"><div class="panelhead"><span class="chip">'+p.unit+'</span>'+(p.low_stock?'<span class="dangerChip">estoque baixo</span>':'')+'</div><h3>'+p.name+'</h3><p>'+Number(p.stock_qty).toLocaleString("pt-BR")+' '+p.unit+' em estoque · mínimo '+Number(p.min_qty).toLocaleString("pt-BR")+'</p><p>Custo médio: '+moneyBR(p.avg_cost)+' / '+p.unit+(p.supplier_name?' · '+p.supplier_name:'')+'</p><button class="secondary smallBtn" data-adjust-product="'+p.id+'">Ajustar estoque</button></article>').join("")||'<p class="muted">Cadastre o primeiro produto.</p>';
-    $("#recipeServiceList").innerHTML=costs.map(c=>'<article><div><span class="chip">'+moneyBR(c.price)+'</span><h3>'+c.service_name+'</h3><p>Produtos '+moneyBR(c.product_cost)+' · comissão '+moneyBR(c.commission)+'</p><strong>Margem direta '+moneyBR(c.gross_margin)+'</strong></div><button class="secondary smallBtn" data-recipe-service="'+c.service_id+'">Configurar consumo</button></article>').join("");
+    const data=await Promise.all([api("/api/products"),api("/api/stock/recipes-overview"),api("/api/suppliers"),api("/api/stock/movements"),api("/api/stock/lots")]);state.products=data[0];state.suppliers=data[2];const costs=data[1],movements=data[3],lots=data[4];
+    $("#iProducts").textContent=state.products.length;$("#iLow").textContent=state.products.filter(x=>x.low_stock).length;$("#iRecipes").textContent=costs.filter(x=>Number(x.product_count)>0).length;
+    $("#productList").innerHTML=state.products.map(p=>{
+      const low=p.low_stock,unit=esc(p.unit),name=esc(p.name),id=esc(p.id);
+      return '<details class="ne-stock-product '+(low?'lowStock':'')+'"><summary><span class="ne-stock-product-symbol" aria-hidden="true">▦</span><span class="ne-stock-title"><strong>'+name+'</strong><small>'+Number(p.stock_qty).toLocaleString("pt-BR")+' '+unit+' disponíveis</small></span>'+(low?'<span class="dangerChip">Repor</span>':'')+'<span class="ne-stock-chevron" aria-hidden="true">⌄</span></summary>'+
+      '<div class="ne-stock-details"><div><small>Estoque mínimo</small><strong>'+Number(p.min_qty).toLocaleString("pt-BR")+' '+unit+'</strong></div><div><small>Custo por '+unit+'</small><strong>'+moneyBR(p.avg_cost)+'</strong></div><div><small>Fornecedor</small><strong>'+esc(p.supplier_name||"Não definido")+'</strong></div>'+
+      '<button type="button" class="secondary" data-adjust-product="'+id+'">Registrar ajuste</button></div></details>';
+    }).join("")||'<p class="muted">Cadastre o primeiro produto.</p>';
+    $("#recipeServiceList").innerHTML=costs.map(c=>'<details class="ne-stock-recipe"><summary><span class="ne-stock-product-symbol" aria-hidden="true">◈</span><span class="ne-stock-title"><strong>'+esc(c.service_name)+'</strong><small>'+Number(c.product_count)+' produtos previstos</small></span><span class="ne-stock-chevron" aria-hidden="true">⌄</span></summary><div class="ne-stock-details"><div><small>Custo dos materiais</small><strong>'+moneyBR(c.product_cost)+'</strong></div><button type="button" class="secondary" data-recipe-service="'+esc(c.service_id)+'">Definir consumo padrão</button></div></details>').join("");
     $$("[data-adjust-product]").forEach(b=>b.onclick=()=>openStockAdjust(b.dataset.adjustProduct));
     $$("[data-recipe-service]").forEach(b=>b.onclick=()=>openRecipe(b.dataset.recipeService));
     $("#stockMovementList").innerHTML=movements.slice(0,40).map(m=>'<div class="tableRow"><div><strong>'+m.product_name+'</strong><small>'+m.reason+' · '+dateTimeBR(m.created_at)+'</small></div><div class="money '+(Number(m.qty)>=0?"income":"expense")+'">'+(Number(m.qty)>=0?"+ ":"")+Number(m.qty).toLocaleString("pt-BR")+' '+m.unit+'</div><span class="status">'+(({purchase:"compra",consumption:"consumo",adjust_in:"ajuste",adjust_out:"ajuste"})[m.type]||m.type)+'</span></div>').join("")||'<p class="muted">Nenhuma movimentação ainda.</p>';
@@ -181,10 +440,11 @@ async function loadSuppliers(){
 function fillProductSupplier(){const s=$("#productSupplier");if(!s)return;s.innerHTML='<option value="">Sem fornecedor</option>'+state.suppliers.map(x=>'<option value="'+x.id+'">'+x.name+'</option>').join("")}
 function openStockAdjust(pid){
   const p=state.products.find(x=>x.id===pid);if(!p)return;
-  $("#stockAdjustForm").elements.product_id.value=p.id;$("#stockAdjustProduct").textContent=p.name+" · atual "+Number(p.stock_qty).toLocaleString("pt-BR")+" "+p.unit;$("#stockAdjustModal").showModal();
+  $("#stockAdjustForm").elements.product_id.value=p.id;$("#stockAdjustProduct").textContent=p.name+" · atual "+Number(p.stock_qty).toLocaleString("pt-BR")+" "+p.unit;
+  const inp=$("#stockAdjustForm").elements.qty;inp.step=["un","unidade","und"].includes(p.unit)?"1":"0.001";inp.value="";$("#neStockAdjustQtyLabel").firstChild.textContent="Quantidade em "+p.unit+" (+ entrada / − saída)";$("#stockAdjustModal").showModal();
 }
 function recipeRow(selected="",qty=""){
-  return '<div class="recipeRow"><select class="recipeProduct"><option value="">Selecione o produto…</option>'+state.products.map(p=>'<option value="'+p.id+'" '+(p.id===selected?'selected':'')+'>'+p.name+' ('+p.unit+')</option>').join("")+'</select><input class="recipeQty" type="number" step="0.01" min="0.01" value="'+qty+'" placeholder="Qtd."><button type="button" class="x recipeRemove">×</button></div>';
+  return '<div class="recipeRow"><select class="recipeProduct"><option value="">Selecione o produto…</option>'+state.products.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===selected?'selected':'')+'>'+esc(p.name)+' ('+esc(p.unit)+')</option>').join("")+'</select><input class="recipeQty" type="number" step="0.001" min="0.001" value="'+esc(String(qty))+'" placeholder="Quantidade na unidade do produto"><button type="button" class="x recipeRemove">×</button></div>';
 }
 function bindRecipeRemove(){$$(".recipeRemove").forEach(b=>b.onclick=()=>b.closest(".recipeRow").remove())}
 async function openRecipe(serviceId){
@@ -197,10 +457,44 @@ $("#addRecipeRow").onclick=()=>{$("#recipeRows").insertAdjacentHTML("beforeend",
 $("#recipeForm").onsubmit=async e=>{e.preventDefault();const sid=e.target.elements.service_id.value,items=$$(".recipeRow",e.target).map(r=>({product_id:$(".recipeProduct",r).value,qty_standard:Number($(".recipeQty",r).value||0)})).filter(x=>x.product_id&&x.qty_standard>0);try{await api("/api/services/"+sid+"/recipe",{method:"PUT",body:JSON.stringify({items})});$("#recipeModal").close();await loadInventory();toast("Consumo padrão atualizado")}catch{toast("Não foi possível salvar o consumo")}};
 $("#supplierForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/suppliers",{method:"POST",body:JSON.stringify(b)});e.target.reset();$("#supplierModal").close();await loadSuppliers();toast("Fornecedor cadastrado")}catch{toast("Erro ao salvar fornecedor")}};
 $("#productForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/products",{method:"POST",body:JSON.stringify(b)});e.target.reset();$("#productModal").close();await loadInventory();toast("Produto cadastrado")}catch{toast("Erro ao salvar produto")}};
-$("#stockAdjustForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));b.qty=Number(b.qty);try{await api("/api/stock/adjust",{method:"POST",body:JSON.stringify(b)});$("#stockAdjustModal").close();e.target.reset();await loadInventory();toast("Estoque ajustado")}catch{toast("Erro ao ajustar estoque")}};
-$("#financeEntryForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/finance/entries",{method:"POST",body:JSON.stringify(b)});e.target.reset();$("#financeEntryModal").close();await loadFinance();toast("Lançamento registrado")}catch(err){toast(err.data?.error==="cash_session_required"?"Abra o caixa antes de lançar dinheiro":"Erro ao registrar lançamento")}};
-$("#cashOpenForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/cash/open",{method:"POST",body:JSON.stringify(b)});e.target.reset();$("#cashOpenModal").close();await loadFinance();toast("Caixa aberto")}catch{toast("Não foi possível abrir o caixa")}};
-$("#cashCloseForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{const out=await api("/api/cash/close",{method:"POST",body:JSON.stringify(b)});$("#cashCloseModal").close();e.target.reset();await loadFinance();toast("Caixa fechado · diferença "+moneyBR(out.difference))}catch{toast("Não foi possível fechar o caixa")}};
+$("#stockAdjustForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));b.qty=Number(b.qty);try{await api("/api/stock/adjust",{method:"POST",body:JSON.stringify(b)}); $("#stockAdjustModal").close();e.target.reset();await loadInventory();toast("Estoque ajustado")}catch(err){toast(err.data?.error==="insufficient_stock"?"Não é possível retirar mais que o saldo existente":err.data?.error==="invalid_stock_quantity"?"Confira a quantidade e a unidade do produto":"Erro ao ajustar estoque")}};
+$("#financeEntryForm").onsubmit=async e=>{
+  e.preventDefault();const form=e.target,b=Object.fromEntries(new FormData(form));
+  try{
+    await api("/api/finance/entries",{method:"POST",body:JSON.stringify(b)});
+    form.reset();$("#financeEntryModal").close();setFinanceTab("entries");await loadFinance();toast("Lançamento registrado");
+  }catch(err){toast(err.data?.error==="cash_session_required"?"Abra o caixa antes de movimentar dinheiro":err.data?.error==="invalid_amount"?"Informe um valor positivo com até duas casas decimais":err.data?.error==="insufficient_cash"?"Dinheiro insuficiente no caixa":err.data?.error==="invalid_payment_method"?"Escolha uma forma de pagamento válida":"Não foi possível salvar o lançamento")}
+};
+$("#cashOpenForm").onsubmit=async e=>{
+  e.preventDefault();const b=Object.fromEntries(new FormData(e.target));
+  try{await api("/api/cash/open",{method:"POST",body:JSON.stringify(b)});
+    e.target.reset();$("#cashOpenModal").close();await loadFinance();toast("Caixa aberto");
+  }catch(err){toast(err.data?.error==="cash_already_open"?"Já existe um caixa aberto":err.data?.error==="invalid_amount"?"Confira o valor inicial":"Não foi possível abrir o caixa")}
+};
+$("#cashCloseForm").onsubmit=async e=>{
+  e.preventDefault();
+  const form=e.target,b=Object.fromEntries(new FormData(form));
+  const difference=Math.round((Number(b.actual)-Number(state.neCashExpected||0))*100);
+  if(difference!==0&&String(b.notes||"").trim().length<8){form.elements.notes.focus();toast("Explique a diferença do caixa antes de fechar");return}
+  if(!window.confirm("Confirmar o fechamento? Valor contado: "+moneyBR(b.actual)+"."))return;
+  try{const out=await api("/api/cash/close",{method:"POST",body:JSON.stringify(b)});
+    $("#cashCloseModal").close();form.reset();await loadFinance();
+    toast("Caixa fechado · diferença "+moneyBR(out.difference));
+  }catch(err){toast(err.data?.error==="cash_difference_reason_required"?"Informe o motivo da diferença (mínimo de oito caracteres)":err.data?.error==="cash_not_open"?"Este caixa já está fechado":"Não foi possível fechar o caixa")}
+};
+$("#cashWithdrawForm").onsubmit=async e=>{
+  e.preventDefault();const form=e.target,b=Object.fromEntries(new FormData(form));
+  if(!window.confirm("Confirmar retirada de "+moneyBR(b.amount)+" do caixa?"))return;
+  try{await api("/api/cash/withdraw",{method:"POST",body:JSON.stringify(b)});
+    form.reset();$("#cashWithdrawModal").close();await loadFinance();toast("Retirada registrada no caixa");
+  }catch(err){toast(err.data?.error==="insufficient_cash"?"O dinheiro em caixa é insuficiente":err.data?.error==="cash_not_open"?"Abra o caixa antes de retirar dinheiro":"Não foi possível registrar a retirada")}
+};
+$("#financePayForm").onsubmit=async e=>{
+  e.preventDefault();const form=e.target,b=Object.fromEntries(new FormData(form));
+  try{await api("/api/finance/entries/"+encodeURIComponent(b.entry_id)+"/pay",{method:"POST",body:JSON.stringify({payment_method:b.payment_method})});
+    form.reset();$("#financePayModal").close();await loadFinance();toast("Pagamento confirmado");
+  }catch(err){toast(err.data?.error==="already_paid"?"Esse lançamento já foi pago":err.data?.error==="cash_session_required"?"Abra o caixa para pagar em dinheiro":err.data?.error==="insufficient_cash"?"Saldo físico insuficiente para esse pagamento":"Não foi possível registrar o pagamento")}
+};
 function decorateAgendaCheckout(){
   $$("[data-status]").forEach(sel=>{
     const status=sel.value,id=sel.dataset.status;if(["completed","cancelled","no_show"].includes(status)||sel.parentElement.querySelector("[data-checkout]"))return;
@@ -209,14 +503,52 @@ function decorateAgendaCheckout(){
   });
 }
 async function loadAgendaPhase2(){await loadAgenda();decorateAgendaCheckout()}
-$("#checkoutForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));b.consumption=collectCheckoutConsumption();try{const out=await api("/api/checkout",{method:"POST",body:JSON.stringify(b)});$("#checkoutModal").close();e.target.reset();$("#checkoutConsumption").innerHTML="";await loadAgendaPhase2();state.dashboard=await api("/api/dashboard");renderDashboard();toast("Atendimento finalizado · "+moneyBR(out.total))}catch(err){const code=err.data?.error;toast(code==="cash_session_required"?"Abra o caixa antes de receber em dinheiro":code==="appointment_already_checked_out"?"Esse atendimento já foi finalizado":code==="package_credit_required"?"Esta cliente não possui crédito válido deste serviço":"Não foi possível finalizar")}};
+$("#checkoutForm").onsubmit=async e=>{
+  e.preventDefault();
+  const b=Object.fromEntries(new FormData(e.target));
+  try{
+    b.consumption=collectCheckoutConsumption();
+    const out=await api("/api/checkout",{method:"POST",body:JSON.stringify(b)});
+    $("#checkoutModal").close();e.target.reset();$("#checkoutConsumption").innerHTML="";
+    await loadAgendaPhase2();state.dashboard=await api("/api/dashboard");renderDashboard();
+    toast("Atendimento finalizado · "+moneyBR(out.total));
+  }catch(err){
+    const code=err.data?.error;
+    toast(code==="cash_session_required"?"Abra o caixa antes de receber em dinheiro":
+      code==="appointment_already_checked_out"?"Esse atendimento já foi finalizado":
+      code==="package_credit_required"?"Esta cliente não possui crédito válido deste serviço":
+      code==="insufficient_stock"?"Estoque insuficiente: "+(err.data?.product_name||"corrija o saldo do produto"):
+      code==="invalid_stock_quantity"||code==="invalid_consumption_product"?"Verifique o consumo informado e sua unidade":
+      code==="invalid_consumption_form"?"Informe quantidades válidas antes de finalizar":"Não foi possível finalizar");
+  }
+};
 
 async function loadDre(){
   const month=$("#dreMonth").value||new Date().toISOString().slice(0,7);$("#dreMonth").value=month;
   try{const d=await api("/api/reports/dre?month="+encodeURIComponent(month));$("#dreBody").innerHTML='<div class="dreHero"><div><span>Entradas</span><strong>'+moneyBR(d.income)+'</strong></div><div><span>Saídas</span><strong>'+moneyBR(d.expense)+'</strong></div><div><span>Resultado</span><strong>'+moneyBR(d.result)+'</strong></div></div><div class="stack">'+d.categories.map(c=>'<div class="row"><div><strong>'+c.category+'</strong><small>'+(c.kind==="income"?"receita":"despesa")+'</small></div><div class="money '+c.kind+'">'+moneyBR(c.total)+'</div></div>').join("")+'</div>'}catch{$("#dreBody").innerHTML='<p class="muted">Não foi possível calcular o DRE.</p>'}
 }
 $("#dreMonth").onchange=loadDre;
-$("#payPendingCommissions").onclick=async e=>{const ids=String(e.currentTarget.dataset.ids||"").split(",").filter(Boolean);if(!ids.length)return;try{const out=await api("/api/commissions/pay",{method:"POST",body:JSON.stringify({ids})});await loadFinance();toast(out.count+" comissões pagas · "+moneyBR(out.total))}catch{toast("Não foi possível pagar as comissões")}};
+$("#payPendingCommissions").onclick=e=>{
+  const ids=String(e.currentTarget.dataset.ids||"").split(",").filter(Boolean);
+  if(!ids.length)return;
+  state.neCommissionIds=ids;
+  $("#commissionPayForm").reset();
+  $("#neCommissionPayDescription").textContent=ids.length+" comissões pendentes · total "+moneyBR(e.currentTarget.dataset.total||0)+". Confirme o método efetivamente utilizado.";
+  $("#commissionPayModal").showModal();
+};
+$("#commissionPayForm").onsubmit=async e=>{
+  e.preventDefault();
+  const form=e.target,method=form.elements.payment_method.value;
+  if(!state.neCommissionIds?.length){toast("Não há comissões selecionadas");return}
+  if(!window.confirm("Registrar essas "+state.neCommissionIds.length+" comissões como pagas?"))return;
+  try{
+    const out=await api("/api/commissions/pay",{method:"POST",body:JSON.stringify({ids:state.neCommissionIds,payment_method:method})});
+    state.neCommissionIds=[];form.reset();$("#commissionPayModal").close();await loadFinance();
+    toast(out.count+" comissões registradas · "+moneyBR(out.total));
+  }catch(err){toast(err.data?.error==="cash_session_required"?"Abra o caixa para pagar comissões em dinheiro":
+    err.data?.error==="insufficient_cash"?"O caixa não tem dinheiro suficiente para essas comissões":
+    err.data?.error==="commission_not_pending"?"Alguma comissão já foi paga. Atualize a lista.":"Não foi possível registrar as comissões")}
+};
 function purchaseRow(selected="",qty="",cost="",lot="",expiry=""){
   return '<div class="purchaseRow"><select class="purchaseProduct"><option value="">Produto…</option>'+state.products.map(p=>'<option value="'+p.id+'" '+(p.id===selected?'selected':'')+'>'+p.name+' ('+p.unit+')</option>').join("")+'</select><input class="purchaseQty" type="number" step="0.01" min="0.01" value="'+qty+'" placeholder="Qtd."><input class="purchaseCost" type="number" step="0.0001" min="0" value="'+cost+'" placeholder="R$/un"><input class="purchaseLot" value="'+lot+'" placeholder="Lote"><input class="purchaseExpiry" type="date" value="'+expiry+'"><button type="button" class="x purchaseRemove">×</button></div>';
 }
@@ -241,36 +573,97 @@ async function openCheckout(appointmentId){
     $("#checkoutForm").elements.appointment_id.value=appointmentId;
     $("#checkoutLabel").textContent=prep.client_name+" · "+prep.service_name+" · "+moneyBR(prep.price);
     state.checkoutPackages=prep.packages||[];const cp=$("#checkoutPackage");cp.innerHTML='<option value="">Selecione…</option>'+state.checkoutPackages.map(p=>'<option value="'+p.client_package_id+'">'+p.package_name+' · '+p.remaining+' crédito(s) · até '+String(p.expires_at).slice(0,10)+' · valor '+moneyBR(p.allocated_unit)+'</option>').join("");$("#checkoutPaymentMethod").value="pix";updateCheckoutPaymentMode();
+    const shortages=[];
     $("#checkoutConsumption").innerHTML=prep.recipe.length?prep.recipe.map(r=>{
-      const suggested=r.client_avg_qty!=null?r.client_avg_qty:r.qty_standard;
+      const unit=String(r.unit||"ml"),stock=Number(r.stock_qty||0),standard=Number(r.qty_standard||0);
+      const avg=Number(r.client_avg_qty),suggested=r.client_avg_qty!=null&&Number.isFinite(avg)?avg:standard;
       const hint=r.client_avg_qty!=null?"média desta cliente ("+r.client_samples+" atend.)":"padrão do serviço";
-      return '<div class="consumptionRow" data-consumption-product="'+r.product_id+'"><div><strong>'+r.product_name+'</strong><small>'+hint+' · padrão '+Number(r.qty_standard).toLocaleString("pt-BR")+' '+r.unit+'</small></div><input type="number" step="0.01" min="0" value="'+Number(suggested).toFixed(2)+'"><span>'+r.unit+'</span></div>';
+      if(suggested>stock)shortages.push(r.product_name);
+      const step=["un","unidade","und"].includes(unit)?"1":"0.001";
+      return '<div class="consumptionRow" data-consumption-product="'+esc(r.product_id)+'" data-unit="'+esc(unit)+'"><div><strong>'+esc(r.product_name)+'</strong><small>'+hint+' · previsto '+standard.toLocaleString("pt-BR")+' '+esc(unit)+' · saldo '+stock.toLocaleString("pt-BR")+' '+esc(unit)+'</small></div><input type="number" step="'+step+'" min="0" max="'+stock+'" required value="'+Number(suggested.toFixed(3))+'"><span>'+esc(unit)+'</span></div>';
     }).join(""):'<p class="muted">Este serviço ainda não tem produtos configurados. O financeiro e a comissão serão registrados normalmente.</p>';
+    $("#neCheckoutStockHint").textContent=shortages.length?"Atenção: saldo insuficiente para "+shortages.join(", ")+". Corrija o estoque antes de finalizar.":"Confira as quantidades. É permitido registrar zero quando um produto não foi usado.";
     $("#checkoutModal").showModal();
   }catch{toast("Não foi possível preparar o fechamento")}
 }
 function collectCheckoutConsumption(){
-  return $$("#checkoutConsumption [data-consumption-product]").map(r=>({product_id:r.dataset.consumptionProduct,actual_qty:Number($("input",r).value||0)})).filter(x=>x.product_id&&x.actual_qty>=0);
+  return $("#checkoutConsumption [data-consumption-product]").map(row=>{
+    const input=$("input",row),number=Number(input.value),unit=row.dataset.unit;
+    if(input.value.trim()===""||!input.checkValidity()||!Number.isFinite(number)||number<0||number>1000000||
+      ["un","unidade","und"].includes(unit)&&!Number.isInteger(number)){
+      input.focus();throw Object.assign(new Error("invalid_consumption_form"),{data:{error:"invalid_consumption_form"}});
+    }
+    return {product_id:row.dataset.consumptionProduct,actual_qty:number};
+  });
 }
-async function payFinanceEntry(id){
-  try{await api("/api/finance/entries/"+id+"/pay",{method:"POST",body:JSON.stringify({payment_method:"pix"})});await loadFinance();toast("Lançamento marcado como pago")}catch(err){toast(err.data?.error==="already_paid"?"Esse lançamento já está pago":"Não foi possível pagar o lançamento")}
+function payFinanceEntry(id){
+  const entry=state.financeEntries?.find(x=>x.id===id);
+  if(!entry||entry.status!=="pending"){toast("Lançamento não encontrado ou já pago");return}
+  const form=$("#financePayForm");form.reset();
+  form.elements.entry_id.value=id;
+  $("#neFinancePayDescription").textContent=entry.description+" · "+moneyBR(entry.amount);
+  $("#financePayModal").showModal();
 }
 
+function showOwnerTab(section){
+  const active=["attention","finance","services","team","clients"].includes(section)?section:"attention";
+  $$("[data-owner-panel]").forEach(el=>el.classList.toggle("hidden",el.dataset.ownerPanel!==active));
+  $$("[data-owner-tab]").forEach(btn=>{
+    const yes=btn.dataset.ownerTab===active;
+    btn.classList.toggle("is-active",yes);
+    if(btn.classList.contains("ne-owner-menu-item"))btn.setAttribute("aria-pressed",String(yes));
+  });
+}
+$$("[data-owner-tab]").forEach(btn=>btn.addEventListener("click",()=>showOwnerTab(btn.dataset.ownerTab)));
+function ownerEmpty(text){return '<p class="ne-owner-empty">'+esc(text)+'</p>'}
+function ownerRanking(items,valueLabel){
+  return items.length?items.map((item,i)=>'<div class="ne-owner-ranking-row"><span class="ne-owner-rank">'+(i+1)+'</span><div class="ne-owner-rank-name"><strong>'+esc(item.name)+'</strong><small>'+Number(item.count).toLocaleString("pt-BR")+' atendimentos</small></div><strong>'+moneyBR(item.volume)+'</strong></div>').join(""):ownerEmpty("Ainda não há atendimentos finalizados para este período.");
+}
 async function loadOwnerEye(){
+  const status=$("#neOwnerStatus");
+  if(!status)return;
+  status.textContent="Atualizando os indicadores do salão...";
   try{
-    const data=await Promise.all([
-      api("/api/intelligence/overview"),api("/api/intelligence/recovery"),api("/api/intelligence/alerts"),
-      api("/api/intelligence/professionals"),api("/api/intelligence/services"),api("/api/intelligence/stock-forecast")
-    ]);
-    const ov=data[0],recovery=data[1],alerts=data[2],pros=data[3],services=data[4],stock=data[5];
-    $("#oiRevenue").textContent=moneyBR(ov.revenue30);$("#oiTicket").textContent=moneyBR(ov.avgTicket);$("#oiRepeat").textContent=Number(ov.repeatRate||0).toFixed(1)+"%";$("#oiRecovery").textContent=moneyBR(ov.recoverableValue);
-    $("#intelligenceAlerts").innerHTML=alerts.map(x=>'<div class="alertItem '+x.severity+'"><div><strong>'+x.title+'</strong><p>'+x.body+'</p></div><span class="chip">'+x.severity+'</span></div>').join("")||'<p class="muted">Nenhum alerta crítico neste momento.</p>';
-    $("#recoveryList").innerHTML=recovery.slice(0,12).map(c=>'<div class="row"><div><strong>'+c.name+'</strong><small>'+(c.last_service||"Sem serviço recente")+' · '+(c.days_late==null?"sem previsão":c.days_late+" dias atrasada")+' · '+moneyBR(c.estimated_value)+'</small></div><button type="button" class="secondary smallBtn" data-recovery-client="'+c.id+'">Preparar contato</button></div>').join("")||'<p class="muted">Nenhuma cliente atrasada pela leitura atual.</p>';
-    $$("[data-recovery-client]").forEach(b=>b.onclick=async()=>{const c=recovery.find(x=>x.id===b.dataset.recoveryClient);try{await api("/api/intelligence/recovery/action",{method:"POST",body:JSON.stringify({client_id:c.id,message:c.suggested_message})});toast("Contato preparado para o Comercial IA");await loadOwnerEye()}catch{toast("Não foi possível preparar o contato")}});
-    $("#performanceList").innerHTML=pros.map(p=>'<div class="tableRow"><div><strong>'+p.name+'</strong><small>'+p.appointments+' atend. · '+Number(p.productive_hours).toFixed(1)+'h produtivas</small></div><div><strong>'+moneyBR(p.revenue)+'</strong><small>'+moneyBR(p.revenue_per_hour)+'/h</small></div><span class="status paid">'+moneyBR(p.avg_ticket)+' ticket</span></div>').join("")||'<p class="muted">Ainda sem atendimentos finalizados.</p>';
-    $("#serviceIntelList").innerHTML=services.slice(0,15).map(s=>'<div class="tableRow"><div><strong>'+s.name+'</strong><small>'+s.count+' vendas · receita '+moneyBR(s.revenue)+'</small></div><div><strong>'+moneyBR(s.direct_margin)+'</strong><small>'+Number(s.direct_margin_pct||0).toFixed(1)+'% margem</small></div><span class="status '+(s.direct_margin_pct<30?"pending":"paid")+'">'+moneyBR(s.product_cost)+' produto</span></div>').join("")||'<p class="muted">Ainda sem dados de serviços.</p>';
-    $("#stockForecastList").innerHTML=stock.slice(0,30).map(s=>'<div class="tableRow"><div><strong>'+s.product_name+'</strong><small>'+Number(s.stock_qty).toLocaleString("pt-BR")+' '+s.unit+' · '+(s.supplier_name||"sem fornecedor")+'</small></div><div><strong>'+(s.days_cover==null?"—":s.days_cover+" dias")+'</strong><small>'+(s.reorder_in_days==null?"sem histórico":"repor em ~"+s.reorder_in_days+" dias")+'</small></div><span class="status '+(s.risk==="critical"?"cancelled":s.risk==="warning"?"pending":"paid")+'">'+s.risk+'</span></div>').join("")||'<p class="muted">Cadastre consumo para gerar previsão.</p>';
-  }catch(err){if(err.status!==403&&err.status!==401)toast("Não foi possível atualizar o Olho do Dono")}
+    const snap=await api("/api/owner-eye/summary");
+    state.ownerEye=snap;
+    const date=day=>String(day||"").split("-").reverse().join("/");
+    status.textContent="Dados de "+date(snap.period.from)+" a "+date(snap.period.to)+" · Fuso "+snap.period.time_zone+" · Atualizado agora";
+    $("#oiRevenue").textContent=moneyBR(snap.money.income);
+    $("#neOwnerVisits").textContent=Number(snap.operations.completed_services).toLocaleString("pt-BR");
+    $("#oiTicket").textContent="ticket médio "+moneyBR(snap.operations.average_checkout);
+    $("#oiRepeat").textContent=snap.operations.repeat_rate==null?"Sem base":snap.operations.repeat_rate.toLocaleString("pt-BR")+"%";
+    $("#neOwnerRepeatCount").textContent=snap.operations.repeat_clients+" de "+snap.operations.clients_with_checkout+" clientes com checkout";
+    $("#neOwnerAlertsCount").textContent=String(snap.alerts.length);
+    $("#neOwnerStockBrief").textContent=snap.attention.critical_stock+" itens críticos no estoque";
+    $("#neOwnerRevenueChange").textContent=snap.money.income_change_pct==null?
+      "Sem período anterior comparável":(snap.money.income_change_pct>=0?"+":"")+snap.money.income_change_pct.toLocaleString("pt-BR")+"% ante os 30 dias anteriores";
+    $("#neOwnerIncome").textContent=moneyBR(snap.money.income);
+    $("#neOwnerExpenses").textContent=moneyBR(snap.money.expenses);
+    $("#neOwnerNet").textContent=moneyBR(snap.money.cash_net);
+    $("#neOwnerRepeated").textContent=String(snap.operations.repeat_clients);
+    $("#neOwnerBuyers").textContent=String(snap.operations.clients_with_checkout);
+    $("#neOwnerTasks").textContent=String(snap.attention.overdue_followups);
+    const allowed={stock:"inventory",bills:"finance",retention:"retention",attendance:"agenda"};
+    $("#intelligenceAlerts").innerHTML=snap.alerts.length?snap.alerts.map(al=>'<div class="ne-owner-alert '+esc(al.severity)+'"><div class="ne-owner-alert-content"><strong>'+esc(al.label)+'</strong><small>'+esc(al.detail)+'</small></div><button type="button" class="secondary smallBtn" data-owner-action="'+esc(al.id)+'">Resolver</button></div>').join(""):'<div class="ne-owner-calm"><strong>Nenhum alerta desta lista no momento.</strong><p>Continue acompanhando os indicadores e as tarefas da equipe.</p></div>';
+    $$("[data-owner-action]",$("#intelligenceAlerts")).forEach(btn=>btn.onclick=()=>{
+      const view=allowed[btn.dataset.ownerAction];
+      if(view)activate(view);
+    });
+    $("#serviceIntelList").innerHTML=ownerRanking(snap.lists.services);
+    $("#performanceList").innerHTML=ownerRanking(snap.lists.professionals);
+    const chart=snap.charts.cashflow14,max=Math.max(1,...chart.map(x=>Number(x.income||0)));
+    $("#neOwnerChart").innerHTML=chart.map(day=>{
+      const height=Math.round(Math.max(2,Number(day.income||0)/max*100));
+      const key=String(day.date).slice(5).split("-").reverse().join("/");
+      return '<div class="ne-owner-bar-column" title="'+esc(key)+" · "+esc(moneyBR(day.income))+'"><div class="ne-owner-bar" style="height:'+height+'%" aria-hidden="true"></div><small>'+esc(key)+'</small></div>';
+    }).join("");
+    $("#neOwnerChart").setAttribute("aria-label","Entradas recebidas nos últimos 14 dias: "+chart.map(x=>date(x.date)+" "+moneyBR(x.income)).join("; "));
+    const definitions=snap.definitions||{};
+    $("#neOwnerDefinitions").innerHTML=Object.entries(definitions).map(([key,text])=>'<p>'+esc(text)+'</p>').join("");
+  }catch(err){
+    status.textContent=err.status===403?"Esta visão é exclusiva da proprietária e da gerência.":"Não foi possível carregar o Olho do Dono. Nenhum indicador foi atualizado.";
+    if(err.status!==403&&err.status!==401)toast("Confira a conexão e atualize novamente");
+  }
 }
 $("#refreshIntelligence").onclick=loadOwnerEye;
 
@@ -306,7 +699,6 @@ function setAgentField(form,name,value){
   if(el.type==="checkbox")el.checked=!!value;
   else el.value=value??"";
 }
-async 
 function updateLlmFields(){
   const f=$("#agentConfigForm"),external=f.elements.llm_provider.value!=="internal";
   f.elements.llm_model.disabled=!external;
@@ -444,7 +836,7 @@ async function loadAdmin(){
     const roleName={owner:"Proprietária",manager:"Gerente",reception:"Recepção",professional:"Profissional"};
     $("#adminUserList").innerHTML=(d.users||[]).map(u=>'<div class="tableRow"><div><strong>'+u.name+'</strong><small>'+u.email+'</small></div><span class="chip">'+(roleName[u.role]||u.role)+'</span><span class="status '+(u.active?"paid":"cancelled")+'">'+(u.active?"ativo":"inativo")+'</span></div>').join("")||'<p class="muted">Nenhum usuário.</p>';
     $("#adminAuditList").innerHTML=(d.audits||[]).slice(0,80).map(a=>'<div class="tableRow"><div><strong>'+(auditNames[a.action]||a.action)+'</strong><small>'+(a.user_name||"sistema")+' · '+dateTimeBR(a.created_at)+'</small></div><span class="chip">'+(a.entity_type||"evento")+'</span><small>'+((a.entity_id||"").slice(0,8))+'</small></div>').join("")||'<p class="muted">Sem eventos de auditoria.</p>';
-    $("#adminBackupList").innerHTML=(d.backup?.recent||[]).map(b=>'<div class="tableRow"><div><strong>'+b.name+'</strong><small>'+dateTimeBR(b.mtime)+'</small></div><strong>'+bytesHuman(b.size)+'</strong><span class="status paid">íntegro</span></div>').join("")||'<p class="muted">Nenhum backup encontrado.</p>';
+    $("#adminBackupList").innerHTML=(d.backup?.recent||[]).map(b=>'<div class="tableRow"><div><strong>'+b.name+'</strong><small>'+dateTimeBR(b.mtime)+'</small></div><strong>'+bytesHuman(b.size)+'</strong><span class="status paid">cifrado</span></div>').join("")||'<p class="muted">Nenhum backup encontrado.</p>';
   }catch(err){
     if(err.status===403)toast("Administração disponível para proprietária/gerência");
     else if(err.status!==401)toast("Não foi possível carregar a administração");
@@ -491,11 +883,20 @@ async function loadTechnical(clientId=null){
   $("#technicalClientMeta").textContent=client?((client.allergies?"Alergias/restrições atuais: "+client.allergies:"Sem alergias/restrições registradas.")+(client.notes?" · "+client.notes:"")):"";
   try{
     const rows=await api("/api/clients/"+cid+"/technical");
-    $("#technicalRecordList").innerHTML=rows.map(r=>'<article class="technicalCard"><div class="panelhead"><div><span class="chip">'+(r.service_name||"Registro")+'</span><h3>'+esc(r.title)+'</h3></div><small>'+dateTimeBR(r.created_at)+'</small></div>'+(r.professional_name?'<p><strong>Profissional:</strong> '+esc(r.professional_name)+'</p>':'')+(r.formula?'<div class="technicalBlock"><strong>Fórmula</strong><p>'+esc(r.formula).replace(/\n/g,"<br>")+'</p></div>':'')+(r.observations?'<div class="technicalBlock"><strong>Observações</strong><p>'+esc(r.observations).replace(/\n/g,"<br>")+'</p></div>':'')+(r.allergies_snapshot?'<p class="technicalAlert"><strong>Alergias/restrições naquele dia:</strong> '+esc(r.allergies_snapshot)+'</p>':'')+'</article>').join("")||'<article class="panel"><p class="muted">Ainda não há registro técnico para esta cliente.</p></article>';
+    $("#technicalRecordList").innerHTML=rows.map(r=>{
+      const service=esc(r.service_name||"Registro"),title=esc(r.title||"Ficha técnica");
+      return '<details class="ne-technical-card"><summary><span class="ne-technical-icon" aria-hidden="true">▤</span><span class="ne-technical-title"><small>'+service+'</small><strong>'+title+'</strong><span>'+dateTimeBR(r.created_at)+'</span></span><span class="ne-service-arrow" aria-hidden="true">⌄</span></summary>'+
+        '<div class="ne-technical-body">'+(r.professional_name?'<p><strong>Profissional:</strong> '+esc(r.professional_name)+'</p>':"")+
+        (r.formula?'<div class="technicalBlock"><strong>Fórmula</strong><p>'+esc(r.formula).replace(/\n/g,"<br>")+'</p></div>':"")+
+        (r.observations?'<div class="technicalBlock"><strong>Observações</strong><p>'+esc(r.observations).replace(/\n/g,"<br>")+'</p></div>':"")+
+        (r.allergies_snapshot?'<p class="technicalAlert"><strong>Alergias/restrições registradas:</strong> '+esc(r.allergies_snapshot)+'</p>':"")+'</div></details>';
+    }).join("")||'<article class="panel"><p class="muted">Ainda não há registro técnico para esta cliente.</p></article>';
     const add=$("#technical .sectionTitle [data-open]");if(add)add.style.display=state.user?.role==="reception"?"none":"";
   }catch(err){if(err.status!==401&&err.status!==403)toast("Não foi possível carregar a ficha técnica")}
 }
-$("#technicalClient").onchange=e=>loadTechnical(e.target.value);
+$("#technicalClient").onchange=e=>{const linked=$("#neTechnicalAppointmentId");if(linked)linked.value="";loadTechnical(e.target.value)};
+$("#technicalFormClient").onchange=()=>{const linked=$("#neTechnicalAppointmentId");if(linked)linked.value=""};
+$("#technicalRecordModal").addEventListener("close",()=>{const linked=$("#neTechnicalAppointmentId");if(linked)linked.value=""});
 $("#technicalRecordForm").onsubmit=async e=>{
   e.preventDefault();const b=Object.fromEntries(new FormData(e.target)),cid=b.client_id;
   try{await api("/api/clients/"+cid+"/technical",{method:"POST",body:JSON.stringify(b)});$("#technicalRecordModal").close();e.target.reset();fillTechnicalSelects();await loadTechnical(cid);toast("Registro técnico salvo")}catch(err){toast(err.status===403?"Seu perfil pode consultar, mas não alterar a ficha":"Não foi possível salvar o registro")}
@@ -557,6 +958,17 @@ async function loadStaff(){
   try{
     const d=await api("/api/staff/overview?period="+encodeURIComponent(period));state.staffOverview=d;
     const can=staffCanManage();
+    if(d.limited){
+      $("#teamList").innerHTML=d.metrics.map(p=>'<article class="ne-team-basic-card"><span class="avatar">'+initials(p.name)+'</span><h3>'+esc(p.name)+'</h3><p>'+esc(p.role||"Profissional")+'</p><div class="tags">'+(p.specialties||[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join("")+'</div></article>').join("")||'<p class="muted">Nenhum profissional ativo.</p>';
+      $("#staffPerformanceList").textContent="Indicadores financeiros disponíveis somente para gerência e proprietária.";
+      $("#staffTimeOffList").textContent="Informações de afastamentos individuais restritas à gerência.";
+      const management=$("#team .ne-stage8-grid");
+      if(management)$$('[data-ne-tab="performance"],[data-ne-tab="leave"]',management).forEach(el=>el.hidden=true);
+      const timeBtn=$('#team [data-open="timeOffModal"]');if(timeBtn)timeBtn.hidden=true;
+      return;
+    }
+    const management=$("#team .ne-stage8-grid");
+    if(management)$$('[data-ne-tab="performance"],[data-ne-tab="leave"]',management).forEach(el=>el.hidden=false);
     $("#teamList").innerHTML=d.metrics.map(p=>'<article><span class="avatar">'+initials(p.name)+'</span><h3>'+esc(p.name)+'</h3><p>'+esc(p.role||"Profissional")+'</p><div class="tags">'+(p.specialties||[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join("")+'</div><div class="staffQuick"><strong>'+moneyBR(p.revenue)+'</strong><small>'+p.appointments+' atendimentos · comissão '+moneyBR(p.commission_total)+'</small></div>'+(can?'<button type="button" class="secondary smallBtn" data-staff-manage="'+p.id+'">Escala & meta</button>':'')+'</article>').join("");
     $("#staffPerformanceList").innerHTML=d.metrics.map(p=>{
       const g=p.goal||{},revTarget=Number(g.target_revenue||0),apTarget=Number(g.target_appointments||0);

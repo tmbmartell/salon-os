@@ -2,15 +2,16 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#fbf8f5"><title>Salon OS — Nova Gente</title>
+<meta name="theme-color" content="#fbf8f5"><title>NOVAGENTE Estética | Gestão Integrada</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/beauty-ui.css?v=13">
 </head>
 <body>
 <div id="authGate" class="authGate">
   <div class="authCard">
-    <div class="authBrand"><div class="logo">NG</div><div><strong>Salon OS</strong><small>Nova Gente</small></div></div>
+    <div class="authBrand"><div class="logo">NG</div><div><strong>NOVAGENTE Estética</strong><small>Sistema integrado</small></div></div>
     <div id="setupPanel" class="authPanel hidden">
       <p class="eyebrow">PRIMEIRO ACESSO</p><h2>Proteja o salão</h2><p>Crie a conta proprietária. Esta etapa fecha automaticamente depois de concluída.</p>
       <form id="setupForm">
@@ -21,12 +22,21 @@
       </form>
     </div>
     <div id="loginPanel" class="authPanel hidden">
-      <p class="eyebrow">ACESSO SEGURO</p><h2>Entrar no Salon OS</h2><p id="loginTenant">Entre com a conta do salão.</p>
+      <p class="eyebrow">ACESSO SEGURO</p><h2>Entrar na NOVAGENTE Estética</h2><p id="loginTenant">Entre com a conta do salão.</p>
       <form id="loginForm">
         <label>E-mail<input name="email" type="email" autocomplete="username" required></label>
         <label id="workspaceLoginField" class="hidden">Empresa<input name="workspace" placeholder="ex.: studio-aurora" autocomplete="organization"></label>
         <label>Senha<input name="password" type="password" autocomplete="current-password" required></label>
         <button class="primary wide">Entrar</button>
+      </form>
+    </div>
+    <div id="mfaPanel" class="authPanel hidden">
+      <p class="eyebrow">SEGURANÇA DA CONTA</p><h2>Verificação em duas etapas</h2>
+      <p>Informe o código de seis dígitos do seu aplicativo autenticador ou um código de recuperação.</p>
+      <form id="mfaLoginForm">
+        <label>Código de autenticação ou recuperação<input name="code" autocomplete="one-time-code" inputmode="text" autocapitalize="characters" required></label>
+        <button class="primary wide" type="submit">Confirmar acesso</button>
+        <button type="button" class="secondary wide" id="mfaCancelLogin">Voltar ao login</button>
       </form>
     </div>
     <div id="resetPanel" class="authPanel hidden">
@@ -43,7 +53,7 @@
 
 <div class="shell">
   <aside class="sidebar">
-    <div class="brand"><div class="logo">NG</div><div><strong>Salon OS</strong><small>Nova Gente</small></div></div>
+    <div class="brand"><div class="logo">NG</div><div><strong>NOVAGENTE Estética</strong><small>Sistema integrado</small></div></div>
     <nav>
       <button data-view="dashboard" class="active">⌂ <span>Visão geral</span></button>
       <button data-view="inbox">✉ <span>Atendimento</span></button>
@@ -76,7 +86,7 @@
 
   <main>
     <header class="topbar">
-      <div><p class="eyebrow">SALON OS · FASES 1–4</p><h1 id="pageTitle">Visão geral</h1><p id="pageSub">O que precisa da sua atenção hoje.</p></div>
+      <div><p class="eyebrow">NOVAGENTE ESTÉTICA · GESTÃO INTEGRADA</p><h1 id="pageTitle">Visão geral</h1><p id="pageSub">O que precisa da sua atenção hoje.</p></div>
       <button class="primary" id="quickAppointment">+ Agendamento</button>
     </header>
 
@@ -107,8 +117,24 @@
     <section id="inbox" class="view messengerView">
       <div class="sectionTitle">
         <div><h2>Central de Mensagens</h2><p>WhatsApp conectado pelo WAHA, organizado como uma mensageria de atendimento.</p></div>
-        <div class="sectionActions"><span id="whatsappBadge" class="chip">verificando</span><button id="syncWhatsappHistory" class="secondary">Sincronizar histórico</button><button id="refreshInbox" class="secondary">Atualizar</button></div>
+        <div class="sectionActions"><span id="whatsappBadge" class="chip">verificando</span><button id="syncWhatsappHistory" class="secondary">Importar histórico</button><button id="refreshInbox" class="secondary">Atualizar</button></div>
       </div>
+      <details id="whatsappBackfillDetails" class="ne-backfill">
+        <summary><span>Importação controlada de conversas antigas</span><small>Abra para acompanhar o progresso</small></summary>
+        <div class="ne-backfill-content">
+          <p class="ne-backfill-note">Importação manual por etapas, sem enviar mensagens. O fim das páginas disponíveis no WAHA não garante que todo o histórico foi recuperado.</p>
+          <div class="ne-backfill-controls">
+            <label>Importar a partir de <input id="neBackfillDate" type="date" value="2026-04-01"></label>
+            <button id="neBackfillStart" type="button" class="secondary">Iniciar importação</button>
+            <button id="neBackfillStep" type="button" class="primary">Processar até 10 páginas</button>
+            <button id="neBackfillPause" type="button" class="secondary">Pausar</button>
+            <button id="neBackfillResume" type="button" class="secondary">Retomar</button>
+            <button id="neBackfillCancel" type="button" class="secondary">Encerrar importação</button>
+          </div>
+          <div id="neBackfillStatus" role="status" aria-live="polite">Consulte o estado da importação para começar.</div>
+          <p class="ne-backfill-note">Apenas proprietária e gerência. Os resultados são registrados no salão conectado; arquivos e mídias não são baixados.</p>
+        </div>
+      </details>
       <div class="messengerToolbar">
         <input id="conversationSearch" type="search" placeholder="Buscar cliente, telefone ou mensagem…">
         <select id="conversationStatusFilter"><option value="">Todos os status</option><option value="open">Aberta</option><option value="pending">Pendente</option><option value="resolved">Resolvida</option></select>
@@ -125,7 +151,7 @@
           <div id="chatActive" class="hidden">
             <div class="chatHead">
               <div><strong id="chatClient">Cliente</strong><small id="chatPhone"></small></div>
-              <div class="chatHeadActions"><button id="chatModeButton" class="secondary" type="button">Humano</button><button id="openClientFromChat" class="link">Ver cliente</button></div>
+              <div class="chatHeadActions"><button id="chatModeButton" class="secondary" type="button">Humano</button><button id="openClientFromChat" class="link">Ver cliente</button><button id="scheduleFromChat" class="secondary" type="button">Agendar</button></div>
             </div>
             <div id="messageList" class="messageList"></div>
             <form id="messageForm" class="messageComposer"><textarea id="messageText" placeholder="Escreva uma mensagem…"></textarea><button class="primary">Enviar</button></form>
@@ -146,22 +172,43 @@
             <button id="saveConversationMeta" class="primary wide">Salvar classificação</button>
             <div class="detailInfo">
               <strong>Cliente</strong>
-              <p id="detailClientInfo" class="muted"></p>
+              <p id="detailClientInfo" class="muted"></p><div id="neClientContext" class="ne-client-context" aria-live="polite"></div>
             </div>
           </div>
         </aside>
       </div>
-      <article class="panel waSetup">
-        <div><h2>Conexão WhatsApp</h2><p id="waSetupText">Verificando o provedor WAHA local…</p></div>
-        <div class="waActions"><button id="prepareWaha" class="secondary">Preparar sessão</button><button id="showQr" class="primary">Mostrar QR</button></div>
-        <img id="waQrImage" class="qrImage hidden" alt="QR Code do WhatsApp">
+      <article class="panel ne-wa-connection">
+        <div class="panelhead"><div><h2>Conexão WhatsApp</h2><p id="waSetupText">Verificando o provedor WAHA local…</p></div><span id="neWhatsAppConnectionStatus" class="chip" role="status">Verificando</span></div>
+        <p class="ne-wa-help">A conexão é exclusiva deste salão. A IA permanece desativada nesta etapa.</p>
+        <form id="neWhatsappSessionForm" class="ne-wa-session-form hidden">
+          <label>Identificador exclusivo da conexão<input id="neWhatsappSessionName" name="session" pattern="[A-Za-z0-9_-]{3,60}" minlength="3" maxlength="60" placeholder="ex.: novagente-estetica-01" required autocomplete="off"></label>
+          <button class="secondary" type="submit">Salvar identificação</button>
+        </form>
+        <div class="waActions"><button id="prepareWaha" class="secondary" type="button">Preparar conexão</button><button id="showQr" class="primary" type="button">Mostrar QR Code</button><button id="neWhatsappRefresh" class="secondary" type="button">Verificar conexão</button></div>
+        <p id="neWhatsappMessage" role="status" class="ne-wa-message">Vincule e prepare a sessão antes de escanear o QR Code.</p>
+        <img id="waQrImage" class="qrImage hidden" alt="QR Code para vincular o WhatsApp do salão">
       </article>
     </section>
 
     <section id="agenda" class="view">
       <div class="sectionTitle"><div><h2>Agenda</h2><p>Cliente, profissional, serviço e recurso sem conflito.</p></div><button class="primary" data-open="appointmentModal">+ Novo</button></div>
-      <article class="panel"><div id="agendaList" class="agenda"></div></article>
-      <article class="panel"><div class="panelhead"><div><h2>Lista de espera</h2><p>Clientes aguardando um encaixe ou horário melhor.</p></div><button class="secondary" data-open="waitlistModal">+ Adicionar</button></div><div id="waitlistList" class="stack"></div></article>
+      <div class="ne-work-toolbar" aria-label="Acesso rápido à agenda">
+        <button type="button" class="ne-action-card" data-open="appointmentModal"><span class="ne-action-icon">＋</span><strong>Agendar</strong><small>Novo horário</small></button>
+        <button type="button" class="ne-action-card" data-ne-agenda-filter="today"><span class="ne-action-icon">◷</span><strong>Hoje</strong><small>Atendimentos do dia</small></button>
+        <button type="button" class="ne-action-card" data-ne-agenda-filter="upcoming"><span class="ne-action-icon">▦</span><strong>Próximos</strong><small>Horários futuros</small></button>
+        <button type="button" class="ne-action-card" data-ne-show-waitlist><span class="ne-action-icon">↻</span><strong>Encaixes</strong><small>Lista de espera</small></button>
+      </div>
+      <div class="ne-agenda-tools">
+        <div class="ne-filter-group" role="group" aria-label="Filtrar situação da agenda">
+          <button type="button" class="active" data-ne-agenda-filter="today" aria-pressed="true">Hoje</button>
+          <button type="button" data-ne-agenda-filter="upcoming">Próximos</button>
+          <button type="button" data-ne-agenda-filter="closed">Encerrados</button>
+          <button type="button" data-ne-agenda-filter="all">Todos</button>
+        </div>
+        <label>Profissional <select id="neAgendaProfessional"><option value="">Todos</option></select></label>
+      </div>
+      <article class="panel ne-agenda-panel"><div class="panelhead"><div><h2>Atendimentos</h2><p id="neAgendaCount">Carregando agenda…</p></div></div><div id="agendaList" class="agenda"></div></article>
+      <article class="panel ne-waitlist-panel"><div class="panelhead"><div><h2>Lista de espera</h2><p>Clientes aguardando um encaixe ou horário melhor.</p></div><button class="secondary" data-open="waitlistModal">+ Adicionar</button></div><div id="waitlistList" class="stack"></div></article>
     </section>
 
     <section id="clients" class="view">
@@ -195,28 +242,42 @@
     </section>
 
     <section id="marketing" class="view">
-      <div class="sectionTitle"><div><h2>Marketing & Relacionamento</h2><p>Base de clientes, canais, campanhas e oportunidades de retorno.</p></div></div>
-      <div class="hubGrid">
-        <button class="hubCard" data-jump="clients"><span>♡</span><strong>Base de clientes</strong><small>Dados, Instagram, Facebook, aniversário, origem e referência.</small></button>
-        <button class="hubCard" data-jump="retention"><span>↻</span><strong>Relacionamento</strong><small>Aniversários, pós-atendimento, indicação e recuperação.</small></button>
-        <button class="hubCard" data-jump="inbox"><span>✉</span><strong>Mensageria WhatsApp</strong><small>Conversas, etiquetas, prioridade e atendimento por WAHA.</small></button>
-        <button class="hubCard" data-jump="reports"><span>▤</span><strong>Relatórios</strong><small>Meça retorno, frequência e valor movimentado.</small></button>
+      <div class="sectionTitle"><div><h2>Marketing e Relacionamento</h2><p>Campanhas, imagens, comunicados e retornos — tudo organizado em cards.</p></div></div>
+      <div class="ne-marketing-cards" role="group" aria-label="Áreas de marketing">
+        <button type="button" class="ne-marketing-card is-active" data-marketing-tab="campaigns" aria-pressed="true"><span aria-hidden="true">▧</span><strong>Campanhas</strong><small>Ofertas e novidades</small></button>
+        <button type="button" class="ne-marketing-card" data-marketing-tab="media" aria-pressed="false"><span aria-hidden="true">▣</span><strong>Biblioteca de mídias</strong><small>JPG, WebP, PNG e GIF</small></button>
+        <button type="button" class="ne-marketing-card" data-marketing-tab="followups" aria-pressed="false"><span aria-hidden="true">↻</span><strong>Pós-atendimento</strong><small>Regras e prazos por serviço</small></button>
+        <button type="button" class="ne-marketing-card" data-marketing-tab="communications" aria-pressed="false"><span aria-hidden="true">✉</span><strong>Comunicados</strong><small>Horários e informações</small></button>
       </div>
-      <article class="panel marketingActions">
-        <div class="panelhead"><div><h2>Ações rápidas</h2><p>Atalhos úteis para trabalhar campanhas e relacionamento.</p></div></div>
-        <div class="sectionActions">
-          <button id="marketingExportClients" class="secondary">Baixar base de clientes</button>
-          <button class="secondary" data-jump="retention">Ver aniversários e retornos</button>
-          <button class="primary" data-jump="inbox">Abrir WhatsApp</button>
-        </div>
-      </article>
+      <p class="ne-marketing-safe-note">Nenhuma campanha será enviada automaticamente. Mídias e mensagens permanecem privadas até serem utilizadas por uma pessoa autorizada.</p>
+      <section data-marketing-panel="campaigns">
+        <div class="ne-marketing-title"><h3>Campanhas do salão</h3><button type="button" class="primary" id="neNewCampaign">+ Nova campanha</button></div>
+        <div id="neCampaignList" class="ne-marketing-list"><p class="muted">Abra esta área para carregar as campanhas.</p></div>
+      </section>
+      <section data-marketing-panel="media" class="hidden">
+        <div class="ne-marketing-title"><h3>Biblioteca de mídias</h3><button type="button" class="primary" id="neNewMedia">+ Adicionar imagem</button></div>
+        <p class="ne-marketing-hint">Imagens privadas, até 3 MB. GIFs animados são preservados. Não há conversão automática nesta etapa.</p>
+        <div id="neMediaList" class="ne-marketing-list"></div>
+      </section>
+      <section data-marketing-panel="followups" class="hidden">
+        <div class="ne-marketing-title"><h3>Acompanhamento pós-serviço</h3><button type="button" class="primary" id="neNewFollowup">+ Nova regra</button></div>
+        <p class="ne-marketing-hint">A regra gera somente uma tarefa interna de relacionamento, com prazo e mensagem sugerida. A recepção decide quando entrar em contato.</p>
+        <div id="neFollowupList" class="ne-marketing-list"></div>
+        <button class="secondary" type="button" data-jump="retention">Abrir tarefas de relacionamento</button>
+      </section>
+      <section data-marketing-panel="communications" class="hidden">
+        <div class="ne-marketing-title"><h3>Comunicados e informações</h3><button type="button" class="primary" id="neNewAnnouncement">+ Novo comunicado</button></div>
+        <p class="ne-marketing-hint">Cadastre horários, feriados e avisos como comunicados. Eles não serão enviados sem uma ação posterior.</p>
+        <div id="neAnnouncementList" class="ne-marketing-list"></div>
+      </section>
     </section>
 
     <section id="technical" class="view">
       <div class="sectionTitle"><div><h2>Ficha Técnica da Cliente</h2><p>Fórmulas, observações e histórico do procedimento.</p></div><button class="primary" data-open="technicalRecordModal">+ Registro técnico</button></div>
-      <article class="panel">
+      <article class="panel ne-technical-filter">
         <div class="technicalFilter"><label>Cliente<select id="technicalClient"></select></label><div id="technicalClientMeta" class="muted">Selecione uma cliente.</div></div>
       </article>
+      <p class="ne-hint">As fórmulas e as observações ficam recolhidas até você abrir a ficha correspondente.</p>
       <div id="technicalRecordList" class="cards"></div>
     </section>
 
@@ -235,6 +296,7 @@
 
     <section id="services" class="view">
       <div class="sectionTitle"><div><h2>Serviços</h2><p>Preço, duração e comissão estruturados.</p></div><button class="primary" data-open="serviceModal">+ Serviço</button></div>
+      <div class="ne-service-tools"><div id="neServiceFilters" class="ne-filter-group" role="group" aria-label="Categorias de serviços"></div><span id="neServiceCount" class="ne-hint"></span></div>
       <div id="serviceList" class="cards cols3"></div>
     </section>
 
@@ -258,78 +320,83 @@
     </section>
 
     <section id="finance" class="view">
-      <div class="sectionTitle"><div><h2>Financeiro & Caixa</h2><p>Receitas, despesas, caixa e comissões em uma mesma leitura.</p></div><button class="primary" data-open="financeEntryModal">+ Lançamento</button></div>
-      <div class="metrics">
-        <article><span>Entradas hoje</span><strong id="fIncome">—</strong><small>recebido</small></article>
-        <article><span>Saídas hoje</span><strong id="fExpense">—</strong><small>pago</small></article>
-        <article><span>Resultado hoje</span><strong id="fNet">—</strong><small>entradas - saídas</small></article>
-        <article><span>Comissões pendentes</span><strong id="fCommission">—</strong><small id="fCommissionCount">0 lançamentos</small></article>
-        <article><span>Contas a pagar</span><strong id="fPayable">—</strong><small id="fPayableCount">0 pendências</small></article>
+      <div class="sectionTitle"><div><h2>Caixa e Financeiro</h2><p>Receba, confira e acompanhe em poucos cliques.</p></div><button class="secondary" data-open="financeEntryModal">+ Lançamento</button></div>
+      <div class="ne-finance-actions" role="group" aria-label="Ações financeiras">
+        <button type="button" class="ne-finance-action" data-ne-finance-action="income"><span aria-hidden="true">＋</span><strong>Registrar recebimento</strong><small>Entrada manual</small></button>
+        <button type="button" class="ne-finance-action" data-ne-finance-action="expense"><span aria-hidden="true">−</span><strong>Registrar despesa</strong><small>Saída e contas</small></button>
+        <button type="button" class="ne-finance-action is-active" data-ne-finance-tab="cash" aria-pressed="true"><span aria-hidden="true">▣</span><strong>Caixa do dia</strong><small>Abrir, conferir e fechar</small></button>
+        <button type="button" class="ne-finance-action" data-ne-finance-tab="entries" aria-pressed="false"><span aria-hidden="true">⇄</span><strong>Movimentações</strong><small>Pagas e pendentes</small></button>
+        <button type="button" class="ne-finance-action" data-ne-finance-tab="commissions" aria-pressed="false"><span aria-hidden="true">♙</span><strong>Comissões</strong><small>Equipe e pagamentos</small></button>
+        <button type="button" class="ne-finance-action" data-ne-finance-tab="results" aria-pressed="false"><span aria-hidden="true">▥</span><strong>Resultados</strong><small>DRE e custos</small></button>
       </div>
-      <div class="grid2">
+      <div class="metrics ne-finance-top-metrics">
+        <article><span>Entradas hoje</span><strong id="fIncome">—</strong><small>recebidas</small></article>
+        <article><span>Saídas hoje</span><strong id="fExpense">—</strong><small>pagas</small></article>
+        <article><span>Resultado hoje</span><strong id="fNet">—</strong><small>entradas − saídas</small></article>
+      </div>
+      <section data-ne-finance-panel="cash">
         <article class="panel">
-          <div class="panelhead"><div><h2>Caixa</h2><p id="cashStatusText">Verificando caixa…</p></div><span id="cashBadge" class="chip">—</span></div>
+          <div class="panelhead"><div><h2>Caixa do dia</h2><p id="cashStatusText">Verificando caixa…</p></div><span id="cashBadge" class="chip">—</span></div>
           <div id="cashBody" class="cashBody"></div>
+          <div id="neCashMethods" class="ne-cash-methods"></div>
+          <div class="ne-cash-actions"><button type="button" class="secondary" id="neCashWithdraw" data-open="cashWithdrawModal">Registrar retirada</button><button type="button" class="secondary" id="neCashHistoryToggle">Histórico de fechamentos</button></div>
+          <div id="neCashHistory" class="ne-cash-history hidden"></div>
         </article>
+      </section>
+      <section data-ne-finance-panel="entries" class="hidden">
+        <div class="metrics ne-finance-pendings">
+          <article><span>Contas a pagar</span><strong id="fPayable">—</strong><small id="fPayableCount">0 pendências</small></article>
+        </div>
         <article class="panel">
-          <div class="panelhead"><div><h2>Custo e margem dos serviços</h2><p>Produto + comissão, antes dos custos fixos.</p></div></div>
-          <div id="serviceCostList" class="stack"></div>
+          <div class="panelhead"><div><h2>Movimentações</h2><p>Abra esta área para conferir lançamentos e dar baixa em pagamentos.</p></div></div>
+          <div id="financeList" class="tableLike"></div>
         </article>
-      </div>
-      <article class="panel">
-        <div class="panelhead"><div><h2>Movimentações</h2><p>Receitas, despesas e compromissos.</p></div></div>
-        <div id="financeList" class="tableLike"></div>
-      </article>
-      <div class="grid2">
+      </section>
+      <section data-ne-finance-panel="commissions" class="hidden">
+        <div class="metrics ne-finance-pendings"><article><span>Comissões pendentes</span><strong id="fCommission">—</strong><small id="fCommissionCount">0 lançamentos</small></article></div>
         <article class="panel">
-          <div class="panelhead"><div><h2>Comissões</h2><p>Geradas automaticamente no fechamento do atendimento.</p></div><button id="payPendingCommissions" class="secondary">Pagar pendentes</button></div>
+          <div class="panelhead"><div><h2>Comissões da equipe</h2><p>Geradas pelos atendimentos. Confirme antes de pagar.</p></div><button id="payPendingCommissions" class="secondary">Pagar pendentes</button></div>
           <div id="commissionList" class="tableLike"></div>
         </article>
-        <article class="panel">
-          <div class="panelhead"><div><h2>DRE gerencial</h2><p>Visão simples de entradas, saídas e resultado do mês.</p></div><input id="dreMonth" type="month"></div>
-          <div id="dreBody" class="dreBody"></div>
-        </article>
-      </div>
+      </section>
+      <section data-ne-finance-panel="results" class="hidden">
+        <article class="panel"><div class="panelhead"><div><h2>Custos e margem dos serviços</h2><p>Produto e comissão, antes dos custos fixos.</p></div></div><div id="serviceCostList" class="stack"></div></article>
+        <article class="panel"><div class="panelhead"><div><h2>DRE gerencial</h2><p>Entradas, saídas e resultado por mês.</p></div><input id="dreMonth" type="month"></div><div id="dreBody" class="dreBody"></div></article>
+      </section>
     </section>
 
     <section id="inventory" class="view">
-      <div class="sectionTitle"><div><h2>Estoque & Consumo</h2><p>Quantidade real, mínimo, custo médio e consumo por serviço.</p></div><button class="primary" data-open="productModal">+ Produto</button></div>
-      <div class="metrics inventoryMetrics">
-        <article><span>Produtos</span><strong id="iProducts">—</strong><small>ativos</small></article>
-        <article><span>Estoque baixo</span><strong id="iLow">—</strong><small>pedem atenção</small></article>
-        <article><span>Consumo automático</span><strong>ON</strong><small>no fechamento</small></article>
-        <article><span>Receitas de serviço</span><strong id="iRecipes">—</strong><small>serviços configurados</small></article>
+      <div class="sectionTitle"><div><h2>Estoque Inteligente</h2><p>Consulta rápida. Abra apenas a área que precisa.</p></div><button class="primary" data-open="productModal">+ Produto</button></div>
+      <div class="ne-stock-action-grid" role="group" aria-label="Áreas do estoque">
+        <button type="button" class="ne-stock-action is-active" data-ne-stock-tab="products" aria-pressed="true"><span aria-hidden="true">▦</span><strong>Produtos</strong><small>Saldos e ajustes</small></button>
+        <button type="button" class="ne-stock-action" data-ne-stock-tab="recipes" aria-pressed="false"><span aria-hidden="true">◈</span><strong>Consumo por serviço</strong><small>Receitas e quantidades</small></button>
+        <button type="button" class="ne-stock-action" data-ne-stock-tab="movements" aria-pressed="false"><span aria-hidden="true">⇄</span><strong>Movimentações</strong><small>Entradas e saídas</small></button>
+        <button type="button" class="ne-stock-action" data-ne-stock-tab="lots" aria-pressed="false"><span aria-hidden="true">▤</span><strong>Lotes</strong><small>Validade e rastreio</small></button>
       </div>
-      <div id="productList" class="cards cols3"></div>
-      <article class="panel">
-        <div class="panelhead"><div><h2>Consumo padrão por serviço</h2><p>Defina quanto cada serviço deveria consumir.</p></div></div>
-        <div id="recipeServiceList" class="cards"></div>
-      </article>
-      <article class="panel">
-        <div class="panelhead"><div><h2>Extrato de estoque</h2><p>Compras, consumo em atendimento e ajustes manuais.</p></div></div>
-        <div id="stockMovementList" class="tableLike"></div>
-      </article>
-      <article class="panel">
-        <div class="panelhead"><div><h2>Lotes & validade</h2><p>O consumo prioriza automaticamente o lote que vence primeiro.</p></div></div>
-        <div id="lotList" class="tableLike"></div>
-      </article>
+      <div class="metrics inventoryMetrics">
+        <article><span>Produtos</span><strong id="iProducts">—</strong><small>cadastrados</small></article>
+        <article><span>Estoque baixo</span><strong id="iLow">—</strong><small>pedem reposição</small></article>
+        <article><span>Consumo na finalização</span><strong>✓</strong><small>conforme receita cadastrada</small></article>
+        <article><span>Serviços com receita</span><strong id="iRecipes">—</strong><small>com consumo previsto</small></article>
+      </div>
+      <section data-ne-stock-panel="products"><div class="ne-stock-section-title"><h3>Produtos e quantidades</h3><p>Abra um produto para consultar custo, unidade e registrar ajuste.</p></div><div id="productList" class="cards cols3"></div></section>
+      <section data-ne-stock-panel="recipes" class="hidden"><div class="ne-stock-section-title"><h3>Consumo padrão por serviço</h3><p>Configure quantidades em g, ml ou unidade. A quantidade real será confirmada no atendimento.</p></div><div id="recipeServiceList" class="cards"></div></section>
+      <section data-ne-stock-panel="movements" class="hidden"><article class="panel"><div class="panelhead"><div><h2>Extrato de estoque</h2><p>Compras, consumo e ajustes.</p></div></div><div id="stockMovementList" class="tableLike"></div></article></section>
+      <section data-ne-stock-panel="lots" class="hidden"><article class="panel"><div class="panelhead"><div><h2>Lotes e validade</h2><p>O controle usa primeiro os lotes com vencimento mais próximo, quando disponíveis.</p></div></div><div id="lotList" class="tableLike"></div></article></section>
     </section>
 
     <section id="suppliers" class="view">
-      <div class="sectionTitle"><div><h2>Fornecedores & Compras</h2><p>Contato, reposição, pedidos e recebimento de mercadoria.</p></div><div class="sectionActions"><button class="secondary" data-open="supplierModal">+ Fornecedor</button><button class="primary" data-open="purchaseModal">+ Pedido</button></div></div>
-      <div id="supplierList" class="cards cols3"></div>
-      <article class="panel">
-        <div class="panelhead"><div><h2>Reposição sugerida</h2><p>Produtos abaixo do mínimo e quantidade para voltar ao estoque ideal.</p></div></div>
-        <div id="purchaseSuggestionList" class="tableLike"></div>
-      </article>
-      <article class="panel">
-        <div class="panelhead"><div><h2>Pedidos de compra</h2><p>Do pedido até a entrada automática no estoque.</p></div></div>
-        <div id="purchaseList" class="tableLike"></div>
-      </article>
-      <article class="panel">
-        <div class="panelhead"><div><h2>Histórico de preços</h2><p>Quanto cada fornecedor cobrou pelo mesmo produto ao longo do tempo.</p></div></div>
-        <div id="supplierPriceList" class="tableLike"></div>
-      </article>
+      <div class="sectionTitle"><div><h2>Fornecedores e Compras</h2><p>Cadastre, reponha e acompanhe por cards.</p></div><div class="sectionActions"><button class="secondary" data-open="supplierModal">+ Fornecedor</button><button class="primary" data-open="purchaseModal">+ Pedido</button></div></div>
+      <div class="ne-stock-action-grid ne-buy-actions" role="group" aria-label="Áreas de compras">
+        <button type="button" class="ne-stock-action is-active" data-ne-purchase-tab="suppliers" aria-pressed="true"><span aria-hidden="true">♧</span><strong>Fornecedores</strong><small>Contatos e condições</small></button>
+        <button type="button" class="ne-stock-action" data-ne-purchase-tab="suggestions" aria-pressed="false"><span aria-hidden="true">!</span><strong>Reposição</strong><small>Estoque abaixo do mínimo</small></button>
+        <button type="button" class="ne-stock-action" data-ne-purchase-tab="orders" aria-pressed="false"><span aria-hidden="true">▣</span><strong>Pedidos</strong><small>Compras e recebimentos</small></button>
+        <button type="button" class="ne-stock-action" data-ne-purchase-tab="prices" aria-pressed="false"><span aria-hidden="true">↗</span><strong>Histórico de preços</strong><small>Comparar fornecedores</small></button>
+      </div>
+      <section data-ne-purchase-panel="suppliers"><div id="supplierList" class="cards cols3"></div></section>
+      <section data-ne-purchase-panel="suggestions" class="hidden"><article class="panel"><div class="panelhead"><div><h2>Reposição sugerida</h2><p>Quantidade necessária para recuperar o estoque ideal.</p></div></div><div id="purchaseSuggestionList" class="tableLike"></div></article></section>
+      <section data-ne-purchase-panel="orders" class="hidden"><article class="panel"><div class="panelhead"><div><h2>Pedidos de compra</h2><p>Pedido criado, recebido e incorporado ao estoque.</p></div></div><div id="purchaseList" class="tableLike"></div></article></section>
+      <section data-ne-purchase-panel="prices" class="hidden"><article class="panel"><div class="panelhead"><div><h2>Histórico de preços</h2><p>Comparação dos valores praticados por fornecedor.</p></div></div><div id="supplierPriceList" class="tableLike"></div></article></section>
     </section>
 
     <section id="packages" class="view">
@@ -360,22 +427,72 @@
     </section>
 
     <section id="ownerEye" class="view">
-      <div class="sectionTitle"><div><h2>Olho do Dono</h2><p>Clientes, receita, margem, equipe e riscos traduzidos em decisão.</p></div><button id="refreshIntelligence" class="secondary">Atualizar leitura</button></div>
-      <div class="metrics">
-        <article><span>Receita 30 dias</span><strong id="oiRevenue">—</strong><small>realizado</small></article>
-        <article><span>Ticket médio</span><strong id="oiTicket">—</strong><small>por atendimento</small></article>
-        <article><span>Recorrência</span><strong id="oiRepeat">—</strong><small>clientes que voltaram</small></article>
-        <article><span>Recuperável</span><strong id="oiRecovery">—</strong><small>clientes atrasados</small></article>
+      <div class="sectionTitle"><div><h2>Olho do Dono</h2><p>O que está acontecendo, o que precisa de atenção e onde agir — sem excesso de números.</p></div><button id="refreshIntelligence" class="secondary" type="button">Atualizar</button></div>
+      <div id="neOwnerStatus" class="ne-owner-status" role="status">Carregando indicadores do salão...</div>
+      <div class="ne-owner-kpis">
+        <button type="button" class="ne-owner-kpi" data-owner-tab="finance" aria-label="Consultar entradas e saídas">
+          <span class="ne-owner-kpi-icon" aria-hidden="true">↗</span><small>Entradas recebidas · 30 dias</small><strong id="oiRevenue">—</strong><span id="neOwnerRevenueChange">comparação anterior</span>
+        </button>
+        <button type="button" class="ne-owner-kpi" data-owner-tab="services" aria-label="Consultar serviços concluídos">
+          <span class="ne-owner-kpi-icon" aria-hidden="true">▦</span><small>Atendimentos com checkout · 30 dias</small><strong id="neOwnerVisits">—</strong><span id="oiTicket">ticket médio —</span>
+        </button>
+        <button type="button" class="ne-owner-kpi" data-owner-tab="clients" aria-label="Consultar clientes recorrentes">
+          <span class="ne-owner-kpi-icon" aria-hidden="true">♡</span><small>Clientes que já voltaram</small><strong id="oiRepeat">—</strong><span id="neOwnerRepeatCount">histórico de checkouts</span>
+        </button>
+        <button type="button" class="ne-owner-kpi" data-owner-tab="attention" aria-label="Consultar alertas do negócio">
+          <span class="ne-owner-kpi-icon" aria-hidden="true">!</span><small>Pontos de atenção</small><strong id="neOwnerAlertsCount">—</strong><span id="neOwnerStockBrief">estoque, contas e relacionamento</span>
+        </button>
       </div>
-      <div class="grid2">
-        <article class="panel"><div class="panelhead"><div><h2>Alertas de gestão</h2><p>O que merece atenção agora.</p></div></div><div id="intelligenceAlerts" class="stack"></div></article>
-        <article class="panel"><div class="panelhead"><div><h2>Clientes para recuperar</h2><p>Quem deveria ter voltado e ainda não voltou.</p></div></div><div id="recoveryList" class="stack"></div></article>
+      <div class="ne-owner-menu" role="group" aria-label="Abrir detalhes dos indicadores">
+        <button type="button" class="ne-owner-menu-item is-active" data-owner-tab="attention" aria-pressed="true"><span aria-hidden="true">!</span> Atenção</button>
+        <button type="button" class="ne-owner-menu-item" data-owner-tab="finance" aria-pressed="false"><span aria-hidden="true">▥</span> Dinheiro</button>
+        <button type="button" class="ne-owner-menu-item" data-owner-tab="services" aria-pressed="false"><span aria-hidden="true">✦</span> Serviços</button>
+        <button type="button" class="ne-owner-menu-item" data-owner-tab="team" aria-pressed="false"><span aria-hidden="true">♙</span> Equipe</button>
+        <button type="button" class="ne-owner-menu-item" data-owner-tab="clients" aria-pressed="false"><span aria-hidden="true">♡</span> Clientes</button>
       </div>
-      <div class="grid2">
-        <article class="panel"><div class="panelhead"><div><h2>Equipe</h2><p>Receita, ticket e produtividade por profissional.</p></div></div><div id="performanceList" class="tableLike"></div></article>
-        <article class="panel"><div class="panelhead"><div><h2>Serviços</h2><p>Receita e margem direta.</p></div></div><div id="serviceIntelList" class="tableLike"></div></article>
-      </div>
-      <article class="panel"><div class="panelhead"><div><h2>Previsão de estoque</h2><p>Dias de cobertura e momento provável de reposição.</p></div></div><div id="stockForecastList" class="tableLike"></div></article>
+      <section data-owner-panel="attention">
+        <div class="ne-owner-panel-title"><div><h3>O que merece sua atenção</h3><p>Alertas operacionais com um caminho direto para agir.</p></div></div>
+        <div id="intelligenceAlerts" class="ne-owner-alerts"></div>
+        <div class="ne-owner-quick-actions">
+          <button type="button" class="secondary" data-jump="agenda">Abrir agenda</button>
+          <button type="button" class="secondary" data-jump="inventory">Ver estoque</button>
+          <button type="button" class="secondary" data-jump="finance">Ver financeiro</button>
+        </div>
+      </section>
+      <section data-owner-panel="finance" class="hidden">
+        <div class="ne-owner-panel-title"><div><h3>Dinheiro recebido e pago</h3><p>Últimos 30 dias, pela data do pagamento. A diferença não equivale ao lucro contábil.</p></div></div>
+        <div class="ne-owner-small-metrics">
+          <div><small>Recebido</small><strong id="neOwnerIncome">—</strong></div>
+          <div><small>Pago em despesas</small><strong id="neOwnerExpenses">—</strong></div>
+          <div><small>Saldo das movimentações</small><strong id="neOwnerNet">—</strong></div>
+        </div>
+        <div class="ne-owner-panel-title"><div><h3>Últimos 14 dias</h3><p>Entradas recebidas por dia, conforme os lançamentos financeiros.</p></div></div>
+        <div id="neOwnerChart" class="ne-owner-chart" role="img" aria-label="Entradas financeiras dos últimos 14 dias"></div>
+        <button type="button" class="secondary" data-jump="finance">Abrir Caixa e Financeiro</button>
+      </section>
+      <section data-owner-panel="services" class="hidden">
+        <div class="ne-owner-panel-title"><div><h3>Serviços mais realizados</h3><p>Atendimentos com checkout nos últimos 30 dias, pelo serviço principal agendado.</p></div></div>
+        <div id="serviceIntelList" class="ne-owner-list"></div>
+        <button type="button" class="secondary" data-jump="services">Abrir catálogo de serviços</button>
+      </section>
+      <section data-owner-panel="team" class="hidden">
+        <div class="ne-owner-panel-title"><div><h3>Produção por profissional</h3><p>Quantidade de atendimentos e valores nominais dos checkouts; não é folha de pagamento.</p></div></div>
+        <div id="performanceList" class="ne-owner-list"></div>
+        <button type="button" class="secondary" data-jump="team">Abrir equipe</button>
+      </section>
+      <section data-owner-panel="clients" class="hidden">
+        <div class="ne-owner-panel-title"><div><h3>Clientes e relacionamento</h3><p>Recorrência histórica: clientes com duas ou mais compras concluídas.</p></div></div>
+        <div class="ne-owner-small-metrics">
+          <div><small>Clientes que já voltaram</small><strong id="neOwnerRepeated">—</strong></div>
+          <div><small>Clientes com checkout</small><strong id="neOwnerBuyers">—</strong></div>
+          <div><small>Tarefas de retorno atrasadas</small><strong id="neOwnerTasks">—</strong></div>
+        </div>
+        <div class="ne-owner-quick-actions">
+          <button type="button" class="secondary" data-jump="clients">Ver clientes</button>
+          <button type="button" class="secondary" data-jump="retention">Ver tarefas de relacionamento</button>
+        </div>
+      </section>
+      <details class="ne-owner-definitions"><summary>Como esses indicadores são calculados?</summary><div id="neOwnerDefinitions" class="ne-owner-definitions-body"></div></details>
     </section>
 
     <section id="agents" class="view">
@@ -568,15 +685,37 @@
 
 <dialog id="cashCloseModal"><form id="cashCloseForm" class="modalForm">
   <div class="modalHead"><div><h3>Fechar caixa</h3><p>Conte o dinheiro físico; o sistema compara com o esperado.</p></div><button type="button" class="x" data-close>×</button></div>
-  <label>Valor contado (R$)<input name="actual" type="number" step="0.01" min="0" required></label>
-  <label>Observações<textarea name="notes"></textarea></label>
+  <p id="neCashCloseExpected" class="ne-finance-guidance">Confira o dinheiro físico antes de informar o valor.</p>
+  <label>Valor contado (R$)<input name="actual" type="number" step="0.01" min="0" required placeholder="Valor realmente contado"></label>
+  <p id="neCashDifferencePreview" class="ne-finance-guidance" role="status">A diferença aparecerá após a contagem.</p>
+  <label>Justificativa da diferença (obrigatória quando houver divergência)<textarea name="notes" placeholder="Conte o motivo da diferença, se houver"></textarea></label>
   <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Fechar caixa</button></div>
+</form></dialog>
+
+<dialog id="cashWithdrawModal"><form id="cashWithdrawForm" class="modalForm">
+  <div class="modalHead"><div><h3>Retirada de dinheiro (sangria)</h3><p>Transferência de dinheiro físico: não é uma despesa operacional.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Valor retirado (R$)<input name="amount" type="number" step="0.01" min="0.01" required></label>
+  <label>Motivo da retirada<input name="reason" minlength="8" maxlength="500" required placeholder="Ex.: recolhimento para o cofre"></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Confirmar retirada</button></div>
+</form></dialog>
+
+<dialog id="commissionPayModal"><form id="commissionPayForm" class="modalForm">
+  <div class="modalHead"><div><h3>Registrar pagamento das comissões</h3><p id="neCommissionPayDescription">Revise os valores antes de confirmar.</p></div><button type="button" class="x" data-close>×</button></div>
+  <label>Forma utilizada para pagar<select name="payment_method" required><option value="">Escolha uma forma</option><option value="pix">Pix</option><option value="cash">Dinheiro</option><option value="debit_card">Cartão de débito</option><option value="credit_card">Cartão de crédito</option><option value="other">Outro</option></select></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Confirmar pagamentos realizados</button></div>
+</form></dialog>
+
+<dialog id="financePayModal"><form id="financePayForm" class="modalForm">
+  <div class="modalHead"><div><h3>Confirmar pagamento</h3><p id="neFinancePayDescription">Confira os detalhes antes de registrar.</p></div><button type="button" class="x" data-close>×</button></div>
+  <input type="hidden" name="entry_id">
+  <label>Forma de pagamento<select name="payment_method" required><option value="">Escolha a forma de pagamento</option><option value="pix">Pix</option><option value="cash">Dinheiro</option><option value="debit_card">Cartão de débito</option><option value="credit_card">Cartão de crédito</option><option value="voucher">Voucher</option><option value="other">Outro</option></select></label>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Confirmar baixa</button></div>
 </form></dialog>
 
 <dialog id="productModal"><form id="productForm" class="modalForm">
   <div class="modalHead"><div><h3>Novo produto</h3><p>Produto de consumo ou revenda.</p></div><button type="button" class="x" data-close>×</button></div>
   <label>Nome<input name="name" required></label><label>SKU / código<input name="sku"></label>
-  <div class="split"><label>Unidade<select name="unit"><option value="ml">ml</option><option value="g">g</option><option value="un">unidade</option><option value="dose">dose</option></select></label><label>Fornecedor<select name="supplier_id" id="productSupplier"><option value="">Sem fornecedor</option></select></label></div>
+  <div class="split"><label>Unidade<select name="unit"><option value="ml">ml</option><option value="g">g</option><option value="un">unidade (un)</option><option value="kg">quilograma (kg)</option><option value="l">litro (L)</option></select></label><label>Fornecedor<select name="supplier_id" id="productSupplier"><option value="">Sem fornecedor</option></select></label></div>
   <div class="split"><label>Estoque atual<input name="stock_qty" type="number" step="0.01" value="0"></label><label>Estoque mínimo<input name="min_qty" type="number" step="0.01" value="0"></label></div>
   <div class="split"><label>Estoque ideal<input name="ideal_qty" type="number" step="0.01" value="0"></label><label>Custo por unidade (R$)<input name="avg_cost" type="number" step="0.0001" value="0"></label></div>
   <div class="split"><label>Preço de revenda (R$)<input name="sale_price" type="number" step="0.01" min="0" value="0"></label><label>Comissão na revenda (%)<input name="sale_commission_pct" type="number" step="0.1" min="0" max="100" value="0"></label></div>
@@ -606,7 +745,7 @@
 <dialog id="stockAdjustModal"><form id="stockAdjustForm" class="modalForm">
   <div class="modalHead"><div><h3>Ajustar estoque</h3><p id="stockAdjustProduct">Produto</p></div><button type="button" class="x" data-close>×</button></div>
   <input name="product_id" type="hidden">
-  <label>Quantidade (+ entrada / - saída)<input name="qty" type="number" step="0.01" required></label>
+  <label id="neStockAdjustQtyLabel">Quantidade (+ entrada / − saída)<input name="qty" type="number" step="0.001" required></label>
   <label>Motivo<input name="reason" required placeholder="Ex.: contagem, perda, uso não registrado"></label>
   <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Aplicar ajuste</button></div>
 </form></dialog>
@@ -625,7 +764,7 @@
   <label>Forma de pagamento<select name="payment_method" id="checkoutPaymentMethod" required><option value="pix">Pix</option><option value="credit_card">Cartão de crédito</option><option value="debit_card">Cartão de débito</option><option value="cash">Dinheiro</option><option value="voucher">Voucher</option><option value="package">Pacote</option><option value="other">Outro</option></select></label>
   <label id="checkoutPackageWrap" class="hidden">Crédito do pacote<select name="client_package_id" id="checkoutPackage"><option value="">Selecione…</option></select><small id="checkoutPackageHint" class="muted"></small></label>
   <label>Desconto (R$)<input name="discount" id="checkoutDiscount" type="number" step="0.01" min="0" value="0"></label>
-  <div class="consumptionBox"><div class="panelhead"><div><strong>Consumo deste atendimento</strong><p>Use a média da cliente como referência e ajuste o que foi usado hoje.</p></div></div><div id="checkoutConsumption"></div></div>
+  <div class="consumptionBox"><div class="panelhead"><div><strong>Consumo deste atendimento</strong><p>Confirme ou corrija a quantidade real usada. A unidade segue o cadastro do produto.</p></div></div><div id="checkoutConsumption"></div><p id="neCheckoutStockHint" class="ne-stock-hint" role="status"></p></div>
   <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Finalizar e receber</button></div>
 </form></dialog>
 
@@ -816,7 +955,7 @@
 
 <dialog id="technicalRecordModal"><form id="technicalRecordForm" class="modalForm">
   <div class="modalHead"><div><h3>Novo registro técnico</h3><p>Registre a fórmula e o que precisa ser lembrado no próximo atendimento.</p></div><button type="button" class="x" data-close>×</button></div>
-  <label>Cliente<select name="client_id" id="technicalFormClient" required></select></label>
+  <input type="hidden" name="appointment_id" id="neTechnicalAppointmentId"><label>Cliente<select name="client_id" id="technicalFormClient" required></select></label>
   <div class="split"><label>Serviço<select name="service_id" id="technicalService"><option value="">Sem serviço específico</option></select></label><label>Profissional<select name="professional_id" id="technicalProfessional"><option value="">Sem profissional</option></select></label></div>
   <label>Título<input name="title" required placeholder="Ex.: Fórmula da coloração 06/10"></label>
   <label>Fórmula / composição<textarea name="formula" rows="5" placeholder="Ex.: 30g 7.0 + 20g 7.1 + OX 20 vol..."></textarea></label>
@@ -832,6 +971,45 @@
   <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Registrar indicação</button></div>
 </form></dialog>
 
+<dialog id="neCampaignModal" class="ne-marketing-modal">
+  <form id="neCampaignForm" class="modalForm">
+    <div class="modalHead"><div><h3>Campanha ou comunicado</h3><p>Cadastre agora e utilize quando desejar.</p></div><button type="button" class="x" data-close>×</button></div>
+    <label>Título<input name="title" minlength="3" maxlength="140" required placeholder="Ex.: Semana da hidratação"></label>
+    <div class="split">
+      <label>Categoria<select name="category" required><option value="promotion">Promoção</option><option value="announcement">Comunicado</option><option value="hours">Horários</option><option value="holiday">Feriados</option><option value="portfolio">Portfólio</option><option value="other">Outros</option></select></label>
+      <label>Situação<select name="status"><option value="draft">Rascunho</option><option value="ready">Pronta para uso</option><option value="archived">Arquivada</option></select></label>
+    </div>
+    <label>Mensagem<textarea name="message" rows="5" maxlength="2000" placeholder="Texto que poderá ser reutilizado no atendimento"></textarea></label>
+    <label>Mídia da biblioteca<select name="media_id" id="neCampaignMedia"><option value="">Sem mídia</option></select></label>
+    <div class="split"><label>Data de início<input name="starts_at" type="date"></label><label>Data final<input name="ends_at" type="date"></label></div>
+    <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary" type="submit">Salvar campanha</button></div>
+  </form>
+</dialog>
+<dialog id="neMediaModal" class="ne-marketing-modal">
+  <form id="neMediaForm" class="modalForm">
+    <div class="modalHead"><div><h3>Adicionar imagem</h3><p>JPG, PNG, WebP ou GIF, com até 3 MB.</p></div><button type="button" class="x" data-close>×</button></div>
+    <label>Arquivo<input name="media" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required></label>
+    <p class="ne-marketing-hint">Este arquivo será armazenado de forma privada. Não é enviado para o WhatsApp.</p>
+    <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary" type="submit">Adicionar à biblioteca</button></div>
+  </form>
+</dialog>
+<dialog id="neFollowupModal" class="ne-marketing-modal">
+  <form id="neFollowupForm" class="modalForm">
+    <div class="modalHead"><div><h3>Regra de pós-atendimento</h3><p>Cria tarefa interna, sem disparar WhatsApp automaticamente.</p></div><button type="button" class="x" data-close>×</button></div>
+    <label>Serviço<select name="service_id" id="neFollowupService" required><option value="">Escolha o serviço</option></select></label>
+    <label>Prazo após conclusão, em horas<input name="delay_hours" type="number" step="1" min="1" max="2160" value="48" required></label>
+    <label>Mensagem sugerida<textarea name="template" rows="5" maxlength="1200" required>Oi, {nome}! Como você está depois do seu atendimento de {servico}? Ficou tudo bem?</textarea></label>
+    <label class="ne-followup-switch"><input name="enabled" type="checkbox"> Ativar esta regra para novos atendimentos finalizados</label>
+    <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary" type="submit">Salvar regra</button></div>
+  </form>
+</dialog>
 <div id="toast" class="toast"></div>
-<script src="/app.js?v=191" type="module"></script>
+<script src="/app.js?v=202" type="module"></script>
+<script src="/marketing-ui.js?v=1" defer></script>
+<script src="/beauty-ui.js?v=2" defer></script>
+<script src="/security-center.js?v=2" defer></script>
+<script src="/whatsapp-onboarding.js?v=1" defer></script>
+<script src="/admin-stage8.js?v=1" defer></script>
+<script src="/mfa-security-ui.js?v=1" defer></script>
+<script src="/whatsapp-backfill-ui.js?v=1" defer></script>
 </body></html>

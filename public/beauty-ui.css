@@ -1,0 +1,402 @@
+/* NOVAGENTE Estética · design progressivo e reversível. Usa toda a estrutura existente. */
+:root{--bg:#f5f8fc;--card:#fff;--ink:#142b48;--muted:#6b7f96;--line:#dce7f2;--soft:#eaf3fd;--accent:#1558a6;--good:#2c795d;--shadow:0 8px 26px rgba(24,64,105,.045);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{background:var(--bg);color:var(--ink)}
+.shell{grid-template-columns:245px minmax(0,1fr)}
+.sidebar{background:#122d4d;color:#fff;border-right:1px solid rgba(255,255,255,.06);padding:22px 14px}
+.sidebar .brand{padding:6px 10px 24px}
+.logo{background:#e9f3ff;color:#1558a6;border-radius:14px;font-size:14px;letter-spacing:.04em}
+.sidebar .brand small{color:#bdcce1}
+.sidebar nav{gap:5px}
+.sidebar nav button{width:100%;font-size:13px;transition:background .16s ease,color .16s ease}
+.sidebar nav .bw-single-link,.sidebar nav .bw-nav-trigger{min-height:45px;padding:12px 15px;color:#edf4fe;font-weight:650;background:transparent;border:0;border-radius:12px;cursor:pointer;text-align:left}
+.sidebar nav .bw-single-link.active,.sidebar nav .bw-single-link:hover,.sidebar nav .bw-nav-trigger:hover,.sidebar nav .bw-nav-group.is-open>.bw-nav-trigger{background:#244b76;color:#fff}
+.bw-nav-trigger::after{content:"⌄";float:right;opacity:.65}
+.bw-nav-group.is-open>.bw-nav-trigger::after{content:"⌃"}
+.bw-submenu{display:none;padding:5px 0 8px 12px;margin:0 0 2px 9px;border-left:1px solid #6389b7}
+.bw-nav-group.is-open>.bw-submenu{display:grid;gap:3px}
+.sidebar .bw-submenu [data-view]{font-size:12px;min-height:38px;color:#c1d4eb;padding:9px 12px;border-radius:9px}
+.sidebar .bw-submenu [data-view].active{background:#285987;color:#fff}
+.sidefoot{margin-top:auto;padding:18px 8px 4px}
+.ghostMini{font-size:12px;color:#edf4fe}
+.topbar{padding:33px 34px 20px;align-items:center}
+.topbar h1{font-size:29px;font-weight:750;letter-spacing:-.035em}
+.eyebrow{color:#2a659e;letter-spacing:.12em}
+.view{padding:0 34px 38px}
+.panel,.metrics article,.cards>article,.hubCard{border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);background:#fff}
+.metrics article{padding:21px;min-width:0}
+.metrics strong{font-weight:750;letter-spacing:-.03em}
+.sectionTitle h2,.panelhead h2{letter-spacing:-.025em}
+.primary{background:#1558a6;color:#fff}
+.primary:hover{background:#0d468b}
+.secondary{background:#e6f0fb;color:#1e5387}
+.link{color:#1558a6}
+.hubCard:hover{border-color:#b0d1f0;box-shadow:0 9px 30px rgba(24,64,105,.09)}
+.bw-disclosure{margin:0 0 18px;min-width:0}
+.bw-disclosure-summary{list-style:none;cursor:pointer;background:#fff;border:1px solid var(--line);border-radius:18px;min-height:98px;padding:19px 22px;display:flex;align-items:center;justify-content:space-between;gap:15px;box-shadow:var(--shadow)}
+.bw-disclosure-summary::-webkit-details-marker{display:none}
+.bw-disclosure-summary:hover{border-color:#b0d1f0;background:#fafeff}
+.bw-disclosure-summary:focus-visible{outline:3px solid #82b6ed;outline-offset:2px}
+.bw-disclosure-copy{display:grid;gap:7px;min-width:0}
+.bw-disclosure-title{font-size:17px;font-weight:750;letter-spacing:-.025em}
+.bw-disclosure-copy small{font-size:12px;line-height:1.45;color:var(--muted)}
+.bw-disclosure-arrow{width:31px;height:31px;flex:0 0 31px;border-radius:50%;background:#e5f1fd;color:#205d98;display:grid;place-items:center;font-size:20px;transition:transform .2s}
+.bw-disclosure[open] .bw-disclosure-arrow{transform:rotate(180deg)}
+.bw-disclosure>.panel{margin:10px 0 0;box-shadow:none}
+#finance>.panel{margin-bottom:0}
+#finance .grid2:has(>.bw-disclosure){align-items:start}
+#inventory>.bw-disclosure,#team>.bw-disclosure{width:100%}
+#inbox .messengerGrid{grid-template-columns:minmax(290px,360px) minmax(320px,1fr) minmax(220px,270px);gap:13px;align-items:start}
+#inbox .inboxListPanel{background:#f5f9fe;padding:14px}
+#inbox .conversationList{display:grid;gap:12px}
+.bw-conversation-section{display:grid;gap:8px}
+.bw-conversation-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 7px 2px}
+.bw-conversation-heading>div{display:grid;gap:4px}
+.bw-conversation-heading strong{font-size:12px;color:#213b58}
+.bw-conversation-heading small{font-size:10px;line-height:1.35;color:var(--muted)}
+.bw-section-count{font-size:11px;background:#e5eff9;color:#37628c;padding:4px 8px;border-radius:20px;font-weight:750}
+.bw-conversation-stack{display:grid;gap:6px}
+.bw-conversation-card{background:#fff;border:1px solid #dce7f2;border-radius:13px;padding:11px 9px;box-shadow:0 2px 8px rgba(24,64,105,.03)}
+.bw-conversation-card:hover,.bw-conversation-card.active{border-color:#7fb5e7;background:#f9fcff}
+.bw-conversation-card .conversationMeta{gap:2px}
+.bw-response-label{display:inline-flex;justify-self:start;font-size:10px;font-weight:700;color:#376b9d;background:#e7f2ff;border-radius:40px;padding:4px 7px;margin-top:3px}
+.bw-reply .bw-response-label{background:#fff0e4;color:#9a5f2e}
+.bw-resolved .bw-response-label{background:#e7f4ec;color:#356c4d}
+#inbox .chatPanel,#inbox .conversationDetailPanel{background:#fff;border-radius:18px}
+#inbox .message.out{background:#1558a6}
+#inbox .message.in{background:#eff4fa}
+@media(max-width:1380px){#inbox .messengerGrid{grid-template-columns:minmax(285px,370px) minmax(0,1fr)}#inbox .conversationDetailPanel{grid-column:1/-1;min-height:0}}
+@media(max-width:900px){.shell{display:block}.topbar{padding:21px 16px 16px}.view{padding:0 16px 98px}#inbox .messengerGrid{grid-template-columns:1fr}#inbox .conversationDetailPanel{grid-column:auto}.bw-disclosure-summary{min-height:83px;padding:15px 17px}.bw-disclosure-title{font-size:15px}}
+@media(max-width:520px){.topbar h1{font-size:24px}#inbox .inboxListPanel{padding:12px}.metrics{gap:10px}.metrics article{padding:15px}}
+
+/* Área de acesso à conta e Central de Segurança */
+.ne-session-link{margin:8px 0;display:block;cursor:pointer}
+.ne-security-quick{margin:16px 0 22px}
+.ne-security-quick h3{font-size:16px;margin:0 0 12px}
+.ne-security-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ne-security-card{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;cursor:pointer;color:var(--ink)}
+.ne-security-card:hover,.ne-security-card:focus-visible{border-color:var(--accent);outline-offset:2px}
+.ne-security-card strong{font-size:14px}
+.ne-security-card small{font-size:12px;color:var(--muted)}
+.ne-security-dialog{position:fixed;inset:0;margin:auto;width:min(640px,calc(100vw - 32px));max-height:84vh;overflow:auto;border:1px solid var(--line);border-radius:18px;padding:24px;background:#fff;color:var(--ink);box-shadow:0 24px 90px rgba(8,32,61,.24)}
+.ne-security-dialog::backdrop{background:rgba(9,25,44,.5)}
+.ne-security-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.ne-security-heading h2{font-size:20px;margin:0 0 5px}
+.ne-security-heading p{font-size:13px;color:var(--muted);margin:0}
+.ne-session-note{font-size:12px;color:var(--muted);margin:16px 0}
+.ne-session-list{display:grid;gap:10px}
+.ne-session-item{padding:14px;border:1px solid var(--line);border-radius:12px;display:flex;justify-content:space-between;gap:16px;align-items:center}
+.ne-session-details{display:grid;gap:4px;min-width:0}
+.ne-session-details small{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+@media(max-width:600px){.ne-security-grid{grid-template-columns:1fr}.ne-session-item{align-items:flex-start;flex-direction:column}}
+
+/* Marca NOVAGENTE original: wordmark adaptado ao menu escuro. */
+.sidebar .brand,.authBrand{flex-direction:column;align-items:flex-start;gap:6px}
+.logo{width:198px;max-width:100%;height:42px;min-height:42px;flex:0 0 auto;border-radius:8px;background:#000;display:flex;align-items:center;justify-content:center;padding:5px 3px;overflow:hidden}
+.logo img{display:block;width:100%;height:auto;object-fit:contain}
+.sidebar .brand strong,.authBrand strong{font-size:16px;letter-spacing:-.02em}
+.authBrand{margin-bottom:22px}
+@media(max-width:900px){.authBrand .logo{max-width:100%}}
+
+/* Etapa 2: WhatsApp + CRM da NOVAGENTE Estética */
+.ne-wa-connection{display:grid;gap:14px}
+.ne-wa-connection .panelhead{align-items:flex-start}
+.ne-wa-help{font-size:12px;color:var(--muted);margin:0}
+.ne-wa-session-form{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.ne-wa-session-form label{display:grid;gap:6px;flex:1 1 255px;font-size:12px;font-weight:700}
+.ne-wa-session-form input{width:100%;min-height:42px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.ne-wa-session-form button{min-height:42px}
+.ne-wa-connection .waActions{display:flex;gap:10px;flex-wrap:wrap}
+.ne-wa-message{font-size:12px;color:var(--muted);margin:0;line-height:1.5}
+.ne-wa-message.ne-error{color:#9f3b31}
+.ne-wa-connection .qrImage{grid-column:auto;max-width:230px}
+.ne-client-context{display:grid;gap:9px;margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+.ne-client-context>strong{font-size:13px}
+.ne-client-context>p{font-size:12px;color:var(--muted);margin:0}
+.ne-client-appointment{display:grid;gap:4px;background:var(--soft);border-radius:10px;padding:10px}
+.ne-client-appointment>strong{font-size:12px}
+.ne-client-appointment>small{font-size:11px;color:var(--muted);line-height:1.4}
+#chatActive .chatHeadActions{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+@media(max-width:670px){.ne-wa-connection .waActions>*{flex:1 1 150px}.ne-wa-connection .panelhead{flex-wrap:wrap}}
+
+/* Etapa 3 — Agenda e Serviços: nível 1 é sempre um card de ação; detalhes sob clique. */
+.ne-work-toolbar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 18px}
+.ne-action-card{display:grid;justify-items:start;align-content:start;text-align:left;gap:6px;min-height:124px;padding:15px;border:1px solid var(--line);border-radius:16px;background:#fff;color:var(--ink);cursor:pointer;box-shadow:var(--shadow)}
+.ne-action-card strong{font-size:14px}.ne-action-card small{font-size:11px;color:var(--muted)}
+.ne-action-icon{height:31px;width:31px;display:grid;place-items:center;border-radius:10px;background:var(--soft);color:var(--accent);font-size:20px}
+.ne-action-card:hover,.ne-action-card:focus-visible{border-color:var(--accent);outline-offset:2px}
+.ne-agenda-tools,.ne-service-tools{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 14px;flex-wrap:wrap}
+.ne-agenda-tools label{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
+.ne-agenda-tools select{font-size:13px;border:1px solid var(--line);border-radius:10px;padding:9px;background:#fff;color:var(--ink);max-width:220px}
+.ne-filter-group{display:flex;gap:5px;flex-wrap:wrap}
+.ne-filter-group button{padding:9px 12px;border-radius:11px;border:1px solid transparent;background:var(--soft);font-size:12px;color:var(--ink);cursor:pointer;font-weight:650}
+.ne-filter-group button.active,.ne-filter-group button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.ne-filter-group button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ne-agenda-panel{padding:17px}
+.ne-agenda-panel>.panelhead{margin-bottom:10px}
+#agendaList{display:grid;gap:10px}
+.ne-agenda-card,.ne-service-card,.ne-technical-card{display:block;min-width:0;border:1px solid var(--line);border-radius:14px;background:#fff;overflow:hidden}
+.ne-agenda-card summary,.ne-service-card summary,.ne-technical-card summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:12px;padding:15px}
+.ne-agenda-card summary::-webkit-details-marker,.ne-service-card summary::-webkit-details-marker,.ne-technical-card summary::-webkit-details-marker{display:none}
+.ne-agenda-card summary:hover,.ne-service-card summary:hover,.ne-technical-card summary:hover{background:#f6faff}
+.ne-agenda-card summary:focus-visible,.ne-service-card summary:focus-visible,.ne-technical-card summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ne-agenda-card[open],.ne-service-card[open],.ne-technical-card[open]{border-color:#9fc4e6}
+.ne-agenda-time{display:grid;gap:2px;font-weight:800;color:var(--accent);min-width:74px}
+.ne-agenda-time small{font-weight:450;color:var(--muted);font-size:10px;text-transform:capitalize}
+.ne-agenda-summary{flex:1;display:grid;gap:5px;min-width:0}
+.ne-agenda-summary strong{font-size:13px}.ne-agenda-summary small{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ne-agenda-status{border:1px solid var(--line);border-radius:30px;padding:6px 9px;color:var(--ink);font-size:11px;background:var(--soft);white-space:nowrap}
+.ne-agenda-chevron,.ne-service-arrow{color:var(--muted);font-size:17px}
+.ne-agenda-card[open] .ne-agenda-chevron,.ne-service-card[open] .ne-service-arrow,.ne-technical-card[open] .ne-service-arrow{transform:rotate(180deg)}
+.ne-agenda-details,.ne-service-details,.ne-technical-body{border-top:1px solid var(--line);padding:14px;background:#fbfdff;display:grid;gap:14px}
+.ne-agenda-meta,.ne-service-facts{display:flex;gap:10px;flex-wrap:wrap}
+.ne-agenda-meta span,.ne-service-facts span{display:grid;gap:3px;min-width:95px;color:var(--muted);font-size:11px}
+.ne-agenda-meta strong,.ne-service-facts strong{color:var(--ink);font-size:13px}
+.ne-agenda-controls,.ne-service-actions{display:flex;flex-wrap:wrap;align-items:center;gap:9px}
+.ne-agenda-controls label{font-size:12px;color:var(--muted)}
+.ne-agenda-controls select{padding:10px;border:1px solid var(--line);border-radius:11px;color:var(--ink);background:#fff;font-size:12px}
+.ne-agenda-controls button,.ne-service-actions button{min-height:40px}
+.ne-empty-view{text-align:center;padding:30px 20px;display:grid;gap:6px}
+.ne-empty-view p{margin:0;color:var(--muted);font-size:12px}
+.ne-service-tools{margin-top:6px}
+.ne-hint{font-size:12px;color:var(--muted)}
+#serviceList .ne-service-card{margin:0;box-shadow:var(--shadow)}
+.ne-service-card summary{align-items:center;min-height:104px}
+.ne-service-symbol,.ne-technical-icon{width:38px;height:38px;flex:0 0 38px;background:var(--soft);color:var(--accent);border-radius:12px;display:grid;place-items:center;font-size:23px}
+.ne-service-title,.ne-technical-title{min-width:0;flex:1;display:grid;gap:6px}
+.ne-service-title small,.ne-technical-title small{font-size:11px;color:var(--accent)}
+.ne-service-title strong,.ne-technical-title strong{font-size:14px}
+.ne-service-title span,.ne-technical-title span{font-size:12px;color:var(--muted)}
+.ne-service-details{padding:15px}
+.ne-technical-card summary{min-height:100px}
+.ne-technical-body .technicalBlock{margin:0;overflow-wrap:anywhere}
+.ne-technical-body p{overflow-wrap:anywhere;line-height:1.5}
+#technicalRecordList{align-items:start}
+#technicalRecordList .ne-technical-card{box-shadow:var(--shadow)}
+@media(max-width:900px){.ne-work-toolbar{grid-template-columns:repeat(2,minmax(0,1fr))}.ne-action-card{min-height:106px}}
+@media(max-width:530px){.ne-action-card{padding:12px}.ne-agenda-card summary{gap:7px;padding:12px 10px;flex-wrap:wrap}.ne-agenda-time{min-width:60px}.ne-agenda-status{margin-left:auto}.ne-agenda-controls>*{flex:1 1 140px}.ne-agenda-controls label{flex:1 1 100%}.ne-filter-group button{padding:8px}.ne-service-card summary{min-height:95px}}
+
+/* Etapa 4: estoque e compras sem poluição visual */
+.ne-stock-action-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.ne-stock-action{background:var(--card);border:1px solid var(--line);border-radius:17px;display:grid;justify-items:start;align-content:start;gap:7px;padding:16px;min-height:128px;cursor:pointer;color:var(--ink);text-align:left;box-shadow:var(--shadow)}
+.ne-stock-action:hover,.ne-stock-action:focus-visible,.ne-stock-action.is-active{border-color:var(--accent);outline-offset:2px}
+.ne-stock-action.is-active{background:#f0f6fc}
+.ne-stock-action>span{background:var(--soft);color:var(--accent);display:grid;place-items:center;width:34px;height:34px;border-radius:11px;font-size:23px}
+.ne-stock-action strong{font-size:13px}.ne-stock-action small{color:var(--muted);font-size:11px}
+.ne-stock-section-title{display:grid;gap:3px;margin:4px 0 16px}
+.ne-stock-section-title h3{font-size:16px;margin:0}
+.ne-stock-section-title p{font-size:12px;color:var(--muted);margin:0}
+.ne-stock-product,.ne-stock-recipe{min-width:0;border:1px solid var(--line);background:#fff;border-radius:15px;overflow:hidden;box-shadow:var(--shadow);align-self:start}
+.ne-stock-product summary,.ne-stock-recipe summary{list-style:none;display:flex;align-items:center;gap:12px;padding:15px;cursor:pointer;min-height:106px}
+.ne-stock-product summary::-webkit-details-marker,.ne-stock-recipe summary::-webkit-details-marker{display:none}
+.ne-stock-product summary:hover,.ne-stock-recipe summary:hover{background:#f5faff}
+.ne-stock-product[open],.ne-stock-recipe[open]{border-color:#98bfdf}
+.ne-stock-product summary:focus-visible,.ne-stock-recipe summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ne-stock-product-symbol{width:35px;height:35px;flex:0 0 35px;background:var(--soft);border-radius:11px;display:grid;place-items:center;color:var(--accent);font-size:21px}
+.ne-stock-title{display:grid;min-width:0;flex:1;gap:5px}
+.ne-stock-title strong{font-size:13px;overflow-wrap:anywhere}
+.ne-stock-title small{color:var(--muted);font-size:11px}
+.ne-stock-chevron{color:var(--muted);font-size:17px}
+.ne-stock-product[open] .ne-stock-chevron,.ne-stock-recipe[open] .ne-stock-chevron{transform:rotate(180deg)}
+.ne-stock-details{display:grid;gap:12px;padding:14px;background:#fafdff;border-top:1px solid var(--line)}
+.ne-stock-details>div{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ne-stock-details small{color:var(--muted);font-size:11px}
+.ne-stock-details strong{font-size:12px;text-align:right}
+.ne-stock-details>button{width:100%}
+.ne-stock-hint{font-size:12px;color:var(--muted);line-height:1.5}
+#recipeServiceList .ne-stock-recipe{align-self:start}
+@media(max-width:880px){.ne-stock-action-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:420px){.ne-stock-action{padding:12px;min-height:113px}.ne-stock-action strong{font-size:12px}.ne-stock-product summary{gap:8px;padding:12px}.inventoryMetrics strong{font-size:20px}}
+
+/* Etapa 5 — Caixa e Financeiro: poucas opções de primeira impressão. */
+.ne-finance-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 17px}
+.ne-finance-action{min-width:0;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:var(--shadow);cursor:pointer;padding:17px;display:grid;justify-items:start;text-align:left;align-content:start;gap:7px;min-height:124px;color:var(--ink)}
+.ne-finance-action:hover,.ne-finance-action:focus-visible{border-color:var(--accent);outline-offset:2px}
+.ne-finance-action.is-active{border-color:var(--accent);background:#f0f6fd}
+.ne-finance-action>span{display:grid;place-items:center;width:36px;height:36px;border-radius:12px;background:var(--soft);font-size:23px;color:var(--accent)}
+.ne-finance-action strong{font-size:14px}.ne-finance-action small{font-size:11px;color:var(--muted)}
+.ne-finance-top-metrics{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:18px}
+.ne-finance-pendings{grid-template-columns:minmax(180px,340px);margin-bottom:14px}
+[data-ne-finance-panel]>.panel{margin-bottom:16px}
+.ne-cash-methods{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:15px}
+.ne-cash-method{border:1px solid var(--line);border-radius:13px;background:var(--soft);padding:13px;display:grid;gap:5px;min-width:0}
+.ne-cash-method small{color:var(--muted);font-size:11px}
+.ne-cash-method strong{font-size:16px}
+.ne-cash-method span{color:var(--muted);font-size:10px}
+.ne-cash-actions{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 0}
+.ne-cash-actions button{min-height:40px}
+.ne-cash-history{display:grid;gap:8px;margin-top:14px}
+.ne-cash-history-row{display:flex;justify-content:space-between;gap:16px;padding:12px;border:1px solid var(--line);border-radius:11px}
+.ne-cash-history-row>div{display:grid;gap:4px}
+.ne-cash-history-row strong{font-size:12px}
+.ne-cash-history-row small{font-size:11px;color:var(--muted)}
+.ne-finance-guidance{color:var(--muted);font-size:12px;line-height:1.45}
+#cashCloseModal .ne-finance-guidance{background:var(--soft);padding:10px 12px;border-radius:10px}
+@media(max-width:900px){.ne-finance-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.ne-cash-methods{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:550px){.ne-finance-action{padding:13px;min-height:116px}.ne-finance-action strong{font-size:12px}.ne-finance-top-metrics{grid-template-columns:1fr 1fr;gap:8px}.ne-finance-top-metrics>article:last-child{grid-column:1/-1}.ne-cash-methods{grid-template-columns:1fr 1fr}}
+
+/* Etapa 6: Biblioteca de mídias, campanhas e pós-atendimento em cards */
+.ne-marketing-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:15px}
+.ne-marketing-card{background:#fff;border:1px solid var(--line);border-radius:17px;min-height:135px;display:grid;justify-items:start;align-content:start;gap:8px;padding:16px;cursor:pointer;text-align:left;color:var(--ink);box-shadow:var(--shadow)}
+.ne-marketing-card>span{background:var(--soft);color:var(--accent);display:grid;place-items:center;width:37px;height:37px;border-radius:12px;font-size:22px}
+.ne-marketing-card strong{font-size:13px}.ne-marketing-card small{font-size:11px;color:var(--muted)}
+.ne-marketing-card:hover,.ne-marketing-card.is-active,.ne-marketing-card:focus-visible{border-color:var(--accent);outline-offset:2px}
+.ne-marketing-card.is-active{background:#edf5fe}
+.ne-marketing-safe-note,.ne-marketing-hint{font-size:12px;color:var(--muted);line-height:1.5;margin:12px 0 20px}
+.ne-marketing-safe-note{border-left:3px solid var(--accent);padding-left:12px}
+.ne-marketing-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.ne-marketing-title h3{margin:0;font-size:17px}
+.ne-marketing-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px;margin-bottom:20px}
+.ne-marketing-entry{display:block;min-width:0;align-self:start;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+.ne-marketing-entry summary{list-style:none;cursor:pointer;display:flex;gap:12px;align-items:center;padding:12px;min-height:100px}
+.ne-marketing-entry summary::-webkit-details-marker{display:none}
+.ne-marketing-entry summary:hover{background:#f7faff}
+.ne-marketing-entry summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ne-marketing-entry[open]{border-color:#95bedf}
+.ne-marketing-entry summary img{height:78px;width:80px;flex:0 0 80px;object-fit:cover;border-radius:12px;background:var(--soft)}
+.ne-marketing-placeholder{display:grid;place-items:center;height:66px;width:66px;flex:0 0 66px;background:var(--soft);border-radius:12px;color:var(--accent);font-size:26px}
+.ne-marketing-entry-text{min-width:0;flex:1;display:grid;gap:7px}
+.ne-marketing-entry-text strong{font-size:13px;overflow-wrap:anywhere}
+.ne-marketing-entry-text small{font-size:11px;color:var(--muted);line-height:1.45}
+.ne-marketing-entry-details{display:grid;gap:14px;padding:13px;border-top:1px solid var(--line);background:#fbfdff}
+.ne-marketing-entry-details p{font-size:12px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.ne-marketing-entry-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.ne-followup-switch{display:flex!important;align-items:center;gap:9px}
+.ne-followup-switch input{width:18px;height:18px;flex:0 0 auto}
+.ne-marketing-modal .modalForm{max-width:min(610px,100%)}
+@media(max-width:900px){.ne-marketing-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.ne-marketing-card{padding:12px;min-height:122px}.ne-marketing-entry summary img{width:64px;height:64px;flex-basis:64px}.ne-marketing-entry summary{min-height:84px}}
+
+/* Etapa 7 — Olho do Dono: visão inicial limpa com aprofundamento sob clique. */
+.ne-owner-status{font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5}
+.ne-owner-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin-bottom:20px}
+.ne-owner-kpi{min-width:0;min-height:158px;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:17px;padding:17px;display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-align:left;cursor:pointer;box-shadow:var(--shadow)}
+.ne-owner-kpi:hover,.ne-owner-kpi:focus-visible,.ne-owner-kpi.is-active{border-color:var(--accent);outline-offset:2px}
+.ne-owner-kpi.is-active{background:#eff6fe}
+.ne-owner-kpi-icon{display:grid;place-items:center;border-radius:11px;height:33px;width:33px;background:var(--soft);color:var(--accent);font-size:21px}
+.ne-owner-kpi small{font-size:11px;color:var(--muted);line-height:1.35}
+.ne-owner-kpi strong{font-size:24px;line-height:1.1;letter-spacing:-.04em;font-weight:790}
+.ne-owner-kpi>span:last-child{font-size:11px;color:var(--muted);line-height:1.45}
+.ne-owner-menu{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px}
+.ne-owner-menu-item{padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:13px;font-weight:650;cursor:pointer}
+.ne-owner-menu-item.is-active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ne-owner-menu-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[data-owner-panel]{background:#fff;border:1px solid var(--line);border-radius:17px;padding:18px;margin-bottom:14px}
+.ne-owner-panel-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+.ne-owner-panel-title h3{font-size:16px;margin:0 0 5px}
+.ne-owner-panel-title p{font-size:12px;line-height:1.5;color:var(--muted);margin:0}
+.ne-owner-alerts,.ne-owner-list{display:grid;gap:10px;margin-bottom:15px}
+.ne-owner-alert{display:flex;align-items:center;justify-content:space-between;gap:13px;background:var(--soft);padding:14px;border-radius:12px;border-left:3px solid var(--accent)}
+.ne-owner-alert.critical{border-left-color:#b54436}.ne-owner-alert.warning{border-left-color:#be7b12}
+.ne-owner-alert-content{display:grid;gap:4px;min-width:0}
+.ne-owner-alert-content strong{font-size:13px}.ne-owner-alert-content small{font-size:11px;color:var(--muted);line-height:1.4}
+.ne-owner-quick-actions{display:flex;gap:8px;flex-wrap:wrap}
+.ne-owner-calm{display:grid;gap:5px;padding:18px;background:var(--soft);border-radius:12px}
+.ne-owner-calm strong{font-size:13px}.ne-owner-calm p{font-size:12px;color:var(--muted);margin:0}
+.ne-owner-small-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:20px}
+.ne-owner-small-metrics>div{padding:14px;border:1px solid var(--line);background:#f8fbff;border-radius:13px;display:grid;gap:8px}
+.ne-owner-small-metrics small{font-size:11px;color:var(--muted)}.ne-owner-small-metrics strong{font-size:19px}
+.ne-owner-ranking-row{display:flex;gap:12px;align-items:center;padding:12px 13px;border:1px solid var(--line);border-radius:12px}
+.ne-owner-rank{height:28px;width:28px;display:grid;place-items:center;color:var(--accent);font-weight:750;background:var(--soft);border-radius:9px}
+.ne-owner-rank-name{display:grid;gap:3px;min-width:0;flex:1}
+.ne-owner-rank-name strong{font-size:13px;overflow-wrap:anywhere}
+.ne-owner-rank-name small{font-size:11px;color:var(--muted)}.ne-owner-ranking-row>strong{font-size:13px;text-align:right}
+.ne-owner-chart{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:6px;align-items:end;border-radius:13px;background:#f7faff;padding:20px 12px;height:210px;margin:0 0 18px}
+.ne-owner-bar-column{height:100%;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px}
+.ne-owner-bar{background:var(--accent);border-radius:6px 6px 2px 2px;min-height:3px;width:70%;max-width:40px}
+.ne-owner-bar-column small{font-size:9px;color:var(--muted);transform:rotate(-45deg);transform-origin:center;white-space:nowrap;margin-top:6px}
+.ne-owner-empty{font-size:12px;color:var(--muted);padding:16px;text-align:center}
+.ne-owner-definitions{border:1px solid var(--line);border-radius:13px;background:#fff;margin:12px 0 20px}
+.ne-owner-definitions summary{cursor:pointer;padding:15px;font-size:12px;font-weight:650}
+.ne-owner-definitions-body{padding:0 15px 15px}
+.ne-owner-definitions-body p{font-size:12px;line-height:1.55;color:var(--muted);margin:0 0 8px}
+@media(max-width:1080px){.ne-owner-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.ne-owner-kpis{gap:9px}.ne-owner-kpi{min-height:146px;padding:12px}.ne-owner-kpi strong{font-size:20px}[data-owner-panel]{padding:13px}.ne-owner-small-metrics{grid-template-columns:1fr}.ne-owner-alert{flex-direction:column;align-items:stretch}.ne-owner-chart{gap:2px;padding:14px 5px}.ne-owner-bar-column small{font-size:8px}.ne-owner-menu-item{flex:1 1 auto}}
+
+/* Etapa 8 — Administração e Equipe: cards progressivos e privacidade. */
+.ne-stage8-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:15px 0 19px}
+.ne-stage8-card{display:grid;align-content:start;justify-items:start;gap:7px;min-width:0;min-height:127px;text-align:left;background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px;color:var(--ink);box-shadow:var(--shadow);cursor:pointer}
+.ne-stage8-card:hover,.ne-stage8-card.is-active,.ne-stage8-card:focus-visible{border-color:var(--accent);outline-offset:2px}
+.ne-stage8-card.is-active{background:#eef6fe}
+.ne-stage8-card strong{font-size:13px}.ne-stage8-card small{font-size:11px;color:var(--muted)}
+.ne-stage8-icon{display:grid;place-items:center;background:var(--soft);color:var(--accent);width:35px;height:35px;border-radius:11px;font-size:21px}
+.ne-stage8-panel{background:#fff;border:1px solid var(--line);border-radius:17px;padding:18px;margin-bottom:17px}
+.ne-stage8-panel h3{font-size:16px;margin:0 0 10px}
+.ne-stage8-help{font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 12px}
+.ne-stage8-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.ne-stage8-field{display:grid;gap:7px;font-size:12px;color:var(--ink);font-weight:600}
+.ne-stage8-field input,.ne-stage8-field select{display:block;width:100%;border:1px solid var(--line);border-radius:11px;padding:10px;background:#fff;min-height:43px;font-size:13px}
+.ne-stage8-form>.primary,.ne-stage8-form>.ne-stage8-help{grid-column:1/-1;justify-self:start}
+.ne-stage8-heading{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.ne-stage8-heading .ne-stage8-help{flex:1 1 220px}
+.ne-stage8-user-management{display:grid;gap:9px;margin-bottom:20px}
+.ne-stage8-user-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;background:var(--soft);border:1px solid var(--line);border-radius:12px;flex-wrap:wrap}
+.ne-stage8-user-info{display:grid;gap:4px;flex:1 1 160px;min-width:0}
+.ne-stage8-user-info strong{font-size:13px;overflow-wrap:anywhere}
+.ne-stage8-user-info small{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ne-stage8-user-actions{display:flex;flex-wrap:wrap;gap:6px}
+.ne-stage8-user-actions select,.ne-stage8-user-actions button{font-size:12px;padding:8px;border:1px solid var(--line);border-radius:9px;background:#fff;min-height:39px}
+.ne-stage8-role{margin:9px 0;border:1px solid var(--line);border-radius:12px;background:#fff}
+.ne-stage8-role summary{cursor:pointer;font-weight:700;font-size:13px;padding:14px}
+.ne-stage8-role-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;padding:0 12px 13px}
+.ne-stage8-role-entry{display:grid;gap:4px;padding:10px;border-radius:9px;background:var(--soft)}
+.ne-stage8-role-entry strong{font-size:12px}.ne-stage8-role-entry small{font-size:11px;color:var(--muted)}
+.ne-stage8-coming{padding:20px;border:1px dashed var(--line);border-radius:14px}
+.ne-stage8-coming p{color:var(--muted);font-size:13px;line-height:1.55}
+.ne-stage8-invites{border-top:1px solid var(--line);padding-top:10px}
+.ne-stage8-dialog{border:none;border-radius:18px;padding:25px;max-width:min(640px,calc(100vw - 26px));width:100%;box-shadow:0 20px 70px #1234}
+.ne-stage8-dialog::backdrop{background:rgba(13,33,61,.55)}
+.ne-stage8-dialog .ne-stage8-form{grid-template-columns:1fr}
+.ne-stage8-dialog-actions{display:flex;gap:9px;flex-wrap:wrap}
+.ne-stage8-invite-link{display:grid;gap:10px}
+.ne-stage8-invite-link input{width:100%;min-height:42px;border:1px solid var(--line);padding:10px;border-radius:9px}
+.ne-stage8-security>.ne-security-quick{margin-bottom:17px}
+.ne-team-basic-card h3{margin:10px 0 6px}
+.ne-stage8-panel.hidden{display:none!important}
+.ne-stage8-card[hidden],.ne-stage8-panel [hidden]{display:none!important}
+@media(max-width:900px){.ne-stage8-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:580px){.ne-stage8-card{padding:12px;min-height:111px}.ne-stage8-card strong{font-size:12px}.ne-stage8-panel{padding:12px}.ne-stage8-form{grid-template-columns:1fr}.ne-stage8-user-actions{width:100%}.ne-stage8-user-actions select{flex:1}}
+
+/* Importação WhatsApp progressiva — sem poluir a central de mensagens. */
+.ne-backfill{border:1px solid var(--line);background:#fff;border-radius:15px;margin-bottom:15px;box-shadow:var(--shadow)}
+.ne-backfill>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;list-style:none;padding:14px 17px;font-size:13px;font-weight:700;cursor:pointer}
+.ne-backfill>summary::-webkit-details-marker{display:none}
+.ne-backfill>summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ne-backfill>summary small{font-weight:400;font-size:11px;color:var(--muted)}
+.ne-backfill[open]>summary{border-bottom:1px solid var(--line)}
+.ne-backfill-content{padding:14px 17px 18px;display:grid;gap:13px}
+.ne-backfill-note{font-size:12px;color:var(--muted);margin:0;line-height:1.5}
+.ne-backfill-controls{display:flex;align-items:end;gap:9px;flex-wrap:wrap}
+.ne-backfill-controls label{display:grid;gap:6px;font-size:11px;color:var(--muted);font-weight:600}
+.ne-backfill-controls input{padding:9px 10px;min-height:41px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:13px}
+.ne-backfill-controls button{min-height:41px;font-size:12px}
+#neBackfillStatus{font-size:12px;line-height:1.6;border:1px solid var(--line);border-radius:12px;background:var(--soft);padding:12px}
+@media(max-width:600px){.ne-backfill>summary{align-items:flex-start;flex-direction:column;gap:4px}.ne-backfill-controls button{flex:1 1 140px}}
+
+/* Etapa 12 — diagnóstico enxuto de ambiente piloto, sem conexão externa. */
+.ne-pilot-readiness{margin-top:16px;border:1px solid var(--line);border-radius:13px;background:#fff;overflow:hidden}
+.ne-pilot-readiness summary{padding:14px 16px;cursor:pointer;font-size:13px;font-weight:700}
+.ne-pilot-readiness summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ne-pilot-readiness-body{padding:12px 15px;display:grid;gap:10px;border-top:1px solid var(--line)}
+.ne-pilot-check{display:grid;grid-template-columns:1fr auto;gap:3px 10px;background:var(--soft);border-radius:10px;padding:12px}
+.ne-pilot-check strong{font-size:12px}.ne-pilot-check-status{color:var(--muted);font-size:11px;font-weight:650}
+.ne-pilot-check p{grid-column:1/-1;color:var(--muted);font-size:11px;line-height:1.5;margin:0}
+.ne-pilot-warning{border-left:3px solid var(--accent);padding:10px 12px;color:var(--muted);font-size:12px;line-height:1.5;margin:5px 0}
+
+/* Etapa 16 — MFA discreto com dados sensíveis sob demanda. */
+.ne-mfa-box{background:#fff;border:1px solid var(--line);border-radius:14px;margin:14px 0;overflow:hidden}
+.ne-mfa-box>summary{cursor:pointer;padding:16px;font-size:13px;font-weight:700}
+.ne-mfa-box>summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ne-mfa-content{border-top:1px solid var(--line);padding:15px;display:grid;gap:12px;max-width:650px}
+.ne-mfa-content h3{font-size:15px;margin:0}.ne-mfa-content .ne-stage8-help{margin:0}
+.ne-mfa-field{display:grid;gap:6px;font-weight:600;font-size:12px;max-width:440px}
+.ne-mfa-field input{border:1px solid var(--line);border-radius:10px;background:#fff;padding:11px;min-height:42px;width:100%;font-size:13px}
+.ne-mfa-content>button{justify-self:start}
+.ne-mfa-secret{padding:12px 14px;background:var(--soft);border:1px dashed var(--line);border-radius:10px;overflow-wrap:anywhere;letter-spacing:.08em;font-size:15px}
+.ne-mfa-codes{padding:14px;overflow:auto;border-radius:10px;background:var(--soft);font-size:13px;line-height:1.9;letter-spacing:.06em}
+.ne-mfa-danger{border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;gap:10px}
+.ne-mfa-danger>summary{font-size:12px;cursor:pointer;font-weight:600}
+.ne-mfa-danger[open]{display:grid}
+@media(max-width:600px){.ne-mfa-content{padding:12px}.ne-mfa-secret{font-size:12px}}
+
+/* Etapa 17: controles de exportação em massa apenas para perfis autorizados. */
+#exportClients[hidden],#marketingExportClients[hidden]{display:none!important}

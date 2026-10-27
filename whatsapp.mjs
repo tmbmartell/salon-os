@@ -35,12 +35,20 @@ export function installWhatsApp(db){
 }
 export function normalizePhone(v=""){return String(v).replace(/\D/g,"").replace(/^0+/,"")}
 export function registerTenantSession(db,tenantId,session=SESSION){
+  if(!/^[a-zA-Z0-9_-]{3,60}$/.test(session))throw Object.assign(new Error("invalid_whatsapp_session_name"),{status:400});
   const ts=new Date().toISOString();
-  db.prepare("insert into whatsapp_tenant_sessions(tenant_id,session,active,created_at,updated_at) values(?,?,1,?,?) on conflict(session) do update set tenant_id=excluded.tenant_id,active=1,updated_at=excluded.updated_at").run(tenantId,session,ts,ts);
-  return session;
+  db.exec("BEGIN IMMEDIATE");
+  try{
+    const owner=db.prepare("select tenant_id from whatsapp_tenant_sessions where session=? limit 1").get(session);
+    if(owner&&owner.tenant_id!==tenantId)throw Object.assign(new Error("whatsapp_session_belongs_to_another_tenant"),{status:409});
+    db.prepare("update whatsapp_tenant_sessions set active=0,updated_at=? where tenant_id=? and session<>?").run(ts,tenantId,session);
+    db.prepare("insert into whatsapp_tenant_sessions(tenant_id,session,active,created_at,updated_at) values(?,?,1,?,?) on conflict(session) do update set active=1,updated_at=excluded.updated_at where whatsapp_tenant_sessions.tenant_id=excluded.tenant_id").run(tenantId,session,ts,ts);
+    db.exec("COMMIT");
+    return session;
+  }catch(e){db.exec("ROLLBACK");throw e}
 }
 export function sessionForTenant(db,tenantId){
-  return db.prepare("select session from whatsapp_tenant_sessions where tenant_id=? and active=1 order by updated_at desc limit 1").get(tenantId)?.session||SESSION;
+  return db.prepare("select session from whatsapp_tenant_sessions where tenant_id=? and active=1 order by updated_at desc limit 1").get(tenantId)?.session||"";
 }
 export function tenantForWahaEvent(db,event){
   const session=String(event?.session||"");
@@ -62,6 +70,7 @@ async function request(path,init={},allow404=false){
   return r;
 }
 export async function wahaStatus(session=SESSION){
+  if(!session)return {...wahaConfigStatus(),session:"",configured:false,connected:false,status:"UNASSIGNED"};
   const config={...wahaConfigStatus(),session};
   if(!config.configured)return {...config,connected:false,status:"NOT_CONFIGURED"};
   try{
@@ -76,6 +85,7 @@ function sessionPayload(session=SESSION){
   return {name:session,config:{webhooks}};
 }
 export async function ensureWahaSession(session=SESSION){
+  if(!session)throw new Error("whatsapp_session_unassigned");
   if(!wahaConfigured())throw new Error("waha_not_configured");
   const current=await wahaStatus(session),payload=sessionPayload(session);
   if(current.status==="MISSING")await request("/api/sessions",{method:"POST",body:JSON.stringify(payload)});
@@ -85,6 +95,7 @@ export async function ensureWahaSession(session=SESSION){
   return wahaStatus(session);
 }
 export async function wahaQr(session=SESSION){
+  if(!session)throw new Error("whatsapp_session_unassigned");
   if(!wahaConfigured())throw new Error("waha_not_configured");
   const r=await request("/api/"+encodeURIComponent(session)+"/auth/qr",{headers:{Accept:"application/json,image/png"}});
   const contentType=(r.headers.get("content-type")||"").split(";")[0];
@@ -104,6 +115,7 @@ export function normalizeWahaMessageId(v){
   return String(v);
 }
 export async function sendText(target,text,session=SESSION){
+  if(!session)throw new Error("whatsapp_session_unassigned");
   const raw=String(target||"").trim(),chatId=raw.includes("@")?raw:normalizePhone(raw)+"@c.us";
   const r=await request("/api/sendText",{method:"POST",body:JSON.stringify({session,chatId,text:String(text),linkPreview:false})});
   const j=await r.json();
@@ -135,8 +147,9 @@ function displayName(payload={}){
 export function listConversations(db,tenantId,limit=120){
   return db.prepare(`select co.*,c.name client_name,c.phone client_phone,c.email client_email,c.tags client_tags,c.source client_source,c.notes client_notes,c.birthday client_birthday,u.name assigned_user_name,
     (select body from messages m where m.conversation_id=co.id order by m.created_at desc limit 1) last_message,
-    (select created_at from messages m where m.conversation_id=co.id order by m.created_at desc limit 1) last_message_created_at
-    from conversations co left join clients c on c.id=co.client_id left join users u on u.id=co.assigned_user_id
+    (select created_at from messages m where m.conversation_id=co.id order by m.created_at desc limit 1) last_message_created_at,
+    (select direction from messages m where m.conversation_id=co.id order by m.created_at desc limit 1) last_message_direction
+    from conversations co left join clients c on c.id=co.client_id and c.tenant_id=co.tenant_id left join users u on u.id=co.assigned_user_id and u.tenant_id=co.tenant_id
     where co.tenant_id=? order by coalesce(co.last_message_at,co.created_at) desc limit ?`).all(tenantId,limit).map(x=>({...x,labels:(()=>{try{return JSON.parse(x.labels||"[]")}catch{return []}})(),client_tags:(()=>{try{return JSON.parse(x.client_tags||"[]")}catch{return []}})()}));
 }
 export function conversationMessages(db,tenantId,conversationId,limit=200){
@@ -146,7 +159,7 @@ export function markConversationRead(db,tenantId,conversationId){
   db.prepare("update conversations set unread_count=0,updated_at=? where id=? and tenant_id=?").run(new Date().toISOString(),conversationId,tenantId);
 }
 export async function sendConversationMessage(db,tenantId,conversationId,text,userId){
-  const co=db.prepare(`select co.*,c.phone client_phone from conversations co left join clients c on c.id=co.client_id
+  const co=db.prepare(`select co.*,c.phone client_phone from conversations co left join clients c on c.id=co.client_id and c.tenant_id=co.tenant_id
     where co.id=? and co.tenant_id=?`).get(conversationId,tenantId);
   if(!co||!co.client_phone)throw Object.assign(new Error("conversation_or_phone_missing"),{status:404});
   const body=String(text||"").trim().slice(0,4000);if(!body)throw Object.assign(new Error("text_required"),{status:400});
@@ -164,10 +177,17 @@ function chatSerializedId(chat){
 function chatName(chat,phone){
   return String(chat?.name||chat?.formattedTitle||chat?.pushName||("WhatsApp "+String(phone).slice(-4))).trim().slice(0,160);
 }
-export async function syncWahaHistory(db,tenantId,{chatLimit=40,messageLimit=80}={}){
-  const session=sessionForTenant(db,tenantId),safeChats=Math.max(1,Math.min(120,Number(chatLimit||40))),safeMsgs=Math.max(1,Math.min(200,Number(messageLimit||80)));
-  const chatsResp=await request("/api/"+encodeURIComponent(session)+"/chats?limit="+safeChats+"&sortOrder=DESC");
-  const chats=await chatsResp.json(),stats={chats_seen:0,chats_imported:0,messages_imported:0,skipped:0};
+export async function syncWahaHistory(db,tenantId,{chatLimit=40,messageLimit=80,chatOffset=0,messageOffset=0,sinceTimestamp=null,paginated=false}={}){
+  const session=sessionForTenant(db,tenantId);if(!session)throw new Error("whatsapp_session_unassigned");const safeChats=Math.max(1,Math.min(120,Math.trunc(Number(chatLimit||40)))),safeMsgs=Math.max(1,Math.min(200,Math.trunc(Number(messageLimit||80))));
+  const safeChatOffset=Math.max(0,Math.trunc(Number(chatOffset)||0)),safeMsgOffset=Math.max(0,Math.trunc(Number(messageOffset)||0));
+  if(paginated&&(!Number.isSafeInteger(safeChatOffset)||!Number.isSafeInteger(safeMsgOffset)))throw new Error("invalid_sync_cursor");
+  const since=sinceTimestamp==null?null:Math.trunc(Number(sinceTimestamp));
+  if(paginated&&(since==null||!Number.isSafeInteger(since)||since<0))throw new Error("invalid_sync_since");
+  const chatsResp=await request("/api/"+encodeURIComponent(session)+"/chats?limit="+safeChats+(paginated?"&offset="+safeChatOffset+"&sortBy=id&sortOrder=asc":"&sortOrder=DESC"));
+  const chats=await chatsResp.json();
+  if(!Array.isArray(chats))throw new Error("waha_invalid_chat_page");
+  const stats={chats_seen:0,chats_imported:0,messages_imported:0,skipped:0,
+    chats_page_length:chats.length,messages_page_length:0,processed_chat_id:null,chat_offset:safeChatOffset,message_offset:safeMsgOffset};
   for(const chat of Array.isArray(chats)?chats:[]){
     stats.chats_seen++;
     const chatId=chatSerializedId(chat);if(!chatId||chatId.endsWith("@g.us")||chatId==="0@c.us"){stats.skipped++;continue}
@@ -190,16 +210,23 @@ export async function syncWahaHistory(db,tenantId,{chatLimit=40,messageLimit=80}
       db.prepare("update conversations set external_id=?,unread_count=?,updated_at=? where id=? and tenant_id=?")
         .run(chatId,Number(chat.unreadCount||0),ts,co.id,tenantId);
     }
-    const msgResp=await request("/api/"+encodeURIComponent(session)+"/chats/"+encodeURIComponent(chatId)+"/messages?limit="+safeMsgs+"&downloadMedia=false&sortOrder=ASC");
-    const msgs=await msgResp.json();let lastAt=co.last_message_at||co.created_at||ts;
+    const msgParams="?limit="+safeMsgs+"&downloadMedia=false"+(paginated?
+      "&offset="+safeMsgOffset+"&filter.timestamp.gte="+since+"&sortOrder=asc":"&sortOrder=ASC");
+    const msgResp=await request("/api/"+encodeURIComponent(session)+"/chats/"+encodeURIComponent(chatId)+"/messages"+msgParams);
+    const msgs=await msgResp.json();if(!Array.isArray(msgs))throw new Error("waha_invalid_message_page");
+    stats.processed_chat_id=chatId;stats.messages_page_length=msgs.length;
+    let lastAt=co.last_message_at||co.created_at||ts;
     for(const m of Array.isArray(msgs)?msgs:[]){
-      if(!m?.id)continue;
-      if(db.prepare("select 1 x from messages where tenant_id=? and external_message_id=?").get(tenantId,String(m.id)))continue;
-      const created=m.timestamp?new Date(Number(m.timestamp)*1000).toISOString():ts;
+      const externalMessageId=normalizeWahaMessageId(m?.id);
+      if(!externalMessageId)continue;
+      if(db.prepare("select 1 x from messages where tenant_id=? and external_message_id=?").get(tenantId,externalMessageId))continue;
+      const timestamp=Number(m?.timestamp);
+      const created=Number.isFinite(timestamp)&&timestamp>0&&timestamp*1000<=Date.now()+60000?
+        new Date(timestamp*1000).toISOString():ts;
       if(created>lastAt)lastAt=created;
       const fromMe=!!m.fromMe,rawBody=String(m.body||"").trim(),body=m.hasMedia?(rawBody&&rawBody.length<=1000?rawBody:"📎 Mídia"):rawBody.slice(0,4000);
       db.prepare("insert into messages(id,tenant_id,conversation_id,direction,sender_type,body,message_type,external_message_id,delivery_status,metadata,created_at) values(?,?,?,?,?,?,?,?,?,?,?)")
-        .run(crypto.randomUUID(),tenantId,co.id,fromMe?"out":"in",fromMe?"staff":"client",body,m.hasMedia?"media":"text",String(m.id),String(m.ackName|| (fromMe?"sent":"received")).toLowerCase(),JSON.stringify({synced:true}),created);
+        .run(crypto.randomUUID(),tenantId,co.id,fromMe?"out":"in",fromMe?"staff":"client",body,m.hasMedia?"media":"text",externalMessageId,String(m.ackName|| (fromMe?"sent":"received")).toLowerCase(),JSON.stringify({synced:true}),created);
       stats.messages_imported++;
     }
     db.prepare("update conversations set last_message_at=?,updated_at=? where id=? and tenant_id=?").run(lastAt,ts,co.id,tenantId);
@@ -208,7 +235,7 @@ export async function syncWahaHistory(db,tenantId,{chatLimit=40,messageLimit=80}
   return stats;
 }
 
-export async function ingestWahaEvent({db,tenantId,event,interpret,autoReply,deliverText=sendText,defaultHandlingMode="human"}){
+export async function ingestWahaEvent({db,tenantId,event,interpret,autoReply,deliverText=sendText,defaultHandlingMode="human",allowAi=false}){
   const expected=sessionForTenant(db,tenantId);if(event?.session!==expected)return {accepted:false,reason:"other_session"};
   const p=event?.payload||{};
   if(event.event==="message.ack"){
@@ -236,7 +263,11 @@ export async function ingestWahaEvent({db,tenantId,event,interpret,autoReply,del
       .run(cid,tenantId,client.id,"whatsapp",p.from,"open",ts,ts,0,initialMode,initialMode==="ai"?"auto":"default",ts);
     co=db.prepare("select * from conversations where id=?").get(cid);
   }
-  if(!p.hasMedia&&defaultHandlingMode==="ai"&&co.handling_mode==="human"&&(co.handling_mode_source||"default")==="default"){
+  if(!allowAi&&co.handling_mode==="ai"){
+    db.prepare("update conversations set handling_mode='human',handling_mode_source='default',updated_at=? where id=? and tenant_id=?").run(ts,co.id,tenantId);
+    co=db.prepare("select * from conversations where id=? and tenant_id=?").get(co.id,tenantId);
+  }
+  if(allowAi&&!p.hasMedia&&defaultHandlingMode==="ai"&&co.handling_mode==="human"&&(co.handling_mode_source||"default")==="default"){
     db.prepare("update conversations set handling_mode='ai',handling_mode_source='auto',updated_at=? where id=? and tenant_id=?").run(ts,co.id,tenantId);
     co=db.prepare("select * from conversations where id=?").get(co.id);
   }
@@ -247,7 +278,7 @@ export async function ingestWahaEvent({db,tenantId,event,interpret,autoReply,del
   let mode=p.hasMedia?"human":co.handling_mode||"human",auto=null;
   if(p.hasMedia)db.prepare("update conversations set last_message_at=?,unread_count=unread_count+1,handling_mode='human',handling_mode_source='handoff',updated_at=? where id=?").run(ts,ts,co.id);
   else db.prepare("update conversations set last_message_at=?,unread_count=unread_count+1,handling_mode=?,updated_at=? where id=?").run(ts,mode,ts,co.id);
-  if(mode==="ai"&&!p.hasMedia&&autoReply){
+  if(allowAi&&mode==="ai"&&!p.hasMedia&&autoReply){
     auto=await autoReply({tenantId,client,conversation:co,text:body,intent});
     if(auto?.handoff){
       mode="human";
