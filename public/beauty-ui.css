@@ -397,3 +397,6 @@ body{background:var(--bg);color:var(--ink)}
 .ne-mfa-danger>summary{font-size:12px;cursor:pointer;font-weight:600}
 .ne-mfa-danger[open]{display:grid}
 @media(max-width:600px){.ne-mfa-content{padding:12px}.ne-mfa-secret{font-size:12px}}
+
+/* Etapa 17: controles de exportação em massa apenas para perfis autorizados. */
+#exportClients[hidden],#marketingExportClients[hidden]{display:none!important}

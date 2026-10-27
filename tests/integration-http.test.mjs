@@ -8,6 +8,7 @@ import path from "node:path";
 import net from "node:net";
 import {spawn} from "node:child_process";
 import {fileURLToPath} from "node:url";
+import {DatabaseSync} from "node:sqlite";
 
 const here=path.dirname(fileURLToPath(import.meta.url)),root=path.resolve(here,"..");
 async function freePort(){
@@ -20,10 +21,10 @@ async function freePort(){
 function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms))}
 async function start(){
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),"novagente-homolog-"));
-  const port=await freePort(),base="http://127.0.0.1:"+port;
+  const port=await freePort(),base="http://127.0.0.1:"+port,dbPath=path.join(directory,"qa.sqlite");
   const child=spawn(process.execPath,["server.mjs"],{
     cwd:root,env:{...process.env,PORT:String(port),HOST:"127.0.0.1",
-      SALON_DB:path.join(directory,"qa.sqlite"),NOVAGENTE_ENABLE_RECEPTIONIST_AI:"false",
+      SALON_DB:dbPath,NOVAGENTE_ENABLE_RECEPTIONIST_AI:"false",
       JEV_CONTROL_PLANE_URL:"http://127.0.0.1:1"},stdio:["ignore","pipe","pipe"]
   });
   let logs="";
@@ -36,7 +37,7 @@ async function start(){
   };
   for(let i=0;i<100;i++){
     if(child.exitCode!==null){await cleanup();throw Error("Falha ao iniciar servidor: "+logs)}
-    try{const r=await fetch(base+"/api/auth/state");if(r.ok)return {base,cleanup,logs:()=>logs}}catch{}
+    try{const r=await fetch(base+"/api/auth/state");if(r.ok)return {base,dbPath,cleanup,logs:()=>logs}}catch{}
     await sleep(120);
   }
   await cleanup();throw Error("Servidor não abriu porta temporária: "+logs);
@@ -234,6 +235,44 @@ test("E2E: servidor + login + CRM + agenda + ficha + estoque + caixa + pós-vend
     const spoof=await owner("/api/admin/business-profile",{headers:{"x-tenant-id":"tenant-forged"}});
     assert.equal(spoof.status,200);
     assert.equal(spoof.data.name,boot.tenant.name);
+    // Exportação integral exige privilégio especial e mantém trilha de auditoria.
+    const exportForbidden=await reception("/api/clients/export");
+    assert.equal(exportForbidden.status,403);
+    const injection=await expectStatus(owner,"/api/clients",201,{method:"POST",body:{
+      name:"=2+3",
+      phone:"69977001122",notes:"+SUM(A1:A9)",source:"imported-test"
+    }});
+    assert.ok(injection.id);
+    const foreignClient="qa-client-foreign";
+    const db=new DatabaseSync(app.dbPath);
+    try{
+      const at=new Date().toISOString();
+      db.prepare("insert into tenants(id,name,slug,timezone,created_at) values(?,?,?,?,?)")
+        .run("qa-tenant-other","Salão Externo QA","qa-externo","America/Porto_Velho",at);
+      db.prepare("insert into clients(id,tenant_id,name,phone,created_at,updated_at) values(?,?,?,?,?,?)")
+        .run(foreignClient,"qa-tenant-other","CLIENTE_DO_OUTRO_SALAO","69955544411",at,at);
+      db.prepare("insert into technical_records(id,tenant_id,client_id,title,formula,created_at) values(?,?,?,?,?,?)")
+        .run("qa-foreign-record","qa-tenant-other",foreignClient,"Registro confidencial","SEGREDO_OUTRO_SALAO",at);
+    }finally{db.close()}
+    assert.equal((await owner("/api/clients/"+foreignClient+"/technical")).status,404);
+    assert.equal((await reception("/api/clients/"+foreignClient+"/technical")).status,404);
+    const visibleClients=await expectStatus(owner,"/api/clients",200);
+    const exported=await owner("/api/clients/export");
+    assert.equal(exported.status,200);
+    assert.ok(exported.headers.get("content-type").includes("text/csv"));
+    assert.equal(exported.headers.get("cache-control"),"no-store");
+    assert.equal(exported.headers.get("x-content-type-options"),"nosniff");
+    assert.match(exported.data,/novagente|Cliente Homologação QA/);
+    assert.doesNotMatch(exported.data,/CLIENTE_DO_OUTRO_SALAO|SEGREDO_OUTRO_SALAO/);
+    assert.ok(exported.data.includes("'=2+3"),"CSV neutraliza fórmulas em nomes");
+    assert.ok(exported.data.includes("'+SUM"),"CSV neutraliza fórmulas nas observações");
+    const dbAudit=new DatabaseSync(app.dbPath,{readOnly:true});
+    try{
+      const row=dbAudit.prepare("select tenant_id,action,metadata from audit_log where action='clients.export' order by created_at desc limit 1").get();
+      assert.equal(row.tenant_id,boot.tenant.id);
+      assert.equal(JSON.parse(row.metadata).count,visibleClients.length);
+    }finally{dbAudit.close()}
+
   }catch(err){err.message+="\nLogs finais do servidor de teste:\n"+app.logs().slice(-2500);throw err}
   finally{await app.cleanup()}
 });

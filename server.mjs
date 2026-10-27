@@ -66,7 +66,7 @@ function parseBody(req,maxBytes=1_000_000){
   });
 }
 function safeText(v,max=500){return String(v??"").trim().slice(0,max)}
-function csvCell(v){const s=String(v??"").replace(/\r?\n/g," ");return /[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+function csvCell(v){let s=String(v??"").replace(/[\r\n]/g," ");if(/^[\s]*[=+@\-\t]/.test(s))s="\u0027"+s;return /[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
 const trafficBuckets=new Map();
 function clientIp(req){return requestIp(req)}
 function trafficLimit(req,url){
@@ -598,7 +598,7 @@ async function api(req,res,url){
   if(req.method==="GET"&&url.pathname==="/api/dashboard"){guard("dashboard.read");return send(res,200,dashboard(tenant))}
 
   if(req.method==="GET"&&url.pathname==="/api/clients/export"){
-    guard("clients.read");
+    guard("clients.export");
     const rows=all(`select c.*,
       count(distinct case when a.status='completed' then a.id end) visits,
       max(case when a.status='completed' then a.start_at end) last_visit,
@@ -614,7 +614,8 @@ async function api(req,res,url){
       c.name,c.phone||"",c.email||"",c.birthday||"",c.instagram||"",c.facebook||"",c.referral_reference||"",c.source||"",
       (()=>{try{return JSON.parse(c.tags||"[]").join(", ")}catch{return ""}})(),c.notes||"",Number(c.visits||0),c.last_visit||"",(Number(c.lifetime_cents||0)/100).toFixed(2),c.created_at
     ].map(csvCell).join(";"))].join("\r\n");
-    return send(res,200,body,{"content-type":"text/csv; charset=utf-8","content-disposition":'attachment; filename="clientes-salon-os-'+new Date().toISOString().slice(0,10)+'.csv"'});
+    audit(db,user,"clients.export","clients",null,{count:rows.length});
+    return send(res,200,body,{"content-type":"text/csv; charset=utf-8","content-disposition":'attachment; filename="novagente-clientes-'+new Date().toISOString().slice(0,10)+'.csv"',"cache-control":"no-store","x-content-type-options":"nosniff"});
   }
   if(req.method==="GET"&&url.pathname==="/api/clients"){
     guard("clients.read");
