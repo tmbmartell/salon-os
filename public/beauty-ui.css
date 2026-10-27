@@ -400,3 +400,20 @@ body{background:var(--bg);color:var(--ink)}
 
 /* Etapa 17: controles de exportação em massa apenas para perfis autorizados. */
 #exportClients[hidden],#marketingExportClients[hidden]{display:none!important}
+
+/* Etapa 19: barra pública e persistente de demonstração. */
+#freePreviewNotice[hidden]{display:none!important}
+#freePreviewNotice:not([hidden]){
+  position:fixed;top:0;left:0;right:0;z-index:9999;
+  min-height:38px;padding:10px 16px;
+  background:#493b2d;color:#fff5df;
+  text-align:center;font-size:12px;line-height:1.5;font-weight:700;
+  box-shadow:0 2px 14px rgba(0,0,0,.12)
+}
+body.is-free-preview{padding-top:40px}
+body.is-free-preview .authGate{padding-top:45px}
+@media(max-width:640px){
+  #freePreviewNotice:not([hidden]){font-size:10px;padding:7px 9px}
+  body.is-free-preview{padding-top:56px}
+  body.is-free-preview .authGate{padding-top:60px}
+}
