@@ -7,7 +7,7 @@
   if(!block)return;
   let job=null,processing=false,stopRequested=false;
   const state=$("neBackfillStatus"),start=$("neBackfillStart"),step=$("neBackfillStep"),
-    pause=$("neBackfillPause"),resume=$("neBackfillResume"),date=$("neBackfillDate");
+    pause=$("neBackfillPause"),resume=$("neBackfillResume"),cancel=$("neBackfillCancel"),date=$("neBackfillDate");
   async function api(path,{method="GET",body}={}){
     const init={method,credentials:"same-origin",headers:{}};
     if(body!==undefined){init.headers["content-type"]="application/json";init.body=JSON.stringify(body)}
@@ -34,6 +34,7 @@
     step.disabled=processing||job?.status!=="running";
     pause.disabled=job?.status!=="running";
     resume.disabled=processing||job?.status!=="paused";
+    cancel.disabled=!job||!["running","paused"].includes(job.status);
     date.disabled=!!job&&["running","paused"].includes(job.status);
   }
   async function refresh(){
@@ -77,10 +78,18 @@
     try{job=(await api("resume",{method:"POST"})).job;display("Retomada. Clique para processar o próximo lote.")}
     catch(e){state.textContent="Não foi possível retomar: "+e.message;await refresh()}
   }
+  async function cancelJob(){
+    if(!job||!["running","paused"].includes(job.status))return;
+    if(!confirm("Encerrar esta importação? As mensagens já importadas serão preservadas."))return;
+    stopRequested=true;
+    try{job=(await api("cancel",{method:"POST"})).job;display("Encerrada. Você pode iniciar uma importação nova.")}
+    catch(e){state.textContent="Não foi possível encerrar: "+e.message;await refresh()}
+  }
   start.addEventListener("click",startNew);
   step.addEventListener("click",processPages);
   pause.addEventListener("click",pauseJob);
   resume.addEventListener("click",resumeJob);
+  cancel.addEventListener("click",cancelJob);
   block.addEventListener("toggle",()=>{if(block.open)refresh()});
   window.addEventListener("ne:backfill-open",refresh);
   display();
