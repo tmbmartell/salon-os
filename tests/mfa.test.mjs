@@ -123,9 +123,9 @@ test("HTTP MFA: configuração cifrada, segundo fator antes do cookie, recupera�
     assert.equal((await send("/api/auth/mfa/status",{cookie:verify.cookie})).data.enabled,false);
     assert.equal((await login()).status,200);
     // Mesmo solicitando um novo desafio, erros do MFA somam no bloqueio da conta.
-    const secondEnroll=await owner("/api/auth/mfa/enroll",{method:"POST",body:{password:pass}});
+    const secondEnroll=await send("/api/auth/mfa/enroll",{method:"POST",cookie:verify.cookie,body:{password:pass}});
     assert.equal(secondEnroll.status,200);
-    assert.equal((await owner("/api/auth/mfa/confirm",{method:"POST",body:{
+    assert.equal((await send("/api/auth/mfa/confirm",{method:"POST",cookie:verify.cookie,body:{
       code:totpAt(secondEnroll.data.secret)
     }})).status,200);
     const challengeA=await login();assert.equal(challengeA.status,202);
