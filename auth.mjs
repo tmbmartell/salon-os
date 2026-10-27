@@ -79,7 +79,7 @@ export function can(user,permission){
   const grants={
     manager:["marketing.read","marketing.write","dashboard.read","clients.read","clients.write","team.read","team.write","services.read","services.write","appointments.read","appointments.write","resources.read","resources.write","conversations.read","conversations.write","whatsapp.send","jev.read","finance.read","finance.write","cash.read","cash.write","inventory.read","inventory.write","suppliers.read","suppliers.write","commissions.read","commissions.write","checkout.write","analytics.read","recovery.write","agents.read","agents.write","agents.approve","agents.execute","admin.read","retention.read","retention.write","technical.read","technical.write","packages.read","packages.manage","packages.sell","staff.read","staff.manage","retail.read","retail.manage","retail.sell","reports.read","reports.export"],
     reception:["marketing.read","dashboard.read","clients.read","clients.write","team.read","services.read","appointments.read","appointments.write","resources.read","conversations.read","conversations.write","whatsapp.send","cash.read","cash.write","inventory.read","suppliers.read","checkout.write","analytics.read","recovery.write","retention.read","retention.write","technical.read","packages.read","packages.sell","staff.read","retail.read","retail.sell"],
-    professional:["dashboard.read","clients.read","team.read","services.read","appointments.read","appointments.write","technical.read","technical.write"]
+    professional:["dashboard.read","clients.read","team.read","staff.read","services.read","appointments.read","appointments.write","technical.read","technical.write"]
   };
   return (grants[user.role]||[]).includes(permission);
 }
@@ -132,6 +132,30 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
       db.exec("COMMIT");
     }catch(e){db.exec("ROLLBACK");throw e}
     return {handled:true,result:send(res,200,{ok:true})};
+  }
+  // Convites: o token só é retornado uma vez à proprietária, jamais listado.
+  // Aceitação não concede acesso de proprietária e exige senha própria.
+  if(url.pathname==="/api/auth/invitations/accept"&&req.method==="POST"){
+    const b=await parseBody(req),token=String(b.token||"").trim(),
+      password=String(b.password||"");
+    if(token.length<30||password.length<12||password.length>128)
+      return {handled:true,result:send(res,400,{error:"invalid_invite_or_password"})};
+    let result;
+    db.exec("BEGIN IMMEDIATE");
+    try{
+      const invite=db.prepare(`select * from user_invites where token_hash=? and accepted_at is null and expires_at>?`).get(sha(token),new Date().toISOString());
+      if(!invite||!["manager","reception","professional"].includes(invite.role))
+        throw Object.assign(new Error("invitation_invalid_or_expired"),{status:410});
+      const existing=db.prepare("select id from users where tenant_id=? and lower(email)=?").get(invite.tenant_id,invite.email.toLowerCase());
+      if(existing)throw Object.assign(new Error("user_already_exists"),{status:409});
+      const userId=crypto.randomUUID(),stamp=new Date().toISOString();
+      db.prepare(`insert into users(id,tenant_id,name,email,role,active,created_at,password_hash,updated_at)
+        values(?,?,?,?,?,1,?,?,?)`).run(userId,invite.tenant_id,invite.name,invite.email,invite.role,stamp,makePasswordHash(password),stamp);
+      db.prepare("update user_invites set accepted_at=? where id=? and accepted_at is null").run(stamp,invite.id);
+      db.exec("COMMIT");
+      result={ok:true,email:invite.email,role:invite.role};
+    }catch(e){db.exec("ROLLBACK");return {handled:true,result:send(res,e.status||400,{error:e.message||"invitation_failed"})}}
+    return {handled:true,result:send(res,201,result)};
   }
   if(url.pathname==="/api/auth/login"&&req.method==="POST"){
     const b=await parseBody(req),email=String(b.email||"").trim().toLowerCase(),password=String(b.password||""),workspace=String(b.workspace||"").trim().toLowerCase();

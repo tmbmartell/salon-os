@@ -935,6 +935,17 @@ async function loadStaff(){
   try{
     const d=await api("/api/staff/overview?period="+encodeURIComponent(period));state.staffOverview=d;
     const can=staffCanManage();
+    if(d.limited){
+      $("#teamList").innerHTML=d.metrics.map(p=>'<article class="ne-team-basic-card"><span class="avatar">'+initials(p.name)+'</span><h3>'+esc(p.name)+'</h3><p>'+esc(p.role||"Profissional")+'</p><div class="tags">'+(p.specialties||[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join("")+'</div></article>').join("")||'<p class="muted">Nenhum profissional ativo.</p>';
+      $("#staffPerformanceList").textContent="Indicadores financeiros disponíveis somente para gerência e proprietária.";
+      $("#staffTimeOffList").textContent="Informações de afastamentos individuais restritas à gerência.";
+      const management=$("#team .ne-stage8-grid");
+      if(management)$$('[data-ne-tab="performance"],[data-ne-tab="leave"]',management).forEach(el=>el.hidden=true);
+      const timeBtn=$('#team [data-open="timeOffModal"]');if(timeBtn)timeBtn.hidden=true;
+      return;
+    }
+    const management=$("#team .ne-stage8-grid");
+    if(management)$$('[data-ne-tab="performance"],[data-ne-tab="leave"]',management).forEach(el=>el.hidden=false);
     $("#teamList").innerHTML=d.metrics.map(p=>'<article><span class="avatar">'+initials(p.name)+'</span><h3>'+esc(p.name)+'</h3><p>'+esc(p.role||"Profissional")+'</p><div class="tags">'+(p.specialties||[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join("")+'</div><div class="staffQuick"><strong>'+moneyBR(p.revenue)+'</strong><small>'+p.appointments+' atendimentos · comissão '+moneyBR(p.commission_total)+'</small></div>'+(can?'<button type="button" class="secondary smallBtn" data-staff-manage="'+p.id+'">Escala & meta</button>':'')+'</article>').join("");
     $("#staffPerformanceList").innerHTML=d.metrics.map(p=>{
       const g=p.goal||{},revTarget=Number(g.target_revenue||0),apTarget=Number(g.target_appointments||0);

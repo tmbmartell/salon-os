@@ -311,3 +311,47 @@ body{background:var(--bg);color:var(--ink)}
 .ne-owner-definitions-body p{font-size:12px;line-height:1.55;color:var(--muted);margin:0 0 8px}
 @media(max-width:1080px){.ne-owner-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.ne-owner-kpis{gap:9px}.ne-owner-kpi{min-height:146px;padding:12px}.ne-owner-kpi strong{font-size:20px}[data-owner-panel]{padding:13px}.ne-owner-small-metrics{grid-template-columns:1fr}.ne-owner-alert{flex-direction:column;align-items:stretch}.ne-owner-chart{gap:2px;padding:14px 5px}.ne-owner-bar-column small{font-size:8px}.ne-owner-menu-item{flex:1 1 auto}}
+
+/* Etapa 8 — Administração e Equipe: cards progressivos e privacidade. */
+.ne-stage8-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:15px 0 19px}
+.ne-stage8-card{display:grid;align-content:start;justify-items:start;gap:7px;min-width:0;min-height:127px;text-align:left;background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px;color:var(--ink);box-shadow:var(--shadow);cursor:pointer}
+.ne-stage8-card:hover,.ne-stage8-card.is-active,.ne-stage8-card:focus-visible{border-color:var(--accent);outline-offset:2px}
+.ne-stage8-card.is-active{background:#eef6fe}
+.ne-stage8-card strong{font-size:13px}.ne-stage8-card small{font-size:11px;color:var(--muted)}
+.ne-stage8-icon{display:grid;place-items:center;background:var(--soft);color:var(--accent);width:35px;height:35px;border-radius:11px;font-size:21px}
+.ne-stage8-panel{background:#fff;border:1px solid var(--line);border-radius:17px;padding:18px;margin-bottom:17px}
+.ne-stage8-panel h3{font-size:16px;margin:0 0 10px}
+.ne-stage8-help{font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 12px}
+.ne-stage8-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.ne-stage8-field{display:grid;gap:7px;font-size:12px;color:var(--ink);font-weight:600}
+.ne-stage8-field input,.ne-stage8-field select{display:block;width:100%;border:1px solid var(--line);border-radius:11px;padding:10px;background:#fff;min-height:43px;font-size:13px}
+.ne-stage8-form>.primary,.ne-stage8-form>.ne-stage8-help{grid-column:1/-1;justify-self:start}
+.ne-stage8-heading{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.ne-stage8-heading .ne-stage8-help{flex:1 1 220px}
+.ne-stage8-user-management{display:grid;gap:9px;margin-bottom:20px}
+.ne-stage8-user-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;background:var(--soft);border:1px solid var(--line);border-radius:12px;flex-wrap:wrap}
+.ne-stage8-user-info{display:grid;gap:4px;flex:1 1 160px;min-width:0}
+.ne-stage8-user-info strong{font-size:13px;overflow-wrap:anywhere}
+.ne-stage8-user-info small{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ne-stage8-user-actions{display:flex;flex-wrap:wrap;gap:6px}
+.ne-stage8-user-actions select,.ne-stage8-user-actions button{font-size:12px;padding:8px;border:1px solid var(--line);border-radius:9px;background:#fff;min-height:39px}
+.ne-stage8-role{margin:9px 0;border:1px solid var(--line);border-radius:12px;background:#fff}
+.ne-stage8-role summary{cursor:pointer;font-weight:700;font-size:13px;padding:14px}
+.ne-stage8-role-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;padding:0 12px 13px}
+.ne-stage8-role-entry{display:grid;gap:4px;padding:10px;border-radius:9px;background:var(--soft)}
+.ne-stage8-role-entry strong{font-size:12px}.ne-stage8-role-entry small{font-size:11px;color:var(--muted)}
+.ne-stage8-coming{padding:20px;border:1px dashed var(--line);border-radius:14px}
+.ne-stage8-coming p{color:var(--muted);font-size:13px;line-height:1.55}
+.ne-stage8-invites{border-top:1px solid var(--line);padding-top:10px}
+.ne-stage8-dialog{border:none;border-radius:18px;padding:25px;max-width:min(640px,calc(100vw - 26px));width:100%;box-shadow:0 20px 70px #1234}
+.ne-stage8-dialog::backdrop{background:rgba(13,33,61,.55)}
+.ne-stage8-dialog .ne-stage8-form{grid-template-columns:1fr}
+.ne-stage8-dialog-actions{display:flex;gap:9px;flex-wrap:wrap}
+.ne-stage8-invite-link{display:grid;gap:10px}
+.ne-stage8-invite-link input{width:100%;min-height:42px;border:1px solid var(--line);padding:10px;border-radius:9px}
+.ne-stage8-security>.ne-security-quick{margin-bottom:17px}
+.ne-team-basic-card h3{margin:10px 0 6px}
+.ne-stage8-panel.hidden{display:none!important}
+.ne-stage8-card[hidden],.ne-stage8-panel [hidden]{display:none!important}
+@media(max-width:900px){.ne-stage8-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:580px){.ne-stage8-card{padding:12px;min-height:111px}.ne-stage8-card strong{font-size:12px}.ne-stage8-panel{padding:12px}.ne-stage8-form{grid-template-columns:1fr}.ne-stage8-user-actions{width:100%}.ne-stage8-user-actions select{flex:1}}
