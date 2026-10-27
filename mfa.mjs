@@ -90,20 +90,22 @@ export function installMfa(db){
   CREATE TABLE IF NOT EXISTS mfa_login_challenges(
     id TEXT PRIMARY KEY,user_id TEXT NOT NULL,tenant_id TEXT NOT NULL,
     token_hash TEXT NOT NULL UNIQUE,expires_at TEXT NOT NULL,
-    attempts INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL
+    attempts INTEGER NOT NULL DEFAULT 0,attempt_key TEXT,created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_mfa_challenge_user ON mfa_login_challenges(tenant_id,user_id);`);
+  const columns=db.prepare("pragma table_info(mfa_login_challenges)").all().map(x=>x.name);
+  if(!columns.includes("attempt_key"))db.exec("alter table mfa_login_challenges add column attempt_key TEXT");
 }
 export const mfaEnabled=(db,userId,tenant)=>!!db.prepare(
   "select 1 x from user_mfa where user_id=? and tenant_id=? and enabled=1"
 ).get(userId,tenant);
-export function beginMfaLogin(db,user){
+export function beginMfaLogin(db,user,attemptKey){
   const token=crypto.randomBytes(32).toString("base64url");
   const id=crypto.randomUUID(),stamp=now(),expires=new Date(Date.now()+5*60000).toISOString();
   db.prepare("delete from mfa_login_challenges where user_id=? and tenant_id=?").run(user.id,user.tenant_id);
   db.prepare("delete from mfa_login_challenges where expires_at<?").run(stamp);
-  db.prepare("insert into mfa_login_challenges(id,tenant_id,user_id,token_hash,expires_at,created_at) values(?,?,?,?,?,?)")
-    .run(id,user.tenant_id,user.id,digest(token),expires,stamp);
+  db.prepare("insert into mfa_login_challenges(id,tenant_id,user_id,token_hash,expires_at,attempt_key,created_at) values(?,?,?,?,?,?,?)")
+    .run(id,user.tenant_id,user.id,digest(token),expires,attemptKey,stamp);
   return {mfa_required:true,challenge:token,expires_in_seconds:300};
 }
 function useVerification(db,entry,code){
@@ -136,11 +138,11 @@ export function completeMfaLogin(db,token,code){
     if(!ok){
       db.prepare("update mfa_login_challenges set attempts=attempts+1 where id=?").run(record.id);
       // Must commit failed attempt: return an error record rather than throw.
-      return {error:"mfa_invalid_code",status:record.attempts>=4?429:401};
+      return {error:"mfa_invalid_code",status:record.attempts>=4?429:401,attempt_key:record.attempt_key};
     }
     db.prepare("delete from mfa_login_challenges where id=?").run(record.id);
     return {user:{id:record.user_id,tenant_id:record.tenant_id,name:record.name,
-      email:record.email,role:record.role}};
+      email:record.email,role:record.role},attempt_key:record.attempt_key};
   });
 }
 export function mfaStatus(db,user){
