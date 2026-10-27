@@ -221,7 +221,7 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
         send(res,401,{error:"invalid_credentials"})};
     }
     if(mfaEnabled(db,u.id,u.tenant_id)){
-      const challenge=beginMfaLogin(db,u);
+      const challenge=beginMfaLogin(db,u,attemptKey);
       return {handled:true,result:send(res,202,challenge)};
     }
     db.prepare("delete from auth_login_attempts where attempt_key=?").run(attemptKey);
@@ -239,7 +239,11 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
     let result;
     try{result=completeMfaLogin(db,String(b.challenge||""),String(b.code||""))}
     catch(e){return {handled:true,result:send(res,e.status||400,{error:e.message})}}
-    if(result.error)return {handled:true,result:send(res,result.status,{error:result.error})};
+    if(result.error){
+      const locked=result.attempt_key?loginFailure(db,result.attempt_key,Date.now()):false;
+      const status=locked?429:result.status;
+      return {handled:true,result:send(res,status,{error:locked?"login_temporarily_blocked":result.error})};
+    }
     const u=result.user,token=crypto.randomBytes(32).toString("base64url"),
       ts=new Date(),expires=new Date(ts.getTime()+7*DAY);
     const label=String(req.headers["user-agent"]||"Dispositivo não identificado").slice(0,180);
@@ -247,7 +251,7 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
     db.prepare("insert into auth_sessions(id,tenant_id,user_id,token_hash,expires_at,created_at,last_seen_at,device_label) values(?,?,?,?,?,?,?,?)")
       .run(crypto.randomUUID(),u.tenant_id,u.id,sha(token),expires.toISOString(),ts.toISOString(),ts.toISOString(),label);
     const user={id:u.id,tenantId:u.tenant_id,name:u.name,email:u.email,role:u.role};
-    db.prepare("delete from auth_login_attempts where attempt_key=?").run(loginAttemptKey(String(u.email).toLowerCase(),""));
+    if(result.attempt_key)db.prepare("delete from auth_login_attempts where attempt_key=?").run(result.attempt_key);
     audit(db,user,"auth.login.mfa","user",u.id,{});
     return {handled:true,result:send(res,200,{ok:true,user},{"set-cookie":sessionCookie(req,token,7*24*3600)})};
   }
