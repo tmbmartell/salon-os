@@ -56,3 +56,7 @@
 @media(max-width:700px){.ne-booking-compose{flex-direction:column}.ne-booking-user,.ne-booking-bot{max-width:100%}}
 /* Etapa 24.1 Mobile · booking conversation */
 @media(max-width:700px){.ne-booking-thread{min-height:96px;max-height:260px;padding:11px}.ne-booking-preview .ne-auto-settings-inside{padding:11px}.ne-booking-compose{gap:7px}}
+
+.ne-booking-client-label{display:grid;gap:7px;font-size:12px;font-weight:750;color:var(--ne-text-secondary)}
+.ne-booking-client-label select{width:100%;min-height:44px;border-radius:10px;background:var(--ne-field);border:1px solid var(--ne-outline);color:var(--ne-text);font-size:13px;padding:10px 12px}
+.ne-booking-client-label select:focus-visible{outline:2px solid #ad83e0;outline-offset:2px}
