@@ -25,3 +25,24 @@ test("QR is prepared on first click, refreshed without hiding old image and erro
  for(const marker of ["await fetchWaQr()","startWaQrPoll()","preloaded.onload=resolve","waQrMessage.classList.toggle","waQrImage.scrollIntoView"])assert.ok(app.includes(marker),marker);
  assert.ok(app.includes("waPrepareButton.onclick=()=>displayWaQr({prepare:true})"));
 });
+test("QR uses CSP-approved data images rather than blocked blob URLs",()=>{
+ const begin=app.indexOf("async function fetchWaQr()");
+ const end=app.indexOf("async function checkWaPairing()",begin);
+ const qr=app.slice(begin,end);
+ assert.ok(qr.includes("new FileReader()"));
+ assert.ok(qr.includes("reader.readAsDataURL(image)"));
+ assert.ok(qr.includes("data:"+String.fromCharCode(34)+"+type+")); // type-constrained image URL
+ assert.ok(!qr.includes("URL.createObjectURL("));
+ assert.ok(!qr.includes("URL.revokeObjectURL("));
+ assert.ok(server.includes("img-src 'self' data:"));
+});
+
+test("Only the primary app controls QR and preparation; onboarding only manages ownership",()=>{
+ const onboarding=readFileSync(new URL("public/whatsapp-onboarding.js",root),"utf8");
+ assert.ok(onboarding.includes("neWhatsappSessionForm"));
+ assert.ok(onboarding.includes("/api/whatsapp/session/link"));
+ assert.doesNotMatch(onboarding,/get\(["'](?:showQr|prepareWaha|waQrImage)["']\)/);
+ assert.doesNotMatch(onboarding,/\.onclick\s*=|URL\.createObjectURL|URL\.revokeObjectURL/);
+ assert.ok(app.includes("waQrButton.onclick=()=>displayWaQr()"));
+ assert.ok(app.includes("reader.readAsDataURL(image)"));
+});
