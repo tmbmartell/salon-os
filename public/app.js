@@ -159,7 +159,8 @@ $("#appointmentForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromE
 function updateWahaUi(){
   const w=state.whatsapp||{},label=w.connected?"WhatsApp conectado":w.status==="UNASSIGNED"?"Vincule o WhatsApp":w.configured?(w.status||"WAHA aguardando QR"):"WAHA sem configuração";
   $("#whatsappBadge").textContent=label;$("#whatsappBadge").classList.toggle("ok",!!w.connected);
-  $("#waSetupText").textContent=w.connected?"Sessão "+w.session+" conectada. Atendimento humano disponível.":w.status==="UNASSIGNED"?"É necessário vincular uma sessão exclusiva a este salão.":w.configured?"Sessão "+w.session+" cadastrada. Prepare a conexão e escaneie o QR Code.":"Conectividade WAHA indisponível ou credenciais não configuradas.";
+  const aiNote=!w.connected?"":!w.ai_enabled?" Respostas automáticas desligadas.":w.reply_engine==="configured_llm"?" Recepcionista automática ativa com IA configurada.":" Recepcionista automática ativa no modo básico. Para conversa avançada, configure a IA em Agentes.";
+  $("#waSetupText").textContent=(w.connected?"Sessão "+w.session+" conectada.":w.status==="UNASSIGNED"?"É necessário vincular uma sessão exclusiva a este salão.":w.configured?"Sessão "+w.session+" cadastrada. Prepare a conexão e escaneie o QR Code.":"Conectividade WAHA indisponível ou credenciais não configuradas.")+aiNote;
   $("#prepareWaha").disabled=!w.configured||!w.session||!["owner","manager"].includes(state.user?.role);$("#showQr").disabled=!w.configured||!w.session||!["owner","manager"].includes(state.user?.role);
 }
 const convStatusName={open:"Aberta",pending:"Pendente",resolved:"Resolvida"};
