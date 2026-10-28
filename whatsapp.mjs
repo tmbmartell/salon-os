@@ -150,7 +150,7 @@ export function listConversations(db,tenantId,limit=120){
     (select created_at from messages m where m.conversation_id=co.id order by m.created_at desc limit 1) last_message_created_at,
     (select direction from messages m where m.conversation_id=co.id order by m.created_at desc limit 1) last_message_direction
     from conversations co left join clients c on c.id=co.client_id and c.tenant_id=co.tenant_id left join users u on u.id=co.assigned_user_id and u.tenant_id=co.tenant_id
-    where co.tenant_id=? order by coalesce(co.last_message_at,co.created_at) desc limit ?`).all(tenantId,limit).map(x=>({...x,labels:(()=>{try{return JSON.parse(x.labels||"[]")}catch{return []}})(),client_tags:(()=>{try{return JSON.parse(x.client_tags||"[]")}catch{return []}})()}));
+    where co.tenant_id=? order by coalesce(co.last_message_at,co.created_at) desc limit ?`).all(tenantId,limit).filter(x=>x.channel!=="demo_booking").map(x=>({...x,labels:(()=>{try{return JSON.parse(x.labels||"[]")}catch{return []}})(),client_tags:(()=>{try{return JSON.parse(x.client_tags||"[]")}catch{return []}})()}));
 }
 export function conversationMessages(db,tenantId,conversationId,limit=200){
   return db.prepare("select * from messages where tenant_id=? and conversation_id=? order by created_at asc limit ?").all(tenantId,conversationId,limit);
