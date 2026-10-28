@@ -172,7 +172,7 @@ export function bookingTurn({db,tenant,client,conversation,message,availability,
   save(db,tenant,conversationId,clientId,{status:"confirmed",service_id:service.id,day:state.day,appointment_id:record.id},nowMs);
   try{afterCreate(db,tenant,record)}catch(e){console.error("booking_postcreate_failed",String(e.message||e).slice(0,120))}
   try{onAudit("receptionist.booking",record.id,{client_id:clientId,conversation_id:conversationId})}catch{}
-  return {...response("Combinado! "+service.name+" confirmado para "+dayLabel(state.day)+" às "+slot.local_time+" com "+slot.professional_name+". Código: "+record.id+"."),booked:true,appointment_id:record.id};
+  return {...response("Prontinho! Seu horário para "+service.name+" está confirmado em "+dayLabel(state.day)+" às "+slot.local_time+" com "+slot.professional_name+". Código: "+record.id+"."),booked:true,appointment_id:record.id};
  }
  if(state?.status==="offered"){
   if(/\b(outro dia|outra data|outra semana)\b/.test(n)){
