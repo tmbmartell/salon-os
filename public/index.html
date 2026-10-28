@@ -6,7 +6,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="/styles.css">
-<link rel="stylesheet" href="/beauty-ui.css?v=14">
+<link rel="stylesheet" href="/beauty-ui.css?v=15">
 <link rel="stylesheet" href="/novagente-experience.css?v=1">
 <link rel="stylesheet" href="/novagente-sidebar.css?v=2">
 <link rel="stylesheet" href="/novagente-operations.css?v=1">
@@ -197,7 +197,7 @@
           <label>Identificador exclusivo da conexão<input id="neWhatsappSessionName" name="session" pattern="[A-Za-z0-9_-]{3,60}" minlength="3" maxlength="60" placeholder="ex.: novagente-estetica-01" required autocomplete="off"></label>
           <button class="secondary" type="submit">Salvar identificação</button>
         </form>
-        <div class="waActions"><button id="prepareWaha" class="secondary" type="button">Preparar conexão</button><button id="showQr" class="primary" type="button">Mostrar QR Code</button><button id="neWhatsappRefresh" class="secondary" type="button">Verificar conexão</button></div>
+        <div class="waActions"><button id="prepareWaha" class="secondary" type="button">Preparar conexão</button><button id="showQr" class="primary" type="button">Gerar QR Code</button><button id="neWhatsappRefresh" class="secondary" type="button">Verificar conexão</button></div>
         <p id="neWhatsappMessage" role="status" class="ne-wa-message">Para conectar: abra WhatsApp no celular → Dispositivos conectados → Conectar dispositivo. Aponte a câmera para o QR exibido aqui.</p>
         <img id="waQrImage" class="qrImage hidden" alt="QR Code temporário para vincular o WhatsApp do salão; mantenha esta tela aberta e escaneie com o próprio aplicativo">
       </article>
@@ -1017,7 +1017,7 @@
   </form>
 </dialog>
 <div id="toast" class="toast"></div>
-<script src="/app.js?v=204" type="module"></script>
+<script src="/app.js?v=205" type="module"></script>
 <script src="/marketing-ui.js?v=1" defer></script>
 <script src="/beauty-ui.js?v=2" defer></script>
 <script src="/novagente-experience.js?v=5" defer></script>
