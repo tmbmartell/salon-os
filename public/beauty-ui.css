@@ -417,3 +417,10 @@ body.is-free-preview .authGate{padding-top:45px}
   body.is-free-preview{padding-top:56px}
   body.is-free-preview .authGate{padding-top:60px}
 }
+
+/* WAHA pairing: QR must be readable and remain visible while refreshing. */
+.ne-wa-connection .qrImage{display:block;width:min(310px,100%);max-width:100%!important;height:auto;aspect-ratio:1;object-fit:contain;background:#fff;padding:13px;border:1px solid #bfc9de;border-radius:17px;box-shadow:0 10px 25px #0e193b24;margin:5px auto 14px;image-rendering:auto}
+.ne-wa-connection .qrImage.hidden{display:none!important}
+.ne-wa-connection .ne-wa-message{font-size:14px;line-height:1.55;max-width:62ch}
+.ne-wa-connection .waActions button{min-height:44px}
+@media(max-width:570px){.ne-wa-connection .qrImage{width:min(280px,100%);padding:10px}.ne-wa-connection .waActions{display:grid;grid-template-columns:1fr}.ne-wa-connection .waActions button{width:100%}}
