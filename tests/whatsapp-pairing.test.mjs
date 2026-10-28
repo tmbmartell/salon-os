@@ -16,3 +16,12 @@ test("WhatsApp pairing is protected by role and API key kept server-side",()=>{
 test("Persistent pilot uses tenant-only seed flag without changing other environments",()=>{
  assert.match(server,/NOVAGENTE_EMPTY_INITIAL_TENANT/);
 });
+test("WhatsApp QR UI has exactly one prepare and QR click handler",()=>{
+ assert.equal((app.match(/waPrepareButton\.onclick=/g)||[]).length,1);
+ assert.equal((app.match(/waQrButton\.onclick=/g)||[]).length,1);
+ assert.equal((app.match(/\$\("#prepareWaha"\)\.onclick=/g)||[]).length,0);
+});
+test("QR is prepared on first click, refreshed without hiding old image and error is visible",()=>{
+ for(const marker of ["await fetchWaQr()","startWaQrPoll()","preloaded.onload=resolve","waQrMessage.classList.toggle","waQrImage.scrollIntoView"])assert.ok(app.includes(marker),marker);
+ assert.ok(app.includes("waPrepareButton.onclick=()=>displayWaQr({prepare:true})"));
+});
