@@ -36,8 +36,15 @@ const HOST=process.env.HOST||"127.0.0.1";
 const DB_PATH=process.env.SALON_DB||path.join(__dirname,"data","salon.sqlite");
 const JEV_BASE=String(process.env.JEV_CONTROL_PLANE_URL||"http://100.68.82.8:9320").replace(/\/+$/,"");
 const DEFAULT_TENANT="11111111-1111-4111-8111-111111111111";
-// IA do WhatsApp desligada até homologação explícita da etapa de agentes.
+// O atendimento automático exige habilitação operacional, política ativa e recepcionista ligada.
 const WAHA_AGENT_ENABLED=process.env.NOVAGENTE_ENABLE_RECEPTIONIST_AI==="true";
+function liveReceptionistEnabled(tenantId){
+  const enabled=one("select enabled from agent_profiles where tenant_id=? and agent_key='receptionist'",[tenantId]);
+  return WAHA_AGENT_ENABLED
+    && process.env.NOVAGENTE_AUTOMATION_V2_APPROVED==="true"
+    && Number(enabled?.enabled)===1
+    && commercialPolicy(db,tenantId,"assistant_reply");
+}
 
 fs.mkdirSync(path.dirname(DB_PATH),{recursive:true});
 const db=new DatabaseSync(DB_PATH);
@@ -551,9 +558,9 @@ async function api(req,res,url){
     const signature=req.headers["x-webhook-hmac"],algorithm=req.headers["x-webhook-hmac-algorithm"];
     if(!verifyWebhook(raw,signature,algorithm))return send(res,401,{error:"invalid_webhook_signature"});
     const targetTenant=tenantForWahaEvent(db,body);if(!targetTenant)return send(res,200,{ok:true,accepted:false,reason:"unmapped_session"});
-    const receptionProfile=one("select enabled from agent_profiles where tenant_id=? and agent_key='receptionist'",[targetTenant]),receptionConfig=getAgentConfig(db,targetTenant,"receptionist");
-    const commercialAiEnabled=WAHA_AGENT_ENABLED&&process.env.NOVAGENTE_AUTOMATION_V2_APPROVED==="true"&&commercialPolicy(db,targetTenant,"assistant_reply");
-    const defaultHandlingMode=commercialAiEnabled&&Number(receptionProfile?.enabled)!==0&&receptionConfig.service?.auto_activate_new_conversations!==false?"ai":"human";
+    const receptionConfig=getAgentConfig(db,targetTenant,"receptionist");
+    const commercialAiEnabled=liveReceptionistEnabled(targetTenant);
+    const defaultHandlingMode=commercialAiEnabled&&receptionConfig.service?.auto_activate_new_conversations!==false?"ai":"human";
     const out=await ingestWahaEvent({db,tenantId:targetTenant,event:body,interpret,autoReply:commercialAiEnabled?receptionistAgentReply:null,allowAi:commercialAiEnabled,defaultHandlingMode});
     if(out.accepted&&out.type==="message"&&out.clientId){try{registerIncoming(db,targetTenant,out.clientId,String(body?.payload?.body||""),{messageId:body?.payload?.id?.id||body?.payload?.id?._serialized||null,source:"whatsapp"});}catch(e){console.error("commercial_ingest_failed",String(e.message||e).slice(0,140))}}
     return send(res,200,{ok:true,...out});
@@ -840,7 +847,7 @@ async function api(req,res,url){
     guard("conversations.write");
     const b=await parseBody(req),mode=safeText(b.mode,16);
     if(!["human","ai"].includes(mode))return send(res,400,{error:"invalid_mode"});
-    if(mode==="ai"&&(!WAHA_AGENT_ENABLED||!commercialPolicy(db,tenant,"assistant_reply")))return send(res,403,{error:"ai_not_enabled"});
+    if(mode==="ai"&&!liveReceptionistEnabled(tenant))return send(res,403,{error:"ai_not_enabled"});
     const info=run("update conversations set handling_mode=?,handling_mode_source='manual',updated_at=? where id=? and tenant_id=?",[mode,now(),modeRoute.id,tenant]);
     if(!info.changes)return send(res,404,{error:"conversation_not_found"});
     audit(db,user,"conversation.mode","conversation",modeRoute.id,{mode});
@@ -867,7 +874,9 @@ async function api(req,res,url){
   if(req.method==="GET"&&url.pathname==="/api/whatsapp/status"){
     guard("conversations.read");
     const activeSession=sessionForTenant(db,tenant);
-    return send(res,200,{...await wahaStatus(activeSession),session:activeSession,ai_enabled:WAHA_AGENT_ENABLED});
+    const active=liveReceptionistEnabled(tenant),llm=getLlmConfig(db,tenant);
+    return send(res,200,{...await wahaStatus(activeSession),session:activeSession,
+      ai_enabled:active,auto_reply_ready:active,reply_engine:active&&(llm.enabled&&llm.provider!=="internal"&&llm.has_api_key?"configured_llm":"internal_or_rules_fallback")||"disabled"});
   }
   if(req.method==="POST"&&url.pathname==="/api/whatsapp/session/link"){
     if(user.role!=="owner")return send(res,403,{error:"owner_only"});
