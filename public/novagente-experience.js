@@ -155,7 +155,7 @@ async function search(query,results){
  matches.forEach(([view,label])=>result(label,"Módulo",()=>navigate(view)));
  try{
   const response=await fetch("/api/clients?q="+encodeURIComponent(query),{credentials:"same-origin"});
-  if(response.ok&&query.trim().toLowerCase()===q){
+  if(response.ok&&document.getElementById("neV3Search")?.value.trim().toLocaleLowerCase("pt-BR")===q){
    const people=await response.json();
    if(Array.isArray(people))people.slice(0,4).forEach(p=>result(p.name,"Cliente",()=>{
     navigate("clients");const inp=document.getElementById("clientSearch");if(inp){inp.value=p.name;inp.dispatchEvent(new Event("input",{bubbles:true}))}
