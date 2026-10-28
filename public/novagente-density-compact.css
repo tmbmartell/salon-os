@@ -1,0 +1,190 @@
+/* NOVAGENTE Estética · Etapa 27 · Densidade compacta global
+   Objetivo: aproximadamente 10–12% menos volume visual em desktop,
+   sem usar CSS zoom/transform que prejudicam layout ou clique.
+   No celular: escala menor, mas corpo mínimo 14px e controles >=44px.
+   Esta camada deve ser SEMPRE o último stylesheet da aplicação.
+*/
+:root{
+ --ne-density:0.90;
+ --ne-type-display:clamp(25px,2.4vw,32px);
+ --ne-type-heading:clamp(19px,1.85vw,24px);
+ --ne-type-subheading:17px;
+ --ne-type-body:14px;
+ --ne-type-secondary:12.5px;
+ --ne-type-caption:12px;
+ --ne-round-card:17px;
+ --ne-card-elevation:0 6px 19px #243d7510;
+ --ne-control-h:44px;
+}
+html{font-size:15px}
+html body{font-size:var(--ne-type-body);line-height:1.45}
+html[data-ne-theme] .view:not(#dashboard){font-size:var(--ne-type-body)}
+html[data-ne-theme] .view:not(#dashboard)>.sectionTitle{
+ min-height:106px;padding:18px 22px;border-radius:18px!important;
+}
+html[data-ne-theme] .view:not(#dashboard)>.sectionTitle :is(h1,h2){
+ font-size:clamp(25px,2.4vw,31px)!important;
+ line-height:1.17!important;
+}
+html[data-ne-theme] .view:not(#dashboard)>.sectionTitle :is(p,small){font-size:13px!important}
+html[data-ne-theme] .view:not(#dashboard) :is(.panelhead h2,.sectionHeading h2,.sectionHead h2,.ne-stage8-head h2,.ne-service-head h2){
+ font-size:var(--ne-type-heading)!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.panelhead p,.sectionHeading p,.sectionHead p){
+ font-size:12.5px!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.panel,.hubCard,.metrics>article,.cards>article,
+ .ne-agenda-panel,.ne-waitlist-panel,.ne-agenda-card,.ne-service-card,.ne-technical-card,
+ .ne-stock-product,.ne-stage8-card,.ne-owner-kpi,.ne-marketing-card,.ne-finance-action,
+ .ne-backfill,.ne-pilot-readiness,.ne-mfa-box){
+ border-radius:17px!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,
+ .ne-marketing-card,.hubCard,.ne-owner-kpi){
+ min-height:132px!important;padding:14px!important;border-radius:16px!important;gap:6px;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.ne-marketing-card,.hubCard,.ne-owner-kpi)
+ :is(.ne-action-icon,.ne-owner-kpi-icon,.ne-stock-action-icon,.hubIcon,.icon,.ne-ui-icon){
+ width:43px!important;height:43px!important;min-width:43px;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.ne-marketing-card,.hubCard)
+ > span:first-child:not(.ne-action-icon){
+ width:43px!important;height:43px!important;
+}
+html[data-ne-theme] .view:not(#dashboard) .ne-ui-icon svg{width:23px;height:23px}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.ne-marketing-card,.hubCard) strong{
+ font-size:15.5px!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.ne-marketing-card,.hubCard) small{
+ font-size:12px!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-work-toolbar,.ne-finance-actions,.cards,.ne-owner-kpis,.ne-marketing-cards){
+ gap:10px;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.panelhead,.ne-work-toolbar,.ne-agenda-tools){gap:11px}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-agenda-card summary,.ne-service-card summary,
+ .ne-stock-product summary,.ne-technical-card summary){
+ min-height:60px;padding:12px 14px;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-agenda-details,.ne-technical-body,.ne-service-details){
+ padding:14px;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-agenda-summary strong,.ne-stock-title strong,
+ .ne-service-card strong,.ne-technical-card strong,.bw-conversation-heading strong,
+ .ne-client-card h3,.ne-owner-menu-item,.ne-stage8-card strong){
+ font-size:14px!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-agenda-summary small,.ne-stock-title small,
+ .ne-service-card small,.bw-conversation-heading small,.ne-owner-kpi small,.ne-client-card p){
+ font-size:12px!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-filter-group,.ne-ops-mini-nav,.ne-owner-menu){gap:7px}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-filter-group button,.ne-ops-mini-nav button,
+ .ne-owner-menu-item,.ne-stage8-tab){
+ min-height:42px;padding:9px 12px!important;font-size:13px!important;
+}
+html[data-ne-theme] :is(.view:not(#dashboard),dialog,.modalForm) :is(input:not([type="checkbox"]):not([type="radio"]),select){
+ min-height:var(--ne-control-h);
+}
+html[data-ne-theme] :is(.view:not(#dashboard),dialog,.modalForm) :is(input,select,textarea){
+ font-size:14px!important;
+}
+html[data-ne-theme] :is(.view:not(#dashboard),dialog,.modalForm) label{font-size:13px!important}
+html[data-ne-theme] .view:not(#dashboard) :is(.chip,.tag,.status,.ne-agenda-status){font-size:11.5px!important;padding:6px 9px}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-agenda-time,.ne-service-price){font-size:15px}
+html[data-ne-theme] :is(dialog,.modalForm,.ne-security-dialog) :is(.modalHead h2,.modalHead h3,h2){font-size:22px!important}
+html[data-ne-theme] :is(dialog,.modalForm,.ne-security-dialog) :is(.modalHead p,small){font-size:12px}
+html[data-ne-theme] .view:not(#dashboard) :is(th,.tableHead){font-size:12px!important}
+html[data-ne-theme] .view:not(#dashboard) :is(td,.tableCell,.row,.tableLike){font-size:12.5px}
+/* Home: compacta banner, módulos, cards de resultado e listas. */
+html #dashboard .ne-v3{gap:17px}
+html #dashboard .ne-v3-hero{
+ min-height:134px;padding:23px 30px;border-radius:19px;gap:20px;
+}
+html #dashboard .ne-v3-hero h2{font-size:clamp(25px,2.9vw,37px)!important;line-height:1.13}
+html #dashboard .ne-v3-hero p{font-size:14px}
+html #dashboard .ne-v3-date-card{max-width:240px;min-width:185px;padding:12px 14px;border-radius:16px}
+html #dashboard .ne-v3-date-icon{width:43px;height:43px}
+html #dashboard .ne-v3-date-copy strong{font-size:14px}
+html #dashboard .ne-v3-section-head{margin-bottom:10px}
+html #dashboard .ne-v3-section-head h3{font-size:19px}
+html #dashboard .ne-v3-grid{gap:11px}
+html #dashboard .ne-v3-tile{min-height:143px;padding:15px 16px;gap:13px;border-radius:16px}
+html #dashboard .ne-v3-tile-icon{width:45px;height:45px}
+html #dashboard .ne-v3-tile-icon svg{width:25px;height:25px}
+html #dashboard .ne-v3-tile-copy strong{font-size:15.5px}
+html #dashboard .ne-v3-tile-copy small{font-size:11.5px}
+html #dashboard .ne-v3-metrics{gap:11px}
+html #dashboard .ne-v3-metric{min-height:106px;padding:13px;gap:11px;border-radius:16px}
+html #dashboard .ne-v3-metric-icon{width:44px;height:44px}
+html #dashboard .ne-v3-metric-icon svg{width:23px;height:23px}
+html #dashboard .ne-v3-metric-value{font-size:clamp(18px,1.8vw,24px)}
+html #dashboard .ne-v3-metric-label{font-size:12px}
+html #dashboard .ne-v3-listbox{padding:14px 16px 12px;border-radius:16px}
+html #dashboard .ne-v3-listbox .ne-v3-section-head h3{font-size:17px}
+html #dashboard .ne-v3-entry{min-height:59px;padding:8px 3px}
+html #dashboard .ne-v3-avatar{width:38px;height:38px}
+/* Cabeçalho e sidebar passam pelo mesmo padrão, sem ícones minúsculos. */
+@media(min-width:901px){
+ html body .shell{grid-template-columns:198px minmax(0,1fr)!important}
+ html body .sidebar.ne-rail-sidebar{width:198px!important;padding:13px 11px!important}
+ html body .sidebar.ne-rail-sidebar .brand{min-height:85px;padding:8px 5px 13px}
+ html body .sidebar.ne-rail-sidebar .brand .logo{width:152px!important;max-width:152px!important}
+ html body .sidebar.ne-rail-sidebar nav{gap:6px}
+ html body .sidebar.ne-rail-sidebar nav .ne-rail-button{min-height:47px!important;padding:8px 11px!important;gap:10px}
+ html body .sidebar.ne-rail-sidebar nav .ne-rail-button svg{width:20px!important;height:20px!important}
+ html body .sidebar.ne-rail-sidebar nav .ne-rail-button .ne-rail-label{font-size:12.5px!important}
+ html body .sidebar.ne-rail-sidebar nav .ne-rail-group .bw-submenu{font-size:13px}
+ html body .sidebar.ne-rail-sidebar nav .ne-rail-group .bw-submenu [data-view]{font-size:12.5px!important;min-height:44px}
+ html body .sidebar.ne-rail-sidebar nav .ne-rail-group .bw-submenu{left:205px;max-height:calc(100dvh - 24px)}
+ html body:has(#dashboard.active) .topbar{padding:13px 20px 9px!important;gap:10px!important}
+ html body:has(#dashboard.active) .ne-v3-searchbar{min-height:44px!important;padding:0 16px}
+ html body:has(#dashboard.active) .ne-v3-searchbar input{height:44px;font-size:13px}
+ html body:has(#dashboard.active) .topbar #quickAppointment{min-height:44px;padding:9px 17px}
+ html[data-ne-theme="light"] body:has(#dashboard.active) #dashboard.active,
+ html[data-ne-theme="dark"] body:has(#dashboard.active) #dashboard.active{
+ width:calc(100% - 40px)!important;margin:0 20px 24px!important;
+ }
+}
+/* Tablet: a escala reduz sem colocar campos lado a lado quando não cabem. */
+@media(min-width:571px) and (max-width:900px){
+ html #dashboard .ne-v3-hero{min-height:128px;padding:20px}
+ html #dashboard .ne-v3-tile{min-height:143px}
+}
+/* Celular: redução moderada, preservando o mínimo legível e área de toque. */
+@media(max-width:570px){
+ :root{--ne-type-body:14px;--ne-type-heading:19px;--ne-control-h:44px}
+ html #dashboard .ne-v3{gap:15px}
+ html #dashboard .ne-v3-hero{min-height:0;padding:18px 17px;gap:12px;border-radius:17px}
+ html #dashboard .ne-v3-hero h2{font-size:26px!important}
+ html #dashboard .ne-v3-hero p{font-size:12px}
+ html #dashboard .ne-v3-date-card{width:100%;max-width:none;min-width:0;padding:10px 11px}
+ html #dashboard .ne-v3-date-icon{width:40px;height:40px}
+ html #dashboard .ne-v3-section-head h3{font-size:17px}
+ html #dashboard .ne-v3-grid{gap:9px}
+ html #dashboard .ne-v3-tile{min-height:139px;padding:13px;gap:10px}
+ html #dashboard .ne-v3-tile-icon{width:43px;height:43px}
+ html #dashboard .ne-v3-tile-copy strong{font-size:14px}
+ html #dashboard .ne-v3-tile-copy small{font-size:11px}
+ html #dashboard .ne-v3-metrics{gap:9px}
+ html #dashboard .ne-v3-metric{min-height:118px;padding:11px;gap:8px}
+ html #dashboard .ne-v3-metric-icon{width:38px;height:38px}
+ html #dashboard .ne-v3-metric-value{font-size:21px}
+ html[data-ne-theme] .view:not(#dashboard)>.sectionTitle{min-height:95px;padding:16px!important}
+ html[data-ne-theme] .view:not(#dashboard)>.sectionTitle :is(h1,h2){font-size:23px!important}
+ html[data-ne-theme] .view:not(#dashboard)>.sectionTitle :is(p,small){font-size:12px!important}
+ html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,
+ .ne-marketing-card,.hubCard,.ne-owner-kpi){min-height:133px!important;padding:12px!important}
+ html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.ne-marketing-card,.hubCard) strong{
+ font-size:14px!important
+ }
+ html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.ne-marketing-card,.hubCard) small{
+ font-size:12px!important
+ }
+ html[data-ne-theme] .view:not(#dashboard) :is(.ne-filter-group button,.ne-ops-mini-nav button){min-height:42px}
+}
+/* Respeita preferência do usuário e garante foco visível. */
+@media(prefers-reduced-motion:reduce){
+ html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.hubCard),
+ html #dashboard .ne-v3-tile{transition:none}
+}
