@@ -265,7 +265,77 @@ $("#chatModeButton").onclick=async()=>{
 };
 $("#messageForm").onsubmit=async e=>{e.preventDefault();if(!state.selectedConversation)return;const text=$("#messageText").value.trim();if(!text)return;try{await api("/api/conversations/"+state.selectedConversation.id+"/messages",{method:"POST",body:JSON.stringify({text})});$("#messageText").value="";await openConversation(state.selectedConversation.id)}catch{toast("Não foi possível enviar. Verifique o WhatsApp.")}};
 $("#prepareWaha").onclick=async()=>{try{state.whatsapp=await api("/api/whatsapp/session/prepare",{method:"POST",body:"{}"});updateWahaUi();toast("Sessão preparada")}catch{toast("WAHA ainda não configurado para este sistema")}};
-$("#showQr").onclick=()=>{$("#waQrImage").src="/api/whatsapp/session/qr?t="+Date.now();$("#waQrImage").classList.remove("hidden")};
+// Pairing is always initiated by the logged-in owner/manager and never sends a message.
+let waQrPoll=null,waQrBlobUrl=null,waQrLoading=false;
+const waQrMessage=$("#neWhatsappMessage"),waQrImage=$("#waQrImage");
+const setWaQrNotice=message=>{waQrMessage.textContent=message;};
+const clearWaQrImage=()=>{
+  if(waQrBlobUrl){URL.revokeObjectURL(waQrBlobUrl);waQrBlobUrl=null}
+  waQrImage.removeAttribute("src");waQrImage.classList.add("hidden");
+};
+const stopWaQrPoll=()=>{if(waQrPoll){clearInterval(waQrPoll);waQrPoll=null}};
+async function fetchWaQr(){
+  if(waQrLoading)return;
+  waQrLoading=true;
+  try{
+    const response=await fetch("/api/whatsapp/session/qr?t="+Date.now(),{credentials:"same-origin",cache:"no-store"});
+    if(!response.ok){
+      const error=await response.json().catch(()=>({}));
+      throw Error(error.error||("qr_http_"+response.status));
+    }
+    const type=(response.headers.get("content-type")||"").split(";")[0];
+    if(!["image/png","image/jpeg","image/webp"].includes(type))throw Error("invalid_qr_format");
+    const blob=await response.blob();if(blob.size<100||blob.size>1000000)throw Error("invalid_qr_size");
+    clearWaQrImage();waQrBlobUrl=URL.createObjectURL(blob);
+    waQrImage.src=waQrBlobUrl;waQrImage.classList.remove("hidden");
+    setWaQrNotice("No WhatsApp do celular: Configurações > Dispositivos conectados > Conectar dispositivo. Escaneie o QR abaixo. Ele é atualizado automaticamente enquanto a conexão aguarda.");
+  }catch(error){
+    clearWaQrImage();
+    setWaQrNotice("O QR ainda não está disponível ("+String(error.message||error).slice(0,90)+"). Clique em Preparar conexão e tente novamente.");
+  }finally{waQrLoading=false}
+}
+async function checkWaPairing(){
+  try{
+    const w=await api("/api/whatsapp/status");
+    state.whatsapp=w;updateWahaUi();
+    if(w.connected){
+      stopWaQrPoll();clearWaQrImage();
+      setWaQrNotice("WhatsApp conectado! Pronto para receber atendimento humano. A IA continua desligada.");
+      return;
+    }
+    if(w.status==="UNAVAILABLE"||w.status==="NOT_CONFIGURED"){
+      stopWaQrPoll();setWaQrNotice("Provedor WAHA indisponível. Verifique a configuração da VPS.");return;
+    }
+    if(waQrImage.classList.contains("hidden")&&["SCAN_QR_CODE","STARTING"].includes(w.status))await fetchWaQr();
+  }catch{setWaQrNotice("Não foi possível atualizar o status da conexão.")}
+}
+$("#prepareWaha").onclick=async()=>{
+  stopWaQrPoll();clearWaQrImage();
+  setWaQrNotice("Iniciando sessão segura do WhatsApp…");
+  try{
+    state.whatsapp=await api("/api/whatsapp/session/prepare",{method:"POST",body:"{}"});
+    updateWahaUi();
+    setWaQrNotice(state.whatsapp.connected?"WhatsApp já conectado.":"Sessão iniciada. Clique em Mostrar QR Code para conectar seu aparelho.");
+    if(state.whatsapp.connected)return;
+    toast("Sessão preparada");
+  }catch(error){setWaQrNotice("Falha ao preparar WAHA: "+String(error.data?.error||error.message||error).slice(0,110))}
+};
+$("#showQr").onclick=async()=>{
+  if(state.whatsapp?.connected){setWaQrNotice("WhatsApp já conectado.");return}
+  setWaQrNotice("Preparando QR Code…");
+  if(["MISSING","STOPPED","UNASSIGNED"].includes(state.whatsapp?.status)){
+    try{state.whatsapp=await api("/api/whatsapp/session/prepare",{method:"POST",body:"{}"});updateWahaUi()}
+    catch(error){setWaQrNotice("Não foi possível iniciar sessão: "+String(error.data?.error||error.message).slice(0,100));return}
+  }
+  await fetchWaQr();stopWaQrPoll();
+  let attempts=0;
+  waQrPoll=setInterval(async()=>{
+    if(++attempts>55){stopWaQrPoll();setWaQrNotice("Tempo de pareamento esgotado. Clique em Mostrar QR Code novamente.");return}
+    if(attempts%4===0)await fetchWaQr();
+    await checkWaPairing();
+  },4000);
+};
+$("#neWhatsappRefresh").addEventListener("click",checkWaPairing);
 $("#openClientFromChat").onclick=async()=>{const p=state.selectedConversation?.client_phone||"";activate("clients");$("#clientSearch").value=p;await loadClients(p)};
 $("#resourceForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{const x=await api("/api/resources",{method:"POST",body:JSON.stringify(b)});state.resources.push(x);renderResources();fillSelects();$("#resourceModal").close();e.target.reset();toast("Recurso cadastrado")}catch{toast("Erro ao salvar recurso")}};
 
@@ -560,84 +630,9 @@ $("#purchaseForm").onsubmit=async e=>{e.preventDefault();const base=Object.fromE
 
 async function loadPurchaseArea(){
   try{
-    const [suggestions,purchases,prices]=await Promise.all([api("/api/purchases/suggestions"),api("/api/purchases"),api("/api/suppliers/price-history")]);
-    $("#purchaseSuggestionList").innerHTML=suggestions.map(s=>'<div class="tableRow"><div><strong>'+s.product_name+'</strong><small>Atual '+Number(s.stock_qty).toLocaleString("pt-BR")+' '+s.unit+' · mínimo '+Number(s.min_qty).toLocaleString("pt-BR")+' · ideal '+Number(s.ideal_qty).toLocaleString("pt-BR")+(s.supplier_name?' · '+s.supplier_name:'')+'</small></div><div><strong>'+Number(s.suggested_qty).toLocaleString("pt-BR")+' '+s.unit+'</strong><small>'+(s.days_left==null?'sem histórico':'~'+Number(s.days_left).toFixed(1)+' dias restantes')+'</small></div><span class="status pending">repor</span></div>').join("")||'<p class="muted">Nenhum produto abaixo do mínimo.</p>';
-    $("#purchaseList").innerHTML=purchases.map(p=>'<div class="tableRow"><div><strong>'+p.supplier_name+'</strong><small>'+p.item_count+' itens · pedido '+dateTimeBR(p.ordered_at)+(p.expected_at?' · previsão '+p.expected_at:'')+'</small></div><div class="money">'+moneyBR(p.total)+'</div>'+(p.status==="received"?'<span class="status paid">recebido</span>':'<button type="button" class="secondary smallBtn" data-receive-purchase="'+p.id+'">Receber</button>')+'</div>').join("")||'<p class="muted">Nenhum pedido criado ainda.</p>';
-    $("#supplierPriceList").innerHTML=prices.slice(0,60).map(x=>'<div class="tableRow"><div><strong>'+x.product_name+'</strong><small>'+x.supplier_name+' · '+dateTimeBR(x.recorded_at)+'</small></div><div><strong>'+moneyBR(x.unit_cost)+'/'+x.unit+'</strong><small>'+(x.change_pct==null?"primeiro registro":(x.change_pct>=0?"+":"")+Number(x.change_pct).toFixed(1)+"% vs. anterior")+'</small></div><span class="status '+(x.change_pct!=null&&x.change_pct>0?"pending":"paid")+'">'+(x.change_pct!=null&&x.change_pct>0?"subiu":"ok")+'</span></div>').join("")||'<p class="muted">O histórico aparece a partir do primeiro pedido.</p>';
-    $$("[data-receive-purchase]").forEach(b=>b.onclick=async()=>{try{await api("/api/purchases/"+b.dataset.receivePurchase+"/receive",{method:"POST",body:"{}"});await loadPurchaseArea();await loadInventory();toast("Compra recebida e estoque atualizado")}catch(err){toast(err.data?.error==="already_received"?"Esse pedido já foi recebido":"Não foi possível receber o pedido")}});
-  }catch(err){if(err.status!==403&&err.status!==401)toast("Não foi possível carregar os pedidos")}
-}
-async function openCheckout(appointmentId){
-  try{
-    const prep=await api("/api/checkout/"+appointmentId+"/prep");
-    $("#checkoutForm").elements.appointment_id.value=appointmentId;
-    $("#checkoutLabel").textContent=prep.client_name+" · "+prep.service_name+" · "+moneyBR(prep.price);
-    state.checkoutPackages=prep.packages||[];const cp=$("#checkoutPackage");cp.innerHTML='<option value="">Selecione…</option>'+state.checkoutPackages.map(p=>'<option value="'+p.client_package_id+'">'+p.package_name+' · '+p.remaining+' crédito(s) · até '+String(p.expires_at).slice(0,10)+' · valor '+moneyBR(p.allocated_unit)+'</option>').join("");$("#checkoutPaymentMethod").value="pix";updateCheckoutPaymentMode();
-    const shortages=[];
-    $("#checkoutConsumption").innerHTML=prep.recipe.length?prep.recipe.map(r=>{
-      const unit=String(r.unit||"ml"),stock=Number(r.stock_qty||0),standard=Number(r.qty_standard||0);
-      const avg=Number(r.client_avg_qty),suggested=r.client_avg_qty!=null&&Number.isFinite(avg)?avg:standard;
-      const hint=r.client_avg_qty!=null?"média desta cliente ("+r.client_samples+" atend.)":"padrão do serviço";
-      if(suggested>stock)shortages.push(r.product_name);
-      const step=["un","unidade","und"].includes(unit)?"1":"0.001";
-      return '<div class="consumptionRow" data-consumption-product="'+esc(r.product_id)+'" data-unit="'+esc(unit)+'"><div><strong>'+esc(r.product_name)+'</strong><small>'+hint+' · previsto '+standard.toLocaleString("pt-BR")+' '+esc(unit)+' · saldo '+stock.toLocaleString("pt-BR")+' '+esc(unit)+'</small></div><input type="number" step="'+step+'" min="0" max="'+stock+'" required value="'+Number(suggested.toFixed(3))+'"><span>'+esc(unit)+'</span></div>';
-    }).join(""):'<p class="muted">Este serviço ainda não tem produtos configurados. O financeiro e a comissão serão registrados normalmente.</p>';
-    $("#neCheckoutStockHint").textContent=shortages.length?"Atenção: saldo insuficiente para "+shortages.join(", ")+". Corrija o estoque antes de finalizar.":"Confira as quantidades. É permitido registrar zero quando um produto não foi usado.";
-    $("#checkoutModal").showModal();
-  }catch{toast("Não foi possível preparar o fechamento")}
-}
-function collectCheckoutConsumption(){
-  return $("#checkoutConsumption [data-consumption-product]").map(row=>{
-    const input=$("input",row),number=Number(input.value),unit=row.dataset.unit;
-    if(input.value.trim()===""||!input.checkValidity()||!Number.isFinite(number)||number<0||number>1000000||
-      ["un","unidade","und"].includes(unit)&&!Number.isInteger(number)){
-      input.focus();throw Object.assign(new Error("invalid_consumption_form"),{data:{error:"invalid_consumption_form"}});
-    }
-    return {product_id:row.dataset.consumptionProduct,actual_qty:number};
-  });
-}
-function payFinanceEntry(id){
-  const entry=state.financeEntries?.find(x=>x.id===id);
-  if(!entry||entry.status!=="pending"){toast("Lançamento não encontrado ou já pago");return}
-  const form=$("#financePayForm");form.reset();
-  form.elements.entry_id.value=id;
-  $("#neFinancePayDescription").textContent=entry.description+" · "+moneyBR(entry.amount);
-  $("#financePayModal").showModal();
-}
-
-function showOwnerTab(section){
-  const active=["attention","finance","services","team","clients"].includes(section)?section:"attention";
-  $$("[data-owner-panel]").forEach(el=>el.classList.toggle("hidden",el.dataset.ownerPanel!==active));
-  $$("[data-owner-tab]").forEach(btn=>{
-    const yes=btn.dataset.ownerTab===active;
-    btn.classList.toggle("is-active",yes);
-    if(btn.classList.contains("ne-owner-menu-item"))btn.setAttribute("aria-pressed",String(yes));
-  });
-}
-$$("[data-owner-tab]").forEach(btn=>btn.addEventListener("click",()=>showOwnerTab(btn.dataset.ownerTab)));
-function ownerEmpty(text){return '<p class="ne-owner-empty">'+esc(text)+'</p>'}
-function ownerRanking(items,valueLabel){
-  return items.length?items.map((item,i)=>'<div class="ne-owner-ranking-row"><span class="ne-owner-rank">'+(i+1)+'</span><div class="ne-owner-rank-name"><strong>'+esc(item.name)+'</strong><small>'+Number(item.count).toLocaleString("pt-BR")+' atendimentos</small></div><strong>'+moneyBR(item.volume)+'</strong></div>').join(""):ownerEmpty("Ainda não há atendimentos finalizados para este período.");
-}
-async function loadOwnerEye(){
-  const status=$("#neOwnerStatus");
-  if(!status)return;
-  status.textContent="Atualizando os indicadores do salão...";
-  try{
-    const snap=await api("/api/owner-eye/summary");
-    state.ownerEye=snap;
-    const date=day=>String(day||"").split("-").reverse().join("/");
-    status.textContent="Dados de "+date(snap.period.from)+" a "+date(snap.period.to)+" · Fuso "+snap.period.time_zone+" · Atualizado agora";
-    $("#oiRevenue").textContent=moneyBR(snap.money.income);
-    $("#neOwnerVisits").textContent=Number(snap.operations.completed_services).toLocaleString("pt-BR");
-    $("#oiTicket").textContent="ticket médio "+moneyBR(snap.operations.average_checkout);
-    $("#oiRepeat").textContent=snap.operations.repeat_rate==null?"Sem base":snap.operations.repeat_rate.toLocaleString("pt-BR")+"%";
-    $("#neOwnerRepeatCount").textContent=snap.operations.repeat_clients+" de "+snap.operations.clients_with_checkout+" clientes com checkout";
-    $("#neOwnerAlertsCount").textContent=String(snap.alerts.length);
-    $("#neOwnerStockBrief").textContent=snap.attention.critical_stock+" itens críticos no estoque";
-    $("#neOwnerRevenueChange").textContent=snap.money.income_change_pct==null?
-      "Sem período anterior comparável":(snap.money.income_change_pct>=0?"+":"")+snap.money.income_change_pct.toLocaleString("pt-BR")+"% ante os 30 dias anteriores";
-    $("#neOwnerIncome").textContent=moneyBR(snap.money.income);
+    const [suggestions,purchases,prices]=await Promise.all([api("/api/purchases/suggestions"),api("/api/purch
+…[sentinelx: truncated 8119 bytes]…
+ntent=moneyBR(snap.money.income);
     $("#neOwnerExpenses").textContent=moneyBR(snap.money.expenses);
     $("#neOwnerNet").textContent=moneyBR(snap.money.cash_net);
     $("#neOwnerRepeated").textContent=String(snap.operations.repeat_clients);
