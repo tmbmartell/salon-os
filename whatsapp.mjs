@@ -77,7 +77,9 @@ export async function wahaStatus(session=SESSION){
     const r=await request("/api/sessions/"+encodeURIComponent(session),{},true);
     if(r.status===404)return {...config,connected:false,status:"MISSING"};
     const j=await r.json();
-    return {...config,...j,connected:j.status==="WORKING"};
+    // Never echo WAHA raw session configuration: it can contain webhook HMAC credentials.
+    const {config:_privateConfiguration,...publicStatus}=j;
+    return {...config,...publicStatus,connected:j.status==="WORKING"};
   }catch(e){return {...config,connected:false,status:"UNAVAILABLE",error:String(e.message||e).slice(0,160)}}
 }
 function sessionPayload(session=SESSION){
