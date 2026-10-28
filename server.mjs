@@ -164,6 +164,7 @@ function ensureSeed(){
   if(one("select id from tenants where id=?",[DEFAULT_TENANT]))return;
   run("insert into tenants(id,name,slug,timezone,created_at) values(?,?,?,?,?)",[DEFAULT_TENANT,"Studio Aurora","studio-aurora","America/Porto_Velho",now()]);
   run("insert into users(id,tenant_id,name,email,role,created_at) values(?,?,?,?,?,?)",[id(),DEFAULT_TENANT,"Dona do Salão","dona@studio.local","owner",now()]);
+  if(process.env.NOVAGENTE_EMPTY_INITIAL_TENANT==="true")return; // ambiente de pareamento sem clientes/horários fictícios
   const profs=[
     ["Ana Ribeiro","Cabeleireira",["Coloração","Corte","Tratamentos"],"09:00","18:00"],
     ["Bia Costa","Nail Designer",["Manicure","Gel"],"09:00","19:00"],
