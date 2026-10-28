@@ -40,3 +40,23 @@
 .ne-auto-feedback{color:#c24b4b;font-size:12px;margin:0}
 @media(max-width:1200px){.ne-auto-stages{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:700px){.ne-auto-metrics{grid-template-columns:1fr}.ne-auto-stages{grid-template-columns:repeat(2,minmax(0,1fr))}.ne-auto-policy-options{grid-template-columns:1fr}.ne-auto-summary{flex-wrap:wrap}.ne-auto-lead{flex-wrap:wrap}.ne-auto-status{margin-left:auto}}
+/* Etapa 24.1: simulador guiado de agendamento, leitura legível nos dois temas */
+.ne-booking-preview[hidden]{display:none}
+.ne-booking-thread{min-height:160px;max-height:350px;overflow:auto;border:1px solid var(--ne-outline);background:var(--ne-surface-alt);border-radius:12px;padding:13px;display:flex;flex-direction:column;gap:8px}
+.ne-booking-thread:empty:before{content:"Conversa de demonstração: escolha uma cliente, escreva um serviço e um dia.";color:var(--ne-text-secondary);font-size:13px;line-height:1.5}
+.ne-booking-user,.ne-booking-bot,.ne-booking-success,.ne-booking-warning{padding:10px 12px;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere;margin:0;max-width:min(90%,610px);font-size:13px;line-height:1.5}
+.ne-booking-user{background:#8060b8;color:#fff;align-self:flex-end;border-bottom-right-radius:3px}
+.ne-booking-bot{background:var(--ne-surface);border:1px solid var(--ne-outline);color:var(--ne-text);align-self:flex-start;border-bottom-left-radius:3px}
+.ne-booking-success{background:#d9f3e5;color:#13573b;font-weight:700}
+.ne-booking-warning{background:#fce8db;color:#793e25;font-weight:700}
+.ne-booking-compose{display:flex;gap:9px;align-items:stretch}
+.ne-booking-compose input{min-width:0;flex:1;min-height:44px;padding:11px 14px;background:var(--ne-field);border:1px solid var(--ne-outline);border-radius:10px;color:var(--ne-text);font-size:13px}
+.ne-booking-compose button{min-height:44px}
+.ne-booking-compose input:focus-visible,.ne-booking-compose button:focus-visible{outline:2px solid #ad83e0;outline-offset:2px}
+@media(max-width:700px){.ne-booking-compose{flex-direction:column}.ne-booking-user,.ne-booking-bot{max-width:100%}}
+/* Etapa 24.1 Mobile · booking conversation */
+@media(max-width:700px){.ne-booking-thread{min-height:96px;max-height:260px;padding:11px}.ne-booking-preview .ne-auto-settings-inside{padding:11px}.ne-booking-compose{gap:7px}}
+
+.ne-booking-client-label{display:grid;gap:7px;font-size:12px;font-weight:750;color:var(--ne-text-secondary)}
+.ne-booking-client-label select{width:100%;min-height:44px;border-radius:10px;background:var(--ne-field);border:1px solid var(--ne-outline);color:var(--ne-text);font-size:13px;padding:10px 12px}
+.ne-booking-client-label select:focus-visible{outline:2px solid #ad83e0;outline-offset:2px}

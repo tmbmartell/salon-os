@@ -1,6 +1,6 @@
 import {AUTOMATION_SWITCHES, FUNNEL_STAGES, classifyMessage, receptionistDraft, policies, setPolicy, setContactPermission, updateServiceRule, registerIncoming, advanceLead, commercialOverview} from "./commercial-automation.mjs";
 const parseIntCents=v=>Number.isInteger(v)&&v>=0?v:null;
-export async function handleCommercialApi({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit,isDemo}){
+export async function handleCommercialApi({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit,isDemo,bookingPreview}){
   if(!url.pathname.startsWith("/api/commercial/"))return false;
   requirePermission(user,"marketing.read");
   const mustManage=()=>{
@@ -65,6 +65,19 @@ export async function handleCommercialApi({req,res,url,db,user,tenant,send,parse
       const services=db.prepare("select name,price_cents,active from services where tenant_id=? and active=1 order by name").all(tenant);
       const out=receptionistDraft({text:String(b.text||"").slice(0,1000),services,lastGreeting:String(b.last_greeting||"").slice(0,200)});
       return send(res,200,{...out,preview:true,delivery:false,note:"Preview deterministic; no WhatsApp message sent; no unverified availability"});
+    }catch(e){return fail(e)}
+  }
+  if(req.method==="POST"&&url.pathname==="/api/commercial/booking-preview"){
+    mustManage();
+    if(!isDemo)return send(res,403,{error:"booking_preview_only_in_disposable_demo"});
+    if(typeof bookingPreview!=="function")return send(res,503,{error:"booking_preview_not_configured"});
+    try{
+      const body=await parseBody(req);
+      if(!String(body.text||"").trim())return send(res,400,{error:"message_required"});
+      if(String(body.text||"").length>1000)return send(res,413,{error:"message_too_long"});
+      const result=bookingPreview({clientId:String(body.client_id||"").slice(0,64),text:body.text});
+      audit(db,user,"commercial.booking_preview","conversation",result.conversation_id,{state:result.booking_state,booked:!!result.booked});
+      return send(res,200,{ok:true,...result});
     }catch(e){return fail(e)}
   }
   if(req.method==="POST"&&url.pathname==="/api/commercial/simulate-inbound"){

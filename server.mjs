@@ -27,6 +27,8 @@ import { installPhase11, handlePhase11Api } from "./phase11.mjs";
 import { checkManualStatusTransition } from "./appointment-status.mjs";
 import { installCommercialAutomation, policy as commercialPolicy, registerIncoming, afterAppointmentCreated, afterAppointmentStatus, receptionistDraft } from "./commercial-automation.mjs";
 import { handleCommercialApi } from "./commercial-api.mjs";
+import { installBookingFlow, bookingTurn, bookingState, handoffBooking, isBookingRequest } from "./booking-flow.mjs";
+import { localTimeToUtc } from "./slot-time.mjs";
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||9331);
@@ -202,6 +204,7 @@ installTenantAdministration(db);
 installPhase6(db);
 installMarketing(db);
 installCommercialAutomation(db);
+installBookingFlow(db);
 installPhase7(db);
 installPhase8(db);
 installPhase9(db);
@@ -290,8 +293,7 @@ function dateFromText(text,timeZone="America/Porto_Velho"){
   return null;
 }
 function localIso(date,time,timeZone="America/Porto_Velho"){
-  const offset=timeZone==="America/Porto_Velho"?"-04:00":"Z";
-  return new Date(date+"T"+time+":00"+offset).toISOString();
+  return localTimeToUtc(date,time,timeZone);
 }
 function appointmentItemsFor(appointmentId){
   return all("select ai.*,s.name service_name,p.name professional_name from appointment_items ai join services s on s.id=ai.service_id join professionals p on p.id=ai.professional_id where ai.appointment_id=? order by ai.sequence",[appointmentId]);
@@ -342,6 +344,16 @@ function createAppointmentRecord(tenant,user,b){
       const rc=one("select id from appointments where tenant_id=? and resource_id=? and status not in ('cancelled','no_show') and start_at<? and end_at>? limit 1",[tenant,resource.id,cursor.toISOString(),start.toISOString()]);
       if(rc){const e=new Error("resource_time_conflict");e.status=409;e.resource=resource.name;throw e}
     }
+    if(b.source==="assistant"){
+      if(segments.length!==1){const e=new Error("assistant_single_service_only");e.status=400;throw e}
+      const zone=one("select timezone from tenants where id=?",[tenant])?.timezone||"America/Porto_Velho";
+      const dateParts=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:zone,year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(start).filter(x=>x.type!=="literal").map(x=>[x.type,x.value]));
+      const localDate=dateParts.year+"-"+dateParts.month+"-"+dateParts.day;
+      const verified=availabilityFor(tenant,{date:localDate,serviceId:segments[0].service.id,professionalId:segments[0].professional.id,resourceId:resource?.id||null,limit:100});
+      if(!verified.some(slot=>slot.start_at===start.toISOString()&&slot.professional_id===segments[0].professional.id)){
+        const e=new Error("assistant_slot_no_longer_available");e.status=409;throw e;
+      }
+    }
     const selected=(Array.isArray(b.tags)?b.tags:[]).map(x=>safeText(x,40)).filter(Boolean),tagSet=new Set(selected);
     const prior=Number(one("select count(*) n from appointments where tenant_id=? and client_id=? and status='completed'",[tenant,client.id])?.n||0);
     tagSet.add(prior?"Retorno":"Primeira visita");
@@ -366,7 +378,7 @@ function availabilityFor(tenant,{date,serviceId,professionalId=null,resourceId=n
   const service=one("select * from services where id=? and tenant_id=? and active=1",[serviceId,tenant]);if(!service)return [];
   const tz=one("select timezone from tenants where id=?",[tenant])?.timezone||"America/Porto_Velho";
   let pros;
-  if(professionalId)pros=all("select * from professionals where id=? and tenant_id=? and active=1",[professionalId,tenant]);
+  if(professionalId)pros=all("select p.* from professionals p where p.id=? and p.tenant_id=? and p.active=1 and (exists(select 1 from professional_services ps where ps.professional_id=p.id and ps.service_id=?) or not exists(select 1 from professional_services px where px.service_id=?))",[professionalId,tenant,serviceId,serviceId]);
   else pros=all("select p.* from professionals p where p.tenant_id=? and p.active=1 and (exists(select 1 from professional_services ps where ps.professional_id=p.id and ps.service_id=?) or not exists(select 1 from professional_services px where px.service_id=?)) order by p.name",[tenant,serviceId,serviceId]);
   const resource=resourceId?one("select * from resources where id=? and tenant_id=? and active=1",[resourceId,tenant]):null;
   const out=[],step=30,dur=Number(service.duration_min);
@@ -374,7 +386,9 @@ function availabilityFor(tenant,{date,serviceId,professionalId=null,resourceId=n
     const window=staffWindowForDate(db,tenant,p.id,date);if(!window)continue;
     const sh=Number(window.start.slice(0,2))*60+Number(window.start.slice(3,5)),eh=Number(window.end.slice(0,2))*60+Number(window.end.slice(3,5));
     for(let min=sh;min+dur<=eh;min+=step){
-      const hh=String(Math.floor(min/60)).padStart(2,"0"),mm=String(min%60).padStart(2,"0"),start=localIso(date,hh+":"+mm,tz),end=new Date(new Date(start).getTime()+dur*60000).toISOString();
+      const hh=String(Math.floor(min/60)).padStart(2,"0"),mm=String(min%60).padStart(2,"0");
+      let start;try{start=localIso(date,hh+":"+mm,tz)}catch{continue}
+      const end=new Date(new Date(start).getTime()+dur*60000).toISOString();
       const pc=professionalHasConflict(tenant,p.id,start,end);
       if(pc)continue;
       if(resource){
@@ -411,10 +425,24 @@ function parseExternalReceptionist(text,meta={}){
 }
 async function receptionistAgentReply({tenantId,client,conversation,text,intent}){
   const safety=receptionistDraft({text});
-  if(safety.handoff)return {handoff:true,reason:safety.reason,meta:{source:"commercial_safety_guard",intent:safety.intent}};
+  if(safety.handoff){
+    handoffBooking(db,tenantId,conversation.id);
+    return {handoff:true,reason:safety.reason,meta:{source:"commercial_safety_guard",intent:safety.intent}};
+  }
   const profile=one("select enabled from agent_profiles where tenant_id=? and agent_key='receptionist'",[tenantId]);
   if(Number(profile?.enabled)===0)return {handoff:true,reason:"receptionist_paused",meta:{source:"paused"}};
   const cfg=getAgentConfig(db,tenantId,"receptionist"),svc=cfg.service||{},llm=getLlmConfig(db,tenantId);
+  if(svc.allow_booking_flow!==false&&commercialPolicy(db,tenantId,"assistant_booking")){
+    const booking=bookingTurn({db,tenant:tenantId,client,conversation,message:text,availability:availabilityFor,
+      createAppointment:createAppointmentRecord,afterCreate:afterAppointmentCreated,
+      onAudit:(action,aid,extra)=>audit(db,{tenantId,id:null},action,"appointment",aid,extra)});
+    if(booking.handoff)return {handoff:true,reason:booking.reason||"booking_handoff",meta:{source:"booking_flow"}};
+    if(booking.handled)return {text:booking.text,meta:{source:"booking_flow",appointment_id:booking.appointment_id||null,booked:!!booking.booked}};
+  }else if(isBookingRequest(text)||bookingState(db,tenantId,conversation.id)?.status==="offered"){
+    handoffBooking(db,tenantId,conversation.id);
+    return {handoff:true,reason:"booking_disabled",meta:{source:"booking_flow"}};
+  }
+
   let brain=null,externalError="";
   if(llm.enabled&&llm.provider!=="internal"){
     try{
@@ -534,7 +562,27 @@ async function api(req,res,url){
   if(!user)return send(res,401,{error:"unauthorized"});
   const tenant=user.tenantId;
   const guard=p=>requirePermission(user,p);
-  const commercialResult=await handleCommercialApi({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit,isDemo:isFreePreview()});
+  const commercialResult=await handleCommercialApi({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit,isDemo:isFreePreview(),
+    bookingPreview:({clientId,text})=>{
+      const c=one("select * from clients where tenant_id=? and id=?",[tenant,clientId]);
+      if(!c){const e=new Error("client_not_found");e.status=404;throw e}
+      let conv=one("select * from conversations where tenant_id=? and client_id=? and channel='demo_booking' order by created_at desc limit 1",[tenant,c.id]);
+      if(!conv){
+        const cid=id(),ts=now();
+        run("insert into conversations(id,tenant_id,client_id,channel,status,created_at,last_message_at,handling_mode,updated_at) values(?,?,?,?,?,?,?,?,?)",[cid,tenant,c.id,"demo_booking","open",ts,ts,"human",ts]);
+        conv=one("select * from conversations where id=? and tenant_id=?",[cid,tenant]);
+      }
+      const request=String(text||"").slice(0,1000),ts=now();
+      run("insert into messages(id,tenant_id,conversation_id,direction,sender_type,body,message_type,created_at) values(?,?,?,?,?,?,?,?)",[id(),tenant,conv.id,"in","client",request,"text",ts]);
+      const safety=receptionistDraft({text:request});
+      const result=safety.handoff?(handoffBooking(db,tenant,conv.id),{handoff:true,reason:safety.reason,text:safety.text}):
+        bookingTurn({db,tenant,client:c,conversation:conv,message:request,availability:availabilityFor,
+          createAppointment:createAppointmentRecord,afterCreate:afterAppointmentCreated,
+          onAudit:(action,aid,extra)=>audit(db,user,action,"appointment",aid,extra)});
+      if(result?.text)run("insert into messages(id,tenant_id,conversation_id,direction,sender_type,body,message_type,created_at) values(?,?,?,?,?,?,?,?)",[id(),tenant,conv.id,"out","assistant",result.text,"text",now()]);
+      return {...result,booking_state:bookingState(db,tenant,conv.id)?.status||null,conversation_id:conv.id,simulation:true,sending_enabled:false};
+    }});
+
   if(commercialResult!==false)return commercialResult;
   if(req.method==="GET"&&url.pathname==="/api/agents/receptionist/llm"){
     guard("agents.read");
