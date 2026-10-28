@@ -264,78 +264,123 @@ $("#chatModeButton").onclick=async()=>{
   try{await api("/api/conversations/"+co.id+"/mode",{method:"PATCH",body:JSON.stringify({mode})});co.handling_mode=mode;updateChatModeButton();renderConversationList();toast(mode==="ai"?"Recepcionista IA ativada":"Atendimento humano ativado")}catch{toast("Não foi possível alterar o modo")}
 };
 $("#messageForm").onsubmit=async e=>{e.preventDefault();if(!state.selectedConversation)return;const text=$("#messageText").value.trim();if(!text)return;try{await api("/api/conversations/"+state.selectedConversation.id+"/messages",{method:"POST",body:JSON.stringify({text})});$("#messageText").value="";await openConversation(state.selectedConversation.id)}catch{toast("Não foi possível enviar. Verifique o WhatsApp.")}};
-$("#prepareWaha").onclick=async()=>{try{state.whatsapp=await api("/api/whatsapp/session/prepare",{method:"POST",body:"{}"});updateWahaUi();toast("Sessão preparada")}catch{toast("WAHA ainda não configurado para este sistema")}};
+
 // Pairing is always initiated by the logged-in owner/manager and never sends a message.
-let waQrPoll=null,waQrBlobUrl=null,waQrLoading=false;
+let waQrPoll=null,waQrBlobUrl=null,waQrLoading=false,waQrAttempts=0;
 const waQrMessage=$("#neWhatsappMessage"),waQrImage=$("#waQrImage");
-const setWaQrNotice=message=>{waQrMessage.textContent=message;};
-const clearWaQrImage=()=>{
-  if(waQrBlobUrl){URL.revokeObjectURL(waQrBlobUrl);waQrBlobUrl=null}
-  waQrImage.removeAttribute("src");waQrImage.classList.add("hidden");
-};
-const stopWaQrPoll=()=>{if(waQrPoll){clearInterval(waQrPoll);waQrPoll=null}};
+const waQrButton=$("#showQr"),waPrepareButton=$("#prepareWaha");
+function waQrNotice(message,error=false){
+  waQrMessage.textContent=message;
+  waQrMessage.classList.toggle("ne-error",error);
+}
+function clearWaQrImage(){
+  const old=waQrBlobUrl;waQrBlobUrl=null;
+  waQrImage.removeAttribute("src");
+  waQrImage.classList.add("hidden");
+  if(old)URL.revokeObjectURL(old);
+}
+function stopWaQrPoll(){
+  if(waQrPoll){clearInterval(waQrPoll);waQrPoll=null}
+}
 async function fetchWaQr(){
-  if(waQrLoading)return;
+  if(waQrLoading)return false;
   waQrLoading=true;
   try{
-    const response=await fetch("/api/whatsapp/session/qr?t="+Date.now(),{credentials:"same-origin",cache:"no-store"});
+    const response=await fetch("/api/whatsapp/session/qr?t="+Date.now(),{
+      credentials:"same-origin",cache:"no-store"
+    });
     if(!response.ok){
-      const error=await response.json().catch(()=>({}));
-      throw Error(error.error||("qr_http_"+response.status));
+      const data=await response.json().catch(()=>({}));
+      throw Error(data.error||"qr_http_"+response.status);
     }
-    const type=(response.headers.get("content-type")||"").split(";")[0];
-    if(!["image/png","image/jpeg","image/webp"].includes(type))throw Error("invalid_qr_format");
-    const blob=await response.blob();if(blob.size<100||blob.size>1000000)throw Error("invalid_qr_size");
-    clearWaQrImage();waQrBlobUrl=URL.createObjectURL(blob);
-    waQrImage.src=waQrBlobUrl;waQrImage.classList.remove("hidden");
-    setWaQrNotice("No WhatsApp do celular: Configurações > Dispositivos conectados > Conectar dispositivo. Escaneie o QR abaixo. Ele é atualizado automaticamente enquanto a conexão aguarda.");
+    const type=(response.headers.get("content-type")||"").split(";")[0].toLowerCase();
+    if(!["image/png","image/jpeg","image/webp"].includes(type))throw Error("Formato do QR inválido");
+    const image=await response.blob();
+    if(image.size<100||image.size>1000000)throw Error("Imagem do QR inválida");
+    const next=URL.createObjectURL(image);
+    // The current QR stays on screen until its replacement is ready.
+    const preloaded=new Image();
+    try{
+      await new Promise((resolve,reject)=>{
+        preloaded.onload=resolve;
+        preloaded.onerror=()=>reject(Error("Imagem do QR não pôde ser carregada"));
+        preloaded.src=next;
+      });
+    }catch(error){URL.revokeObjectURL(next);throw error}
+    const previous=waQrBlobUrl;
+    waQrBlobUrl=next;
+    waQrImage.src=next;waQrImage.classList.remove("hidden");
+    if(previous)URL.revokeObjectURL(previous);
+    const stamp=new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+    waQrNotice("QR atualizado às "+stamp+". No celular, abra WhatsApp → Dispositivos conectados → Conectar dispositivo. Aponte a câmera para o código.");
+    return true;
   }catch(error){
-    clearWaQrImage();
-    setWaQrNotice("O QR ainda não está disponível ("+String(error.message||error).slice(0,90)+"). Clique em Preparar conexão e tente novamente.");
+    const message=String(error.message||error);
+    // A temporary 409 while WAHA starts must not erase a valid QR already visible.
+    const transient=/qr_http_409|waha_qr|qr.*unavailable|STARTING|SCAN_QR_CODE/i.test(message);
+    waQrNotice(
+      transient?"Aguardando o WAHA gerar o código. Vou tentar novamente automaticamente…":
+      "Não foi possível abrir o QR ("+message.slice(0,95)+"). Tente novamente ou use Verificar conexão.",
+      !transient
+    );
+    return false;
   }finally{waQrLoading=false}
 }
 async function checkWaPairing(){
   try{
-    const w=await api("/api/whatsapp/status");
-    state.whatsapp=w;updateWahaUi();
-    if(w.connected){
+    const status=await api("/api/whatsapp/status");
+    state.whatsapp=status;updateWahaUi();
+    if(status.connected||status.status==="WORKING"){
       stopWaQrPoll();clearWaQrImage();
-      setWaQrNotice("WhatsApp conectado! Pronto para receber atendimento humano. A IA continua desligada.");
+      waQrNotice("WhatsApp conectado. A recepcionista IA permanece desligada.");
+      waQrButton.disabled=true;
       return;
     }
-    if(w.status==="UNAVAILABLE"||w.status==="NOT_CONFIGURED"){
-      stopWaQrPoll();setWaQrNotice("Provedor WAHA indisponível. Verifique a configuração da VPS.");return;
+    if(status.status==="NOT_CONFIGURED"||status.status==="UNAVAILABLE"){
+      stopWaQrPoll();
+      waQrNotice("Conexão WAHA indisponível. Solicite a verificação da VPS.",true);
+      return;
     }
-    if(waQrImage.classList.contains("hidden")&&["SCAN_QR_CODE","STARTING"].includes(w.status))await fetchWaQr();
-  }catch{setWaQrNotice("Não foi possível atualizar o status da conexão.")}
+    if(["SCAN_QR_CODE","STARTING"].includes(status.status)&&waQrImage.classList.contains("hidden"))await fetchWaQr();
+  }catch{waQrNotice("Não foi possível atualizar o status do WhatsApp.",true)}
 }
-$("#prepareWaha").onclick=async()=>{
-  stopWaQrPoll();clearWaQrImage();
-  setWaQrNotice("Iniciando sessão segura do WhatsApp…");
-  try{
-    state.whatsapp=await api("/api/whatsapp/session/prepare",{method:"POST",body:"{}"});
-    updateWahaUi();
-    setWaQrNotice(state.whatsapp.connected?"WhatsApp já conectado.":"Sessão iniciada. Clique em Mostrar QR Code para conectar seu aparelho.");
-    if(state.whatsapp.connected)return;
-    toast("Sessão preparada");
-  }catch(error){setWaQrNotice("Falha ao preparar WAHA: "+String(error.data?.error||error.message||error).slice(0,110))}
-};
-$("#showQr").onclick=async()=>{
-  if(state.whatsapp?.connected){setWaQrNotice("WhatsApp já conectado.");return}
-  setWaQrNotice("Preparando QR Code…");
-  if(["MISSING","STOPPED","UNASSIGNED"].includes(state.whatsapp?.status)){
-    try{state.whatsapp=await api("/api/whatsapp/session/prepare",{method:"POST",body:"{}"});updateWahaUi()}
-    catch(error){setWaQrNotice("Não foi possível iniciar sessão: "+String(error.data?.error||error.message).slice(0,100));return}
-  }
-  await fetchWaQr();stopWaQrPoll();
-  let attempts=0;
+function startWaQrPoll(){
+  stopWaQrPoll();
+  waQrAttempts=0;
   waQrPoll=setInterval(async()=>{
-    if(++attempts>55){stopWaQrPoll();setWaQrNotice("Tempo de pareamento esgotado. Clique em Mostrar QR Code novamente.");return}
-    if(attempts%4===0)await fetchWaQr();
+    if(++waQrAttempts>90){
+      stopWaQrPoll();
+      waQrNotice("O período de pareamento terminou. Clique em Gerar QR Code novamente.");
+      return;
+    }
     await checkWaPairing();
+    if(waQrPoll&&waQrAttempts%4===0)await fetchWaQr();
   },4000);
+}
+async function displayWaQr({prepare=false}={}){
+  if(state.whatsapp?.connected){waQrNotice("Esta conta já está conectada.");return}
+  waQrButton.disabled=true;waPrepareButton.disabled=true;
+  waQrNotice("Preparando a conexão e carregando o QR Code…");
+  try{
+    if(prepare||!state.whatsapp?.session||["MISSING","STOPPED","UNASSIGNED"].includes(state.whatsapp?.status)){
+      state.whatsapp=await api("/api/whatsapp/session/prepare",{method:"POST",body:"{}"});
+      updateWahaUi();
+    }
+    // QR starts as soon as the session is prepared, no extra click required.
+    const success=await fetchWaQr();
+    if(success)waQrImage.scrollIntoView({block:"nearest",behavior:"smooth"});
+    else document.querySelector(".ne-wa-connection")?.scrollIntoView({block:"nearest",behavior:"smooth"});
+    startWaQrPoll();
+  }catch(error){
+    waQrNotice("Falha ao preparar conexão: "+String(error.data?.error||error.message||error).slice(0,110),true);
+  }finally{updateWahaUi()}
+}
+waPrepareButton.onclick=()=>displayWaQr({prepare:true});
+waQrButton.onclick=()=>displayWaQr();
+$("#neWhatsappRefresh").onclick=async()=>{
+  await checkWaPairing();
+  if(!state.whatsapp?.connected&&!waQrPoll)await displayWaQr();
 };
-$("#neWhatsappRefresh").addEventListener("click",checkWaPairing);
 $("#openClientFromChat").onclick=async()=>{const p=state.selectedConversation?.client_phone||"";activate("clients");$("#clientSearch").value=p;await loadClients(p)};
 $("#resourceForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{const x=await api("/api/resources",{method:"POST",body:JSON.stringify(b)});state.resources.push(x);renderResources();fillSelects();$("#resourceModal").close();e.target.reset();toast("Recurso cadastrado")}catch{toast("Erro ao salvar recurso")}};
 
