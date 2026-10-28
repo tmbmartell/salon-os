@@ -46,3 +46,12 @@ test("Only the primary app controls QR and preparation; onboarding only manages 
  assert.ok(app.includes("waQrButton.onclick=()=>displayWaQr()"));
  assert.ok(app.includes("reader.readAsDataURL(image)"));
 });
+test("Live receptionist checks both operational approval and the owner policy",()=>{
+ for(const token of ["function liveReceptionistEnabled(tenantId)",'NOVAGENTE_AUTOMATION_V2_APPROVED','commercialPolicy(db,tenantId,"assistant_reply")','Number(enabled?.enabled)===1','liveReceptionistEnabled(targetTenant)','liveReceptionistEnabled(tenant)'])
+  assert.ok(server.includes(token),token);
+});
+test("WhatsApp screen reports actual runtime mode",()=>{
+ assert.ok(app.includes('w.reply_engine==="configured_llm"'));
+ assert.ok(app.includes('Recepcionista automática ativa no modo básico'));
+ assert.ok(app.includes('Respostas automáticas desligadas'));
+});

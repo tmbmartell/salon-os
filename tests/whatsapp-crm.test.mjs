@@ -71,3 +71,31 @@ test("webhook de sessão diferente não contamina o CRM",async()=>{
     assert.equal(db.prepare("select count(*) n from clients").get().n,0);
   }finally{db.close()}
 });
+
+test("Modo automático responde apenas à próxima mensagem; conversas de atendimento humano manual continuam humanas",async()=>{
+  const db=fixture();let sends=0;
+  try{
+    const make=(id,body)=>({session:"sessao-teste",event:"message",payload:{
+      id,from:"5569999990022@c.us",fromMe:false,body,pushName:"Cliente Teste"}});
+    const human=await ingestWahaEvent({db,tenantId:"salon-a",event:make("auto-1","Oi"),allowAi:false});
+    assert.equal(human.handlingMode,"human");
+    assert.equal(sends,0);
+    const automatic=await ingestWahaEvent({db,tenantId:"salon-a",event:make("auto-2","Tem horário amanhã?"),
+      allowAi:true,defaultHandlingMode:"ai",
+      autoReply:async()=>({text:"Me conta qual serviço você quer fazer para eu consultar a agenda."}),
+      deliverText:async()=>{sends++;return {messageId:"mock-out-auto-1"};}});
+    assert.equal(automatic.handlingMode,"ai");
+    assert.equal(automatic.automaticReply,true);
+    assert.equal(sends,1);
+    const duplicate=await ingestWahaEvent({db,tenantId:"salon-a",event:make("auto-2","Tem horário amanhã?"),
+      allowAi:true,defaultHandlingMode:"ai",autoReply:async()=>({text:"Não deve repetir"}),deliverText:async()=>{sends++;return {messageId:"mock-out-auto-2"};}});
+    assert.equal(duplicate.type,"duplicate");
+    assert.equal(sends,1);
+    db.prepare("update conversations set handling_mode='human',handling_mode_source='manual' where id=?").run(automatic.conversationId);
+    const manual=await ingestWahaEvent({db,tenantId:"salon-a",event:make("auto-3","Quero falar com a equipe"),
+      allowAi:true,defaultHandlingMode:"ai",autoReply:async()=>({text:"Não deve responder"}),
+      deliverText:async()=>{sends++;return {messageId:"mock-out-auto-3"};}});
+    assert.equal(manual.handlingMode,"human");
+    assert.equal(sends,1);
+  }finally{db.close()}
+});
