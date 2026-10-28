@@ -266,7 +266,7 @@ $("#chatModeButton").onclick=async()=>{
 $("#messageForm").onsubmit=async e=>{e.preventDefault();if(!state.selectedConversation)return;const text=$("#messageText").value.trim();if(!text)return;try{await api("/api/conversations/"+state.selectedConversation.id+"/messages",{method:"POST",body:JSON.stringify({text})});$("#messageText").value="";await openConversation(state.selectedConversation.id)}catch{toast("Não foi possível enviar. Verifique o WhatsApp.")}};
 
 // Pairing is always initiated by the logged-in owner/manager and never sends a message.
-let waQrPoll=null,waQrBlobUrl=null,waQrLoading=false,waQrAttempts=0;
+let waQrPoll=null,waQrLoading=false,waQrAttempts=0;
 const waQrMessage=$("#neWhatsappMessage"),waQrImage=$("#waQrImage");
 const waQrButton=$("#showQr"),waPrepareButton=$("#prepareWaha");
 function waQrNotice(message,error=false){
@@ -274,10 +274,8 @@ function waQrNotice(message,error=false){
   waQrMessage.classList.toggle("ne-error",error);
 }
 function clearWaQrImage(){
-  const old=waQrBlobUrl;waQrBlobUrl=null;
   waQrImage.removeAttribute("src");
   waQrImage.classList.add("hidden");
-  if(old)URL.revokeObjectURL(old);
 }
 function stopWaQrPoll(){
   if(waQrPoll){clearInterval(waQrPoll);waQrPoll=null}
@@ -297,20 +295,22 @@ async function fetchWaQr(){
     if(!["image/png","image/jpeg","image/webp"].includes(type))throw Error("Formato do QR inválido");
     const image=await response.blob();
     if(image.size<100||image.size>1000000)throw Error("Imagem do QR inválida");
-    const next=URL.createObjectURL(image);
-    // The current QR stays on screen until its replacement is ready.
+    // The site's CSP allows data images but not blob URLs.
+    const next=await new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>resolve(reader.result);
+      reader.onerror=()=>reject(Error("Falha ao preparar o QR Code"));
+      reader.readAsDataURL(image);
+    });
+    if(typeof next!=="string"||!next.startsWith("data:"+type+";base64,"))throw Error("QR Code com formato inesperado");
     const preloaded=new Image();
-    try{
-      await new Promise((resolve,reject)=>{
-        preloaded.onload=resolve;
-        preloaded.onerror=()=>reject(Error("Imagem do QR não pôde ser carregada"));
-        preloaded.src=next;
-      });
-    }catch(error){URL.revokeObjectURL(next);throw error}
-    const previous=waQrBlobUrl;
-    waQrBlobUrl=next;
-    waQrImage.src=next;waQrImage.classList.remove("hidden");
-    if(previous)URL.revokeObjectURL(previous);
+    await new Promise((resolve,reject)=>{
+      preloaded.onload=resolve;
+      preloaded.onerror=()=>reject(Error("Imagem do QR não pôde ser carregada"));
+      preloaded.src=next;
+    });
+    waQrImage.src=next;
+    waQrImage.classList.remove("hidden");
     const stamp=new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
     waQrNotice("QR atualizado às "+stamp+". No celular, abra WhatsApp → Dispositivos conectados → Conectar dispositivo. Aponte a câmera para o código.");
     return true;
