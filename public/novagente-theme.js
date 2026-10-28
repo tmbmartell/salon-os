@@ -44,8 +44,8 @@ function install(){
   small.addEventListener("click",()=>setTheme(document.documentElement.dataset.neTheme==="dark"?"light":"dark"));
   footer.prepend(small);
  }
- setTheme(read()==="light"?"light":"dark",false);
+ setTheme(read()==="dark"?"dark":"light",false);
 }
-setTheme(read()==="light"?"light":"dark",false);
+setTheme(read()==="dark"?"dark":"light",false);
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});else install();
 })();
