@@ -105,9 +105,11 @@ function addSection(){
  bookingPane.append(bookingHead);
  const bookContent=create("div","ne-auto-settings-inside");
  bookContent.append(create("p","ne-auto-muted","Simule uma conversa com dados fictícios. A IA verifica a agenda, oferece opções, registra a escolha e não envia mensagens reais."));
+ const bookingLabel=create("label","ne-booking-client-label","Cliente fictícia");
+ const bookingClient=create("select");bookingClient.id="neBookingClient";bookingLabel.append(bookingClient);bookContent.append(bookingLabel);
  const thread=create("div","ne-booking-thread");thread.setAttribute("role","log");thread.setAttribute("aria-live","polite");
  bookContent.append(thread);
- clientPicker.addEventListener("change",()=>thread.replaceChildren());
+ bookingClient.addEventListener("change",()=>thread.replaceChildren());
  const form=create("div","ne-booking-compose");
  const prompt=create("input");prompt.type="text";prompt.maxLength=800;
  prompt.placeholder="Ex.: quero agendar coloração amanhã";
@@ -120,7 +122,7 @@ function addSection(){
   quick.append(action);
  }
  send.addEventListener("click",async()=>{
-  const input=prompt.value.trim(),clientId=clientPicker.value;
+  const input=prompt.value.trim(),clientId=bookingClient.value;
   if(!input||!clientId)return;
   const textRow=create("p","ne-booking-user",input);thread.append(textRow);
   send.disabled=true;prompt.value="";
@@ -147,7 +149,7 @@ function addSection(){
  let initiated=false;
  root.addEventListener("toggle",async()=>{
   if(!root.open)return;
-  try{if(!initiated){const health=await api("/api/health");bookingPane.hidden=!health.disposable_demo;const clients=await api("/api/clients");clientPicker.replaceChildren();for(const c of clients){const opt=document.createElement("option");opt.value=c.id;opt.textContent=c.name;clientPicker.append(opt)}initiated=true}await refresh(root)}catch(e){showError(e)}
+  try{if(!initiated){const health=await api("/api/health");bookingPane.hidden=!health.disposable_demo;const clients=await api("/api/clients");clientPicker.replaceChildren();for(const c of clients){const opt=document.createElement("option");opt.value=c.id;opt.textContent=c.name;clientPicker.append(opt);bookingClient.append(opt.cloneNode(true))}initiated=true}await refresh(root)}catch(e){showError(e)}
  });
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",addSection,{once:true});else addSection();
