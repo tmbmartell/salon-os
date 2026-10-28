@@ -10,7 +10,7 @@ const parse=(v,fallback)=>{try{return JSON.parse(v)}catch{return fallback}};
 const stageList=["novo_contato","respondeu","orcamento_enviado","agendou","sinal_pago","atendido","voltou"];
 export const FUNNEL_STAGES=Object.freeze(stageList);
 export const AUTOMATION_SWITCHES=Object.freeze([
-  "assistant_reply","appointment_confirmation_24h","appointment_reminder_2h",
+  "assistant_reply","assistant_booking","appointment_confirmation_24h","appointment_reminder_2h",
   "deposit_receivable","waitlist_offer","quote_followups","lead_recovery_7d",
   "return_cycle","birthday","inactive_60d","review_invitation",
   "high_value_alert","owner_digest","stock_replenishment","commission_reports",
