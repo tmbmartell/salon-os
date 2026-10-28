@@ -25,6 +25,8 @@ import { installPhase9, handlePhase9Api, staffWindowForDate } from "./phase9.mjs
 import { installPhase10, handlePhase10Api } from "./phase10.mjs";
 import { installPhase11, handlePhase11Api } from "./phase11.mjs";
 import { checkManualStatusTransition } from "./appointment-status.mjs";
+import { installCommercialAutomation, policy as commercialPolicy, registerIncoming, afterAppointmentCreated, afterAppointmentStatus, receptionistDraft } from "./commercial-automation.mjs";
+import { handleCommercialApi } from "./commercial-api.mjs";
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||9331);
@@ -199,6 +201,7 @@ installPhase5(db);
 installTenantAdministration(db);
 installPhase6(db);
 installMarketing(db);
+installCommercialAutomation(db);
 installPhase7(db);
 installPhase8(db);
 installPhase9(db);
@@ -407,6 +410,8 @@ function parseExternalReceptionist(text,meta={}){
   return {text:String(p.reply).trim().slice(0,3500),intent:intents.has(p.intent)?p.intent:"other",handoff:!!p.handoff,reason:String(p.reason||"").slice(0,200),confidence:Math.max(0,Math.min(1,Number(p.confidence||0))),entities:p.entities&&typeof p.entities==="object"?p.entities:{},meta};
 }
 async function receptionistAgentReply({tenantId,client,conversation,text,intent}){
+  const safety=receptionistDraft({text});
+  if(safety.handoff)return {handoff:true,reason:safety.reason,meta:{source:"commercial_safety_guard",intent:safety.intent}};
   const profile=one("select enabled from agent_profiles where tenant_id=? and agent_key='receptionist'",[tenantId]);
   if(Number(profile?.enabled)===0)return {handoff:true,reason:"receptionist_paused",meta:{source:"paused"}};
   const cfg=getAgentConfig(db,tenantId,"receptionist"),svc=cfg.service||{},llm=getLlmConfig(db,tenantId);
@@ -518,8 +523,10 @@ async function api(req,res,url){
     if(!verifyWebhook(raw,signature,algorithm))return send(res,401,{error:"invalid_webhook_signature"});
     const targetTenant=tenantForWahaEvent(db,body);if(!targetTenant)return send(res,200,{ok:true,accepted:false,reason:"unmapped_session"});
     const receptionProfile=one("select enabled from agent_profiles where tenant_id=? and agent_key='receptionist'",[targetTenant]),receptionConfig=getAgentConfig(db,targetTenant,"receptionist");
-    const defaultHandlingMode=WAHA_AGENT_ENABLED&&Number(receptionProfile?.enabled)!==0&&receptionConfig.service?.auto_activate_new_conversations!==false?"ai":"human";
-    const out=await ingestWahaEvent({db,tenantId:targetTenant,event:body,interpret,autoReply:WAHA_AGENT_ENABLED?receptionistAgentReply:null,allowAi:WAHA_AGENT_ENABLED,defaultHandlingMode});
+    const commercialAiEnabled=WAHA_AGENT_ENABLED&&process.env.NOVAGENTE_AUTOMATION_V2_APPROVED==="true"&&commercialPolicy(db,targetTenant,"assistant_reply");
+    const defaultHandlingMode=commercialAiEnabled&&Number(receptionProfile?.enabled)!==0&&receptionConfig.service?.auto_activate_new_conversations!==false?"ai":"human";
+    const out=await ingestWahaEvent({db,tenantId:targetTenant,event:body,interpret,autoReply:commercialAiEnabled?receptionistAgentReply:null,allowAi:commercialAiEnabled,defaultHandlingMode});
+    if(out.accepted&&out.type==="message"&&out.clientId){try{registerIncoming(db,targetTenant,out.clientId,String(body?.payload?.body||""),{messageId:body?.payload?.id?.id||body?.payload?.id?._serialized||null,source:"whatsapp"});}catch(e){console.error("commercial_ingest_failed",String(e.message||e).slice(0,140))}}
     return send(res,200,{ok:true,...out});
   }
 
@@ -527,6 +534,8 @@ async function api(req,res,url){
   if(!user)return send(res,401,{error:"unauthorized"});
   const tenant=user.tenantId;
   const guard=p=>requirePermission(user,p);
+  const commercialResult=await handleCommercialApi({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit,isDemo:isFreePreview()});
+  if(commercialResult!==false)return commercialResult;
   if(req.method==="GET"&&url.pathname==="/api/agents/receptionist/llm"){
     guard("agents.read");
     const cfg=getLlmConfig(db,tenant);
@@ -723,7 +732,7 @@ async function api(req,res,url){
   if(req.method==="POST"&&url.pathname==="/api/appointments"){
     guard("appointments.write");
     const b=await parseBody(req);
-    try{return send(res,201,createAppointmentRecord(tenant,user,b))}
+    try{const created=createAppointmentRecord(tenant,user,b);try{afterAppointmentCreated(db,tenant,created)}catch(e){console.error("commercial_booking_hook_failed",String(e.message||e).slice(0,140))}return send(res,201,created)}
     catch(e){return send(res,e.status||500,{error:String(e.message||"appointment_create_failed"),professional:e.professional||null,resource:e.resource||null})}
   }
   const ap=routeMatch(url.pathname,"/api/appointments/:id/status");
@@ -738,6 +747,7 @@ async function api(req,res,url){
     const info=run("update appointments set status=?,updated_at=? where id=? and tenant_id=? and status=?",[status,now(),ap.id,tenant,current.status]);
     if(!info.changes)return send(res,409,{error:"status_changed_reload"});
     audit(db,user,"appointment.status","appointment",ap.id,{from:current.status,to:status});
+    try{afterAppointmentStatus(db,tenant,ap.id,status)}catch(e){console.error("commercial_status_hook_failed",String(e.message||e).slice(0,140))}
     return send(res,200,{ok:true,status});
   }
 
@@ -781,7 +791,7 @@ async function api(req,res,url){
     guard("conversations.write");
     const b=await parseBody(req),mode=safeText(b.mode,16);
     if(!["human","ai"].includes(mode))return send(res,400,{error:"invalid_mode"});
-    if(mode==="ai"&&!WAHA_AGENT_ENABLED)return send(res,403,{error:"ai_not_enabled"});
+    if(mode==="ai"&&(!WAHA_AGENT_ENABLED||!commercialPolicy(db,tenant,"assistant_reply")))return send(res,403,{error:"ai_not_enabled"});
     const info=run("update conversations set handling_mode=?,handling_mode_source='manual',updated_at=? where id=? and tenant_id=?",[mode,now(),modeRoute.id,tenant]);
     if(!info.changes)return send(res,404,{error:"conversation_not_found"});
     audit(db,user,"conversation.mode","conversation",modeRoute.id,{mode});
