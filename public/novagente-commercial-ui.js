@@ -136,7 +136,7 @@ function addSection(){
  });
  prompt.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();send.click()}});
  form.append(prompt,send);bookContent.append(form,quick);bookingPane.append(bookContent);
- internal.append(bookingPane);
+ content.prepend(bookingPane);
  const queue=create("details","ne-auto-settings");queue.append(create("summary","","Ações futuras e bloqueios"));
  const queueRows=create("div","ne-auto-jobs");queueRows.id="neAutoJobs";queue.append(queueRows);internal.append(queue);
  more.append(internal);content.append(more);
