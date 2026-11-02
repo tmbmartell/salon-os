@@ -33,3 +33,10 @@ tmp/
 
 # Private visual references / production captures
 docs/referencias/
+
+# Graphify: estado local da máquina e backups automáticos
+graphify-out/.graphify_python
+graphify-out/.graphify_root
+graphify-out/.graphify_build_state.json
+graphify-out/.graphify_labels.pending.json
+graphify-out/20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/

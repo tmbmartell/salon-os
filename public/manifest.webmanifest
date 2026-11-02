@@ -1,12 +1,12 @@
 {
-  "name":"Salon OS · Nova Gente",
-  "short_name":"Salon OS",
-  "description":"Sistema Operacional Inteligente para salões de beleza",
+  "name":"Novagente Estética",
+  "short_name":"Novagente",
+  "description":"Sistema de gestão para salões",
   "start_url":"/",
   "scope":"/",
   "display":"standalone",
-  "background_color":"#fbf8f5",
-  "theme_color":"#fbf8f5",
+  "background_color":"#fafbfc",
+  "theme_color":"#b8d8ea",
   "orientation":"portrait-primary",
   "icons":[
     {"src":"/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},

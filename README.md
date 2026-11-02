@@ -1,8 +1,8 @@
-# Salon OS — Nova Gente
+# Novagente Estética
 
-Sistema operacional para salões e negócios de beleza, criado pela **Nova Gente**.
+Sistema operacional para salões e negócios de beleza, criado pela **Novagente Estética**.
 
-O Salon OS reúne operação, atendimento, agenda, CRM, WhatsApp, financeiro, estoque, pacotes, equipe, relatórios e agentes de IA em uma única aplicação.
+O sistema reúne operação, atendimento, agenda, CRM, WhatsApp, financeiro, estoque, pacotes, equipe, relatórios e agentes de IA em uma única aplicação.
 
 ## Principais módulos
 
@@ -70,5 +70,5 @@ O `.gitignore` deste projeto já cobre esses arquivos.
 
 ## Empresa
 
-**Nova Gente** — Inteligência Artificial aplicada em sua vida.
+**Novagente Estética** — Inteligência Artificial aplicada em sua vida.
 

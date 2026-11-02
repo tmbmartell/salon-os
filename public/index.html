@@ -2,15 +2,20 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#fbf8f5"><title>Salon OS — Nova Gente</title>
+<meta name="theme-color" content="#b8d8ea" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#1a2229" media="(prefers-color-scheme: dark)"><title>Novagente Estética</title>
+<link rel="icon" type="image/svg+xml" href="/logo/novagente-icone-app.svg">
+<link rel="preload" href="/fonts/figtree-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/instrument-serif-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<script src="/theme.js"></script>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="stylesheet" href="/tokens.css">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <div id="authGate" class="authGate">
   <div class="authCard">
-    <div class="authBrand"><div class="logo">NG</div><div><strong>Salon OS</strong><small>Nova Gente</small></div></div>
+    <div class="authBrand"><span class="lockup"><svg width="46" height="46" viewBox="0 0 64 64" aria-hidden="true"><rect x="4" y="4" width="56" height="56" rx="18" fill="#b8d8ea"/><path class="markLine" pathLength="1" d="M21 44V24C21 18 27 17 29 23L35 41C37 47 43 46 43 40V20" fill="none" stroke="#26323b" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><span><span class="nm">Novagente</span><span class="sb">ESTÉTICA</span></span></span></div>
     <div id="setupPanel" class="authPanel hidden">
       <p class="eyebrow">PRIMEIRO ACESSO</p><h2>Proteja o salão</h2><p>Crie a conta proprietária. Esta etapa fecha automaticamente depois de concluída.</p>
       <form id="setupForm">
@@ -21,10 +26,10 @@
       </form>
     </div>
     <div id="loginPanel" class="authPanel hidden">
-      <p class="eyebrow">ACESSO SEGURO</p><h2>Entrar no Salon OS</h2><p id="loginTenant">Entre com a conta do salão.</p>
+      <p class="eyebrow">ACESSO SEGURO</p><h2>Entrar</h2><p id="loginTenant">Entre com a conta do salão.</p>
       <form id="loginForm">
         <label>E-mail<input name="email" type="email" autocomplete="username" required></label>
-        <label id="workspaceLoginField" class="hidden">Empresa<input name="workspace" placeholder="ex.: studio-aurora" autocomplete="organization"></label>
+        <label id="workspaceLoginField" class="hidden">Empresa<input name="workspace" placeholder="ex.: novagente-estetica" autocomplete="organization"></label>
         <label>Senha<input name="password" type="password" autocomplete="current-password" required></label>
         <button class="primary wide">Entrar</button>
       </form>
@@ -43,30 +48,21 @@
 
 <div class="shell">
   <aside class="sidebar">
-    <div class="brand"><div class="logo">NG</div><div><strong>Salon OS</strong><small>Nova Gente</small></div></div>
-    <nav>
-      <button data-view="dashboard" class="active">⌂ <span>Visão geral</span></button>
-      <button data-view="inbox">✉ <span>Atendimento</span></button>
-      <button data-view="agenda">▦ <span>Agenda</span></button>
-      <button data-view="clients">♡ <span>Clientes</span></button>
-      <button data-view="people">◉ <span>Gente</span></button>
-      <button data-view="productsHub">▦ <span>Produtos</span></button>
-      <button data-view="marketing">✦ <span>Marketing</span></button>
-      <button data-view="technical">⌁ <span>Ficha Técnica</span></button>
-      <button data-view="team">◉ <span>Equipe</span></button>
-      <button data-view="services">◇ <span>Serviços</span></button>
-      <button data-view="packages">▣ <span>Pacotes</span></button>
-      <button data-view="retail">▦ <span>PDV Produtos</span></button>
-      <button data-view="resources">▤ <span>Recursos</span></button>
-      <button data-view="finance">R$ <span>Financeiro</span></button>
-      <button data-view="inventory">□ <span>Estoque</span></button>
-      <button data-view="suppliers">⇄ <span>Fornecedores</span></button>
-      <button data-view="retention">♡ <span>Fidelização</span></button>
-      <button data-view="ownerEye">◎ <span>Olho do Dono</span></button>
-      <button data-view="agents">⚙ <span>Agentes</span></button>
-      <button data-view="admin">☷ <span>Administração</span></button>
-      <button data-view="reports">▤ <span>Relatórios</span></button>
-      <button data-view="intelligence">✦ <span>JEV</span></button>
+    <div class="brand"><span class="lockup "><img src="/logo/novagente-simbolo.svg" width="40" height="40" alt=""><span><span class="nm">Novagente</span><span class="sb">ESTÉTICA</span></span></span></div>
+    <div class="menuLabel">MENU</div>
+    <nav aria-label="Menu principal">
+      <button data-view="dashboard" class="active navTop"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 11l8-7 8 7M6 10v10h12V10"/></svg><span>Início</span></button>
+      <button data-view="agenda" class="navTop"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 6h16v15H4zM4 10h16M8 3v5M16 3v5"/></svg><span>Agenda</span></button>
+      <button data-view="clients" class="navTop"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21c0-4 3-6 7-6s7 2 7 6M16 4a4 4 0 0 1 0 7M18 15c2.500.700 4 2.500 4 6"/></svg><span>Clientes</span></button>
+      <button data-view="inbox" class="navTop" data-deny="professional"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 5h16v11H9l-5 4zM8 9h8M8 12h5"/></svg><span>Conversas</span></button>
+      <button data-view="retail" class="navTop" data-deny="professional"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 8h12l1 12H5zM9 8V6a3 3 0 0 1 6 0v2"/></svg><span>Vender produto</span></button>
+      <button data-view="finance" class="navTop" data-deny="reception professional"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H3zM3 7V5h14v2M16 13h2"/></svg><span>Gastos e caixa</span></button>
+      <p class="navSectionLabel">Mais opções</p>
+      <div class="navGroup"><button type="button" class="navGroupBtn"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 9l1-5h14l1 5M4 9v11h16V9M4 9h16M9 20v-6h6v6"/></svg><span>Meu salão</span><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></i></button><div class="navChildren"><button data-view="team"><span>Equipe</span></button><button data-view="services"><span>Serviços</span></button><button data-view="packages"><span>Pacotes</span></button><button data-view="resources"><span>Cadeiras e salas</span></button></div></div>
+      <div class="navGroup"><button type="button" class="navGroupBtn"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7l8-4 8 4v10l-8 4-8-4zM4 7l8 4 8-4M12 11v10"/></svg><span>Estoque</span><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></i></button><div class="navChildren"><button data-view="inventory"><span>Estoque</span></button><button data-view="suppliers"><span>Fornecedores</span></button><button data-view="productsHub"><span>Todos os produtos</span></button></div></div>
+      <div class="navGroup"><button type="button" class="navGroupBtn"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 20s-8-5-8-11a4.500 4.500 0 0 1 8-3 4.500 4.500 0 0 1 8 3c0 6-8 11-8 11z"/></svg><span>Relacionamento</span><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></i></button><div class="navChildren"><button data-view="retention"><span>Fidelidade</span></button><button data-view="technical"><span>Ficha técnica</span></button><button data-view="marketing"><span>Marketing</span></button><button data-view="people"><span>Pessoas</span></button></div></div>
+      <div class="navGroup"><button type="button" class="navGroupBtn"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Relatórios</span><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></i></button><div class="navChildren"><button data-view="reports"><span>Relatórios</span></button><button data-view="ownerEye"><span>Olho do Dono</span></button></div></div>
+      <div class="navGroup"><button type="button" class="navGroupBtn"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M14 6a5 5 0 0 0-6 6l-5 5 3 3 5-5a5 5 0 0 0 6-6l-3 3-3-3z"/></svg><span>Sistema</span><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></i></button><div class="navChildren"><button data-view="agents"><span>Assistentes de IA</span></button><button data-view="intelligence"><span>JEV</span></button><button data-view="admin"><span>Administração</span></button></div></div>
     </nav>
     <div class="sidefoot">
       <div><span class="dot"></span><small id="health">Conectando…</small></div>
@@ -75,33 +71,73 @@
   </aside>
 
   <main>
+    <div class="appBar">
+      <img class="logoMini" src="/logo/novagente-simbolo.svg" alt="Novagente Estética"><button id="appBack" class="appBarBtn" title="Recolher menu" aria-label="Recolher menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H5M11 6l-6 6 6 6"/></svg></button>
+      <div class="appBarInfo">
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9l1-5h14l1 5M4 9v11h16V9M4 9h16M9 20v-6h6v6"/></svg><b id="appTenant">NOVAGENTE ESTÉTICA</b></span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v15H4zM4 10h16M8 3v5M16 3v5"/></svg><b id="appDate"></b></span>
+        <span class="appUser"><i id="appAvatar" class="appAvatar"></i><b id="appUser"></b></span>
+        <div class="themeSeg" role="group" aria-label="Tema"><button type="button" data-theme-set="auto" aria-pressed="true">Auto</button><button type="button" data-theme-set="light" aria-pressed="false">Claro</button><button type="button" data-theme-set="dark" aria-pressed="false">Escuro</button></div><button id="appFullscreen" class="appBarBtn" title="Tela cheia" aria-label="Tela cheia"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
+      </div>
+    </div>
     <header class="topbar">
-      <div><p class="eyebrow">SALON OS · FASES 1–4</p><h1 id="pageTitle">Visão geral</h1><p id="pageSub">O que precisa da sua atenção hoje.</p></div>
-      <button class="primary" id="quickAppointment">+ Agendamento</button>
+      <div><h1 id="pageTitle">Dashboard</h1><p id="pageSub"></p></div>
+      <button class="secondary" id="quickAppointment">Marcar agendamento</button>
     </header>
 
     <section id="dashboard" class="view active">
-      <div class="metrics">
-        <article><span>Atendimentos hoje</span><strong id="mAppointments">—</strong><small>agenda ativa</small></article>
-        <article><span>Previsto hoje</span><strong id="mForecast">—</strong><small>serviços agendados</small></article>
-        <article><span>Clientes</span><strong id="mClients">—</strong><small>base cadastrada</small></article>
-        <article><span>Profissionais</span><strong id="mPros">—</strong><small>ativos</small></article>
+      <div class="homeHead"><h2 id="dashGreeting">Olá</h2><p id="dashToday"></p></div>
+      <div class="homeActions">
+        <button type="button" class="homeAction main" data-jump="agenda"><span><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M4 6h16v15H4zM4 10h16M8 3v5M16 3v5"/></svg></span><strong>Marcar agendamento</strong><small>Escolha o dia, o horário e o profissional</small></button>
+        <button type="button" class="homeAction" data-open="clientModal"><span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM3 21c0-4 3-6 7-6 1.500 0 3 .3 4 1M18 14v6M15 17h6"/></svg></span><strong>Cadastrar cliente</strong><small>Nome e WhatsApp</small></button>
+        <button type="button" class="homeAction" data-jump="retail" data-deny="professional"><span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 8h12l1 12H5zM9 8V6a3 3 0 0 1 6 0v2"/></svg></span><strong>Vender produto</strong><small>Venda no balcão</small></button>
+        <button type="button" class="homeAction" data-jump="finance" data-deny="reception professional"><span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H3zM3 7V5h14v2M16 13h2"/></svg></span><strong>Ver gastos e caixa</strong><small>Entradas, saídas e contas</small></button>
       </div>
-      <div class="grid2">
+      <div class="dashBottom">
         <article class="panel">
           <div class="panelhead"><div><h2>Agenda de hoje</h2><p>Atendimentos e status.</p></div><button class="link" data-jump="agenda">Abrir agenda</button></div>
           <div id="todayList" class="stack"></div>
         </article>
-        <article class="panel">
-          <div class="panelhead"><div><h2>Comando inteligente</h2><p>Regra local primeiro; JEV só entra quando precisa.</p></div><span class="chip">baixo custo</span></div>
-          <form id="commandForm" class="command"><textarea id="commandText" placeholder="Ex.: Quero marcar unha amanhã com a Bia"></textarea><button class="primary">Interpretar</button></form>
-          <div id="commandResult" class="result muted">Nenhum comando analisado ainda.</div>
+        <article class="panel dashCommand">
+          <div class="panelhead"><div><h2>Pergunte ao assistente</h2></div></div>
+          <form id="commandForm" class="command"><textarea id="commandText" placeholder="Ex.: Quero marcar unha amanhã com a Bia"></textarea><button class="primary">Perguntar</button></form>
+          <div id="commandResult" class="result muted">Escreva o que você precisa e eu ajudo.</div>
         </article>
       </div>
-      <article class="panel">
-        <div class="panelhead"><div><h2>Fluxo central</h2><p>A espinha dorsal antes de avançarmos para financeiro e estoque.</p></div></div>
-        <div class="pipeline"><span>WhatsApp</span><i>→</i><span>Cliente</span><i>→</i><span>Agenda</span><i>→</i><span>Atendimento</span><i>→</i><span>Histórico</span></div>
-      </article>
+      <details id="dashNumbers" class="dashNumbers" data-deny="professional">
+        <summary><span><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg></span><b>Ver números do salão</b><small>Faturamento, agenda ocupada e projeção da semana</small><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></i></summary>
+        <p id="dashDenied" class="muted hidden">Estes números ficam disponíveis para os perfis de gestão e recepção.</p>
+      <div id="dashAnalytics">
+        <form id="dashFilters" class="panel dashFilters">
+          <label>De <input id="dashFrom" type="date" required></label>
+          <label>até <input id="dashTo" type="date" required></label>
+          <button class="accentBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14-5L4 8V3M4 13a8 8 0 0 0 14 5l2-2v5"/></svg>Atualizar</button>
+          <label>Comparando com <select id="dashCompare"></select></label>
+          <small id="dashCompareText"></small>
+        </form>
+        <div class="dashKpis">
+          <article class="dashKpi"><span class="dashGlyph green"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg></span><h3>Faturamento do período</h3><strong id="dashRevenue">—</strong><em id="dashRevenueDelta" class="dashDelta neutral">—</em></article>
+          <article class="dashKpi"><span class="dashGlyph purple"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v15H4zM4 10h16M8 3v5M16 3v5"/></svg></span><h3>Agenda ocupada</h3><strong id="dashOccupancy">—</strong><em id="dashOccupancyDelta" class="dashDelta neutral">—</em></article>
+          <article class="dashKpi"><span class="dashGlyph blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M16 7H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6H7"/></svg></span><h3>Valor médio por atendimento</h3><strong id="dashTicket">—</strong><em id="dashTicketDelta" class="dashDelta neutral">—</em></article>
+          <article class="dashKpi"><span class="dashGlyph red"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v15H4zM4 10h16M8 3v5M16 3v5"/></svg></span><h3>Cancelamento de última hora</h3><strong id="dashCancel">—</strong><em id="dashCancelDelta" class="dashDelta neutral">—</em></article>
+        </div>
+        <div class="dashBody">
+          <div class="dashSide">
+            <article class="dashKpi"><span class="dashGlyph blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6L4 9V4"/></svg></span><h3>Clientes que voltaram no prazo</h3><strong id="dashReturn">—</strong><em id="dashReturnDelta" class="dashDelta neutral">—</em><small id="dashReturnNote"></small></article>
+            <article class="panel dashProjection">
+              <h2><span class="dashGlyph blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H3zM3 7V5h14v2M16 13h2"/></svg></span>Projeção para semana</h2>
+              <dl><dt>Contas a receber</dt><dd id="dashReceivable">—</dd><dt>Receita estimada</dt><dd id="dashEstimated">—</dd><dt>Contas a pagar</dt><dd id="dashPayable">—</dd></dl>
+              <div class="dashTotal"><b>TOTAL</b><strong id="dashTotal">—</strong></div>
+            </article>
+          </div>
+          <article class="panel dashChartPanel">
+            <h2>Faturamento por período</h2>
+            <div id="dashChart" class="dashChart"></div>
+            <div class="dashLegend"><span><i class="swatch"></i>Período atual</span><span><i class="swatch compare"></i><b id="dashLegendCompare"></b></span></div>
+          </article>
+        </div>
+      </div>
+      </details>
     </section>
 
     <section id="inbox" class="view messengerView">
@@ -158,10 +194,31 @@
       </article>
     </section>
 
-    <section id="agenda" class="view">
-      <div class="sectionTitle"><div><h2>Agenda</h2><p>Cliente, profissional, serviço e recurso sem conflito.</p></div><button class="primary" data-open="appointmentModal">+ Novo</button></div>
-      <article class="panel"><div id="agendaList" class="agenda"></div></article>
-      <article class="panel"><div class="panelhead"><div><h2>Lista de espera</h2><p>Clientes aguardando um encaixe ou horário melhor.</p></div><button class="secondary" data-open="waitlistModal">+ Adicionar</button></div><div id="waitlistList" class="stack"></div></article>
+    <section id="agenda" class="view agendaView">
+      <aside class="agLeft">
+        <div id="agMoon" class="agMoon"></div>
+        <div class="agMonthBar"><button type="button" id="agPrevMonth" aria-label="Mês anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button><strong id="agMonthLabel"></strong><button type="button" id="agNextMonth" aria-label="Próximo mês"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>
+        <div id="agCalendar" class="agCalendar"></div>
+        <div class="agTabs"><button type="button" class="active" data-ag-tab="professionals">Profissionais</button><button type="button" data-ag-tab="groups">Grupo</button></div>
+        <div id="agProList" class="agProList"></div>
+      </aside>
+      <div class="agMain">
+        <div class="agToolbar">
+          <input id="agClient" type="search" placeholder="Buscar cliente" aria-label="Filtrar por cliente">
+          <button type="button" id="agFiltersToggle" class="secondary" aria-expanded="false" aria-controls="agFilters">Filtros e opções</button>
+          <button type="button" id="agRefresh" class="agIcon" title="Atualizar" aria-label="Atualizar"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14-5L4 8V3M4 13a8 8 0 0 0 14 5l2-2v5"/></svg></button>
+          <button type="button" class="primary agMark" data-open="appointmentModal">Marcar agendamento</button>
+        </div>
+        <div id="agFilters" class="agFilters hidden">
+          <div id="agStatusFilters" class="agStatusFilters" role="group" aria-label="Mostrar só"></div>
+          <label class="agPresence"><input type="radio" data-ag-presence="in"> Check in</label>
+          <label class="agPresence"><input type="radio" data-ag-presence="out"> Check out</label>
+          <button type="button" id="agRotation" class="secondary">Rodízio</button>
+          <button type="button" id="agWaitlist" class="secondary">Lista de espera</button>
+        </div>
+        <p class="agHint">Para marcar, clique em um horário livre na coluna do profissional.</p>
+        <div id="agGrid" class="agGrid"></div>
+      </div>
     </section>
 
     <section id="clients" class="view">
@@ -176,31 +233,31 @@
     <section id="people" class="view">
       <div class="sectionTitle"><div><h2>Gente</h2><p>Pessoas do salão, clientes, equipe e relacionamento em um só lugar.</p></div></div>
       <div class="hubGrid">
-        <button class="hubCard" data-jump="clients"><span>♡</span><strong>Clientes</strong><small>Cadastro, aniversário, redes sociais, referência e histórico.</small></button>
-        <button class="hubCard" data-jump="team"><span>◉</span><strong>Equipe</strong><small>Profissionais, escala, metas, folgas e desempenho.</small></button>
-        <button class="hubCard" data-jump="retention"><span>◎</span><strong>Fidelização</strong><small>Aniversários, indicações, pós-atendimento e clientes VIP.</small></button>
-        <button class="hubCard" data-jump="agents"><span>⚙</span><strong>Agentes</strong><small>Recepcionista IA e funcionários artificiais.</small></button>
+        <button class="hubCard" data-jump="clients"><span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 20s-8-5-8-11a4.500 4.500 0 0 1 8-3 4.500 4.500 0 0 1 8 3c0 6-8 11-8 11z"/></svg></span><strong>Clientes</strong><small>Cadastro, aniversário, redes sociais, referência e histórico.</small></button>
+        <button class="hubCard" data-jump="team"><span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c0-4 3.500-6 8-6s8 2 8 6"/></svg></span><strong>Equipe</strong><small>Profissionais, escala, metas, folgas e desempenho.</small></button>
+        <button class="hubCard" data-jump="retention"><span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg></span><strong>Fidelização</strong><small>Aniversários, indicações, pós-atendimento e clientes VIP.</small></button>
+        <button class="hubCard" data-jump="agents"><span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg></span><strong>Agentes</strong><small>Recepcionista IA e funcionários artificiais.</small></button>
       </div>
     </section>
 
     <section id="productsHub" class="view">
       <div class="sectionTitle"><div><h2>Produtos</h2><p>Venda, estoque, serviços, pacotes e compras conectados.</p></div></div>
       <div class="hubGrid">
-        <button class="hubCard" data-jump="retail"><span>▦</span><strong>PDV Produtos</strong><small>Venda de produtos com estoque e financeiro integrados.</small></button>
-        <button class="hubCard" data-jump="inventory"><span>□</span><strong>Estoque</strong><small>Quantidade, custo, validade e consumo automático.</small></button>
-        <button class="hubCard" data-jump="suppliers"><span>⇄</span><strong>Fornecedores</strong><small>Compras, reposição e histórico de preços.</small></button>
-        <button class="hubCard" data-jump="services"><span>◇</span><strong>Serviços</strong><small>Preço, duração, comissão e catálogo de serviços.</small></button>
-        <button class="hubCard" data-jump="packages"><span>▣</span><strong>Pacotes</strong><small>Venda antecipada, créditos e validade.</small></button>
+        <button class="hubCard" data-jump="retail"><span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 4h16v16H4zM4 10h16M10 10v10"/></svg></span><strong>PDV Produtos</strong><small>Venda de produtos com estoque e financeiro integrados.</small></button>
+        <button class="hubCard" data-jump="inventory"><span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7l8-4 8 4v10l-8 4-8-4zM4 7l8 4 8-4M12 11v10"/></svg></span><strong>Estoque</strong><small>Quantidade, custo, validade e consumo automático.</small></button>
+        <button class="hubCard" data-jump="suppliers"><span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg></span><strong>Fornecedores</strong><small>Compras, reposição e histórico de preços.</small></button>
+        <button class="hubCard" data-jump="services"><span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3l9 9-9 9-9-9z"/></svg></span><strong>Serviços</strong><small>Preço, duração, comissão e catálogo de serviços.</small></button>
+        <button class="hubCard" data-jump="packages"><span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 8h18v12H3zM3 8l2-4h14l2 4M12 8v12"/></svg></span><strong>Pacotes</strong><small>Venda antecipada, créditos e validade.</small></button>
       </div>
     </section>
 
     <section id="marketing" class="view">
       <div class="sectionTitle"><div><h2>Marketing & Relacionamento</h2><p>Base de clientes, canais, campanhas e oportunidades de retorno.</p></div></div>
       <div class="hubGrid">
-        <button class="hubCard" data-jump="clients"><span>♡</span><strong>Base de clientes</strong><small>Dados, Instagram, Facebook, aniversário, origem e referência.</small></button>
-        <button class="hubCard" data-jump="retention"><span>↻</span><strong>Relacionamento</strong><small>Aniversários, pós-atendimento, indicação e recuperação.</small></button>
-        <button class="hubCard" data-jump="inbox"><span>✉</span><strong>Mensageria WhatsApp</strong><small>Conversas, etiquetas, prioridade e atendimento por WAHA.</small></button>
-        <button class="hubCard" data-jump="reports"><span>▤</span><strong>Relatórios</strong><small>Meça retorno, frequência e valor movimentado.</small></button>
+        <button class="hubCard" data-jump="clients"><span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 20s-8-5-8-11a4.500 4.500 0 0 1 8-3 4.500 4.500 0 0 1 8 3c0 6-8 11-8 11z"/></svg></span><strong>Base de clientes</strong><small>Dados, Instagram, Facebook, aniversário, origem e referência.</small></button>
+        <button class="hubCard" data-jump="retention"><span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14-5L4 8V3M4 13a8 8 0 0 0 14 5l2-2v5"/></svg></span><strong>Relacionamento</strong><small>Aniversários, pós-atendimento, indicação e recuperação.</small></button>
+        <button class="hubCard" data-jump="inbox"><span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18v12H3zM3 7l9 6 9-6"/></svg></span><strong>Mensageria WhatsApp</strong><small>Conversas, etiquetas, prioridade e atendimento por WAHA.</small></button>
+        <button class="hubCard" data-jump="reports"><span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7"/></svg></span><strong>Relatórios</strong><small>Meça retorno, frequência e valor movimentado.</small></button>
       </div>
       <article class="panel marketingActions">
         <div class="panelhead"><div><h2>Ações rápidas</h2><p>Atalhos úteis para trabalhar campanhas e relacionamento.</p></div></div>
@@ -258,7 +315,7 @@
     </section>
 
     <section id="finance" class="view">
-      <div class="sectionTitle"><div><h2>Financeiro & Caixa</h2><p>Receitas, despesas, caixa e comissões em uma mesma leitura.</p></div><button class="primary" data-open="financeEntryModal">+ Lançamento</button></div>
+      <div class="sectionTitle"><div><h2>Financeiro & Caixa</h2><p>Receitas, despesas, caixa e comissões em uma mesma leitura.</p></div><button class="primary" data-open="financeEntryModal">Lançar gasto ou entrada</button></div>
       <div class="metrics">
         <article><span>Entradas hoje</span><strong id="fIncome">—</strong><small>recebido</small></article>
         <article><span>Saídas hoje</span><strong id="fExpense">—</strong><small>pago</small></article>
@@ -457,15 +514,14 @@
   </main>
 </div>
 
+<div id="navScrim" class="navScrim"></div>
 <div class="mobileNav">
-  <button data-view="dashboard" class="active">⌂<small>Início</small></button>
-  <button data-view="inbox">✉<small>Whats</small></button>
-  <button data-view="agenda">▦<small>Agenda</small></button>
-  <button data-view="people">◉<small>Gente</small></button>
-  <button data-view="productsHub">▦<small>Produtos</small></button>
-  <button data-view="marketing">✦<small>Marketing</small></button>
-  <button data-view="clients">♡<small>Clientes</small></button>
-  <button data-view="finance">R$<small>Gestão</small></button>
+  <button data-view="dashboard" class="active"><svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M4 11l8-7 8 7M6 10v10h12V10"/></svg><small>Início</small></button>
+  <button data-view="agenda"><svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M4 6h16v15H4zM4 10h16M8 3v5M16 3v5"/></svg><small>Agenda</small></button>
+  <button data-view="clients"><svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21c0-4 3-6 7-6s7 2 7 6M16 4a4 4 0 0 1 0 7M18 15c2.500.700 4 2.500 4 6"/></svg><small>Clientes</small></button>
+  <button data-view="inbox" data-deny="professional"><svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M4 5h16v11H9l-5 4zM8 9h8M8 12h5"/></svg><small>Conversas</small></button>
+  <button data-view="finance" data-deny="reception professional"><svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M3 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H3zM3 7V5h14v2M16 13h2"/></svg><small>Gastos</small></button>
+  <button id="mobileMenu" type="button" aria-label="Abrir menu completo"><svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><small>Menu</small></button>
 </div>
 
 <dialog id="clientModal"><form id="clientForm" class="modalForm">
@@ -669,7 +725,7 @@
         <label>Nome de apresentação<input name="greeting_name" placeholder="Assistente do salão"></label>
       </div>
       <label>Mensagem de apresentação<textarea name="introduction" rows="3" placeholder="Oi! Eu sou a assistente virtual do salão..."></textarea></label>
-      <label>Assinatura opcional<input name="signature" placeholder="Ex.: — Clara, atendimento Studio Aurora"></label>
+      <label>Assinatura opcional<input name="signature" placeholder="Ex.: — Clara, atendimento Novagente Estética"></label>
     </section>
 
     <section class="agentConfigSection llmSection">
@@ -832,6 +888,23 @@
   <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Registrar indicação</button></div>
 </form></dialog>
 
-<div id="toast" class="toast"></div>
-<script src="/app.js?v=191" type="module"></script>
+<dialog id="agEventModal"><div class="modalForm">
+  <div class="modalHead"><div><h3 id="agEventTitle">Agendamento</h3><p id="agEventSub"></p></div><button type="button" class="x" data-close>×</button></div>
+  <div id="agEventBody"></div>
+  <div id="agEventActions" class="agEventActions"></div>
+</div></dialog>
+
+<dialog id="agRotationModal"><div class="modalForm">
+  <div class="modalHead"><div><h3>Rodízio</h3><p>Ordem sugerida: quem está livre e atendeu menos no dia vem primeiro.</p></div><button type="button" class="x" data-close>×</button></div>
+  <div id="agRotationList" class="agRotationList"></div>
+</div></dialog>
+
+<dialog id="agWaitlistModal"><div class="modalForm">
+  <div class="modalHead"><div><h3>Lista de espera</h3><p>Clientes aguardando um encaixe ou horário melhor.</p></div><button type="button" class="x" data-close>×</button></div>
+  <div id="waitlistList" class="stack"></div>
+  <div class="stickyActions"><button type="button" class="secondary" data-close>Fechar</button><button type="button" class="primary" data-open="waitlistModal">+ Adicionar</button></div>
+</div></dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="/app.js?v=199" type="module"></script>
 </body></html>
