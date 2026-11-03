@@ -1,4 +1,4 @@
-const CACHE="salon-os-v199-shell";
+const CACHE="salon-os-v212-shell";
 const SHELL=["/","/tokens.css","/theme.js","/styles.css","/app.js","/appointment-ui.js","/dashboard-board.js","/agenda-board.js","/manifest.webmanifest","/icon-192.png","/icon-512.png","/logo/novagente-simbolo.svg","/logo/novagente-icone-app.svg","/fonts/figtree-latin-400-normal.woff2","/fonts/figtree-latin-500-normal.woff2","/fonts/figtree-latin-600-normal.woff2","/fonts/figtree-latin-700-normal.woff2","/fonts/instrument-serif-latin-400-normal.woff2"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()))});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});

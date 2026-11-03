@@ -4,6 +4,8 @@ const WEEK=["D","S","T","Q","Q","S","S"];
 const STATUS=[["scheduled","Agendado"],["confirmed","Confirmado"],["arrived","Chegou"],["in_service","Em atendimento"],["completed","Finalizado"],["cancelled","Cancelado"],["no_show","Não compareceu"]];
 const OFF_LABEL={day_off:"FOLGA",vacation:"FÉRIAS",medical:"ATESTADO",personal:"COMPROMISSO",training:"CURSO"};
 const CLOSED=["cancelled","no_show","completed"];
+// Mesmas transições manuais aceitas pelo servidor (appointment-status.mjs).
+const NEXT={scheduled:["confirmed","arrived","in_service","cancelled","no_show"],confirmed:["arrived","in_service","cancelled","no_show"],arrived:["in_service","cancelled"],in_service:[],completed:[],cancelled:[],no_show:[]};
 const iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 const hhmm=d=>d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
 
@@ -81,8 +83,8 @@ export function setupAgenda({api,esc,fmt,toast,$,$$,statusLabel,initials,openNew
     $("#agEventTitle").textContent=a.client_name;$("#agEventSub").textContent=hhmm(start)+" – "+hhmm(end)+" · "+statusLabel(a.status);
     $("#agEventBody").innerHTML='<div class="agFacts"><span>Serviços</span><strong>'+esc(a.service_summary||a.service_name)+"</strong><span>Profissional</span><strong>"+esc(a.professional_summary||a.professional_name)+"</strong><span>Valor</span><strong>"+fmt.format(a.price||0)+"</strong>"+(a.client_phone?"<span>WhatsApp</span><strong>"+esc(a.client_phone)+"</strong>":"")+(a.resource_name?"<span>Recurso</span><strong>"+esc(a.resource_name)+"</strong>":"")+(a.notes?"<span>Observações</span><strong>"+esc(a.notes)+"</strong>":"")+"</div>";
     const locked=a.status==="completed";
-    $("#agEventActions").innerHTML=(locked?'<p class="muted">Atendimento finalizado.</p>':STATUS.filter(s=>s[0]!=="completed").map(s=>'<button type="button" class="secondary '+(s[0]===a.status?"current":"")+'" data-ag-status="'+s[0]+'">'+s[1]+"</button>").join(""))+(CLOSED.includes(a.status)?"":'<button type="button" class="primary" id="agEventCheckout">Finalizar e receber</button>');
-    $$("[data-ag-status]").forEach(btn=>btn.onclick=async()=>{try{await api("/api/appointments/"+a.id+"/status",{method:"PATCH",body:JSON.stringify({status:btn.dataset.agStatus})});$("#agEventModal").close();toast("Status atualizado");await load();await afterChange()}catch{toast("Não foi possível atualizar")}});
+    $("#agEventActions").innerHTML=(locked?'<p class="muted">Atendimento finalizado.</p>':STATUS.filter(s=>s[0]===a.status||(NEXT[a.status]||[]).includes(s[0])).map(s=>'<button type="button" class="secondary '+(s[0]===a.status?"current":"")+'" data-ag-status="'+s[0]+'">'+s[1]+"</button>").join(""))+(CLOSED.includes(a.status)?"":'<button type="button" class="primary" id="agEventCheckout">Finalizar e receber</button>');
+    $$("[data-ag-status]").forEach(btn=>btn.onclick=async()=>{try{await api("/api/appointments/"+a.id+"/status",{method:"PATCH",body:JSON.stringify({status:btn.dataset.agStatus})});$("#agEventModal").close();toast("Status atualizado");await load();await afterChange()}catch(err){toast(err.data?.error==="checkout_required"?"Finalize e receba pelo caixa":err.status===409?"A situação mudou. Recarregando agenda.":"Não foi possível atualizar");if(err.status===409)await load()}});
     if($("#agEventCheckout"))$("#agEventCheckout").onclick=()=>{$("#agEventModal").close();openCheckout(a.id)};
     $("#agEventModal").showModal();
   }

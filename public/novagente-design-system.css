@@ -1,0 +1,280 @@
+/* NOVAGENTE Estética — DESIGN SYSTEM GLOBAL / Etapa 26
+   Identidade da Home aplicada a todos os módulos, subabas, formulários e diálogos.
+   Sem mudanças em dados, regras, endpoints ou permissões.
+*/
+:root{
+ --ne-ui-font:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+ --ne-type-display:clamp(27px,2.7vw,36px);
+ --ne-type-heading:clamp(21px,2vw,27px);
+ --ne-type-subheading:18px;
+ --ne-type-body:15px;
+ --ne-type-secondary:13px;
+ --ne-type-caption:12px;
+ --ne-weight-heading:800;
+ --ne-weight-action:740;
+ --ne-round-card:20px;
+ --ne-round-button:12px;
+ --ne-round-pill:999px;
+ --ne-control-h:44px;
+ --ne-card-elevation:0 8px 22px #243d7510;
+}
+html[data-ne-theme="light"]{
+ --ne-page:#f4f5fd;--ne-ui-panel:#fff;--ne-ui-panel-alt:#f8f7fe;
+ --ne-ui-fg:#142140;--ne-ui-muted:#586987;--ne-ui-edge:#e3e5f3;
+ --ne-ui-tint:#f0edff;--ne-ui-primary:#6043e9;--ne-ui-primary-text:#fff;
+ --ne-ui-focus:#6c45e8;--ne-ui-glow:0 8px 22px #324ca51b;
+ --ne-pastel-violet:#eeeafb;--ne-pastel-pink:#ffe9f3;--ne-pastel-peach:#fff0e4;--ne-pastel-green:#e0f7f1;
+ --ne-pastel-yellow:#fff5d8;--ne-pastel-blue:#e7f0ff;--ne-pastel-lilac:#f0edff;--ne-pastel-sky:#e8f4ff;
+}
+html[data-ne-theme="dark"]{
+ --ne-page:#111929;--ne-ui-panel:#202c40;--ne-ui-panel-alt:#28364d;
+ --ne-ui-fg:#f0f3fc;--ne-ui-muted:#b9c7df;--ne-ui-edge:#455674;
+ --ne-ui-tint:#342a57;--ne-ui-primary:#ae8af9;--ne-ui-primary-text:#16102e;
+ --ne-ui-focus:#c2a2ff;--ne-ui-glow:0 8px 24px #0003;
+ --ne-pastel-violet:#273650;--ne-pastel-pink:#2d344e;--ne-pastel-peach:#303747;--ne-pastel-green:#213e44;
+ --ne-pastel-yellow:#3b3945;--ne-pastel-blue:#253a52;--ne-pastel-lilac:#302d4c;--ne-pastel-sky:#24384e;
+}
+/* Fonte única em toda a aplicação, incluindo itens gerados por JS e pop-ups. */
+html,html body,html .shell,html :is(button,input,select,textarea,summary,dialog,label,table,th,td),
+html :is(.sidebar,.view,.modalForm,.authCard,.toast,.ne-rail-label,.bw-submenu){
+ font-family:var(--ne-ui-font)!important;
+}
+html body{font-size:var(--ne-type-body);line-height:1.5}
+html :is(button,input,select,textarea){letter-spacing:-.01em}
+html .shell :is(h1,h2,h3,h4,strong),html :is(dialog,.modalForm,.authCard) :is(h2,h3,strong){
+ letter-spacing:-.025em;
+}
+html :is(.view,dialog,.authCard) :is(button,input,select,textarea,summary){
+ -webkit-tap-highlight-color:transparent;
+}
+html :is(.view,dialog) :is(button,a,input,select,textarea,summary):focus-visible{
+ outline:3px solid var(--ne-ui-focus);outline-offset:2px;
+}
+/* Superfície comum em todos os módulos, sem alterar a página inicial aprovada. */
+html[data-ne-theme] .view:not(#dashboard){color:var(--ne-ui-fg);font-size:var(--ne-type-body)}
+html[data-ne-theme] .view:not(#dashboard)>.sectionTitle{
+ display:flex;align-items:center;flex-wrap:wrap;gap:12px;
+ min-height:128px;padding:23px 27px;
+ background:var(--ne-ui-panel)!important;border:1px solid var(--ne-ui-edge)!important;
+ border-radius:23px!important;box-shadow:var(--ne-ui-glow);color:var(--ne-ui-fg);
+}
+html[data-ne-theme="light"] .view:not(#dashboard)>.sectionTitle{
+ background:linear-gradient(116deg,#fff 68%,#f3edff)!important
+}
+html[data-ne-theme] .view:not(#dashboard)>.sectionTitle>div:first-child{min-width:0;flex:1}
+html[data-ne-theme] .view:not(#dashboard)>.sectionTitle :is(h1,h2){
+ font-size:var(--ne-type-display)!important;font-weight:830!important;
+ line-height:1.15!important;letter-spacing:-.047em!important;color:var(--ne-ui-fg)!important;margin:1px 0 5px;
+}
+html[data-ne-theme] .view:not(#dashboard)>.sectionTitle :is(p,small){
+ font-size:14px!important;line-height:1.5!important;color:var(--ne-ui-muted)!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-ops-kicker,.ne-section-kicker,.eyebrow){
+ font-size:12px!important;line-height:1.35;letter-spacing:.08em!important;
+ font-weight:800!important;color:var(--ne-ui-primary)!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.panelhead h2,.sectionHeading h2,.sectionHead h2,.ne-stage8-head h2,.ne-service-head h2){
+ font-size:var(--ne-type-heading)!important;font-weight:800!important;
+ line-height:1.25;letter-spacing:-.035em!important;color:var(--ne-ui-fg)!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.panelhead p,.sectionHeading p,.sectionHead p){
+ font-size:var(--ne-type-secondary)!important;line-height:1.5;color:var(--ne-ui-muted)!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.panel,.hubCard,.metrics>article,.cards>article,
+ .ne-agenda-panel,.ne-waitlist-panel,.ne-agenda-card,.ne-service-card,.ne-technical-card,
+ .ne-stock-product,.ne-stage8-card,.ne-owner-kpi,.ne-marketing-card,.ne-finance-action,
+ .ne-backfill,.ne-pilot-readiness,.ne-mfa-box){
+ border-radius:var(--ne-round-card)!important;border-color:var(--ne-ui-edge)!important;
+ box-shadow:var(--ne-card-elevation);color:var(--ne-ui-fg);
+}
+html[data-ne-theme="light"] .view:not(#dashboard) :is(.panel,.hubCard,.metrics>article,.cards>article,.ne-agenda-card,.ne-service-card,.ne-technical-card,.ne-stock-product){
+ background:var(--ne-ui-panel);
+}
+html[data-ne-theme="dark"] .view:not(#dashboard) :is(.panel,.hubCard,.metrics>article,.cards>article,.ne-agenda-card,.ne-service-card,.ne-technical-card,.ne-stock-product){
+ background:var(--ne-ui-panel);
+}
+/* Os "atalhos" de Agenda, Financeiro, Equipe, Operação e demais módulos
+   passam a ter cards pastel, ícones redondos e legendas legíveis. */
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.ne-marketing-card,.hubCard,.ne-owner-kpi){
+ --ne-card-pastel:var(--ne-pastel-violet);--ne-card-icon:#7650ee;
+ min-width:0;min-height:153px!important;padding:18px!important;
+ border:1px solid var(--ne-ui-edge)!important;border-radius:19px!important;
+ background:var(--ne-card-pastel)!important;box-shadow:var(--ne-card-elevation);
+ color:var(--ne-ui-fg)!important;transition:transform .16s,box-shadow .16s;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.ne-marketing-card,.hubCard,.ne-owner-kpi):hover{
+ transform:translateY(-2px);box-shadow:0 13px 24px #30447524!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-work-toolbar,.ne-finance-actions,.cards,.ne-marketing-cards,.ne-owner-kpis) > :nth-child(4n + 1){
+ --ne-card-pastel:var(--ne-pastel-violet);--ne-card-icon:#7650ee;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-work-toolbar,.ne-finance-actions,.cards,.ne-marketing-cards,.ne-owner-kpis) > :nth-child(4n + 2){
+ --ne-card-pastel:var(--ne-pastel-pink);--ne-card-icon:#ed438c;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-work-toolbar,.ne-finance-actions,.cards,.ne-marketing-cards,.ne-owner-kpis) > :nth-child(4n + 3){
+ --ne-card-pastel:var(--ne-pastel-peach);--ne-card-icon:#f59418;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-work-toolbar,.ne-finance-actions,.cards,.ne-marketing-cards,.ne-owner-kpis) > :nth-child(4n + 4){
+ --ne-card-pastel:var(--ne-pastel-green);--ne-card-icon:#00b88a;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.ne-marketing-card,.hubCard,.ne-owner-kpi) :is(.ne-action-icon,.ne-owner-kpi-icon,.ne-stock-action-icon,.hubIcon,.icon){
+ width:48px!important;height:48px!important;min-width:48px;display:grid!important;
+ place-items:center;border-radius:50%!important;background:var(--ne-card-icon)!important;
+ color:white!important;font-size:23px!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.ne-marketing-card,.hubCard) > span:first-child:not(.ne-action-icon),
+html[data-ne-theme] .view:not(#dashboard) .ne-finance-action>span:first-child{
+ color:#fff!important;background:var(--ne-card-icon)!important;
+ display:grid;place-items:center;border-radius:50%!important;
+ width:48px;height:48px;font-size:22px;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.ne-marketing-card,.hubCard) strong{
+ font-size:17px!important;line-height:1.25!important;font-weight:800!important;color:var(--ne-ui-fg)!important;
+ letter-spacing:-.02em!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.ne-marketing-card,.hubCard) small{
+ font-size:13px!important;line-height:1.4!important;color:var(--ne-ui-muted)!important;
+}
+/* Hierarquia de informação dentro de listas, filas, registros e cards. */
+html[data-ne-theme] .view:not(#dashboard) :is(.panelhead,.ne-work-toolbar,.ne-agenda-tools){gap:14px}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-agenda-summary strong,.ne-stock-title strong,
+ .ne-service-card strong,.ne-technical-card strong,.bw-conversation-heading strong,
+ .ne-client-card h3,.ne-owner-menu-item,.ne-stage8-card strong){
+ font-size:15px!important;font-weight:750!important;line-height:1.35!important;color:var(--ne-ui-fg)!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-agenda-summary small,.ne-stock-title small,
+ .ne-service-card small,.bw-conversation-heading small,.ne-owner-kpi small,
+ .ne-client-card p,.ne-agenda-time small){
+ font-size:12.5px!important;line-height:1.5!important;color:var(--ne-ui-muted)!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-agenda-time,.ne-service-price){
+ font-size:16px;font-weight:820;letter-spacing:-.03em;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-agenda-card summary,.ne-service-card summary,
+ .ne-stock-product summary,.ne-technical-card summary){
+ min-height:65px;padding:15px 17px;gap:12px;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-agenda-details,.ne-technical-body,.ne-service-details){
+ padding:17px;background:var(--ne-ui-panel-alt)!important;
+}
+/* Botões, chips, filtros, abas, buscas e entradas padronizadas. */
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-filter-group,.ne-ops-mini-nav,.ne-owner-menu){gap:9px}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-filter-group button,.ne-ops-mini-nav button,
+ .ne-owner-menu-item,.ne-stage8-tab,.bw-nav-trigger,.secondary,.primary,.link){
+ font-size:13.5px!important;font-weight:730!important;line-height:1.3!important;
+ border-radius:var(--ne-round-button)!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-filter-group button,.ne-ops-mini-nav button,
+ .ne-owner-menu-item,.ne-stage8-tab){
+ min-height:42px;padding:10px 15px!important;
+}
+html[data-ne-theme] .view:not(#dashboard) .ne-filter-group button[aria-pressed="true"],
+html[data-ne-theme] .view:not(#dashboard) .ne-filter-group button.active{
+ color:#fff!important;background:#5f42d8!important;border-color:#5f42d8!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(button,summary){
+ touch-action:manipulation;
+}
+html[data-ne-theme] :is(.view:not(#dashboard),dialog) :is(input:not([type="checkbox"]):not([type="radio"]),
+ select,textarea){
+ font-size:14px!important;line-height:1.45!important;border-radius:var(--ne-round-button);
+ border:1px solid var(--ne-ui-edge);color:var(--ne-ui-fg);
+}
+html[data-ne-theme] :is(.view:not(#dashboard),dialog) :is(input:not([type="checkbox"]):not([type="radio"]),select){
+ min-height:var(--ne-control-h);
+}
+html[data-ne-theme] :is(.view:not(#dashboard),dialog) label{
+ font-size:13.5px;line-height:1.4;font-weight:650;color:var(--ne-ui-fg);
+}
+html[data-ne-theme] :is(.view:not(#dashboard),dialog) :is(input,textarea)::placeholder{
+ color:var(--ne-ui-muted);opacity:1;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.chip,.tag,.status,.ne-agenda-status,.dangerChip){
+ font-size:12px!important;line-height:1.3;font-weight:720;
+ padding:7px 10px;border-radius:var(--ne-round-pill)!important;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-empty-view,.chatEmpty,.emptyState,.muted){
+ font-size:14px;line-height:1.55;
+}
+html[data-ne-theme] .view:not(#dashboard) .ne-empty-view strong{
+ font-size:18px;line-height:1.35;font-weight:780;color:var(--ne-ui-fg)
+}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-ops-mini-nav button,.ne-filter-group button:not(.active):not([aria-pressed="true"])){
+ color:var(--ne-ui-fg)!important;border:1px solid var(--ne-ui-edge)!important;
+ background:var(--ne-ui-panel)!important;
+}
+/* Sidebar escura: texto é protagonista e submenus compartilham a mesma escala. */
+html .sidebar.ne-rail-sidebar nav .ne-rail-button .ne-rail-label{
+ font-size:14px!important;font-weight:720!important;line-height:1.32!important;
+ letter-spacing:-.012em!important;
+}
+html .sidebar.ne-rail-sidebar nav .ne-rail-group .bw-submenu [data-view]{
+ font-size:14px!important;font-weight:700!important;line-height:1.4!important;min-height:47px;
+}
+html .sidebar.ne-rail-sidebar .brand strong{font-size:14px!important;font-weight:780!important}
+html .sidebar.ne-rail-sidebar .sidefoot small{font-size:11px!important}
+/* Tipografia de painéis internos e popups respeita temas, sem vazar branco sobre branco. */
+html :is(dialog,.authCard,.modalForm,.ne-security-dialog){
+ font-size:15px;line-height:1.5;color:var(--ne-ui-fg);
+}
+html :is(dialog,.modalForm,.ne-security-dialog) :is(.modalHead h2,.modalHead h3,h2){
+ font-size:24px!important;font-weight:800!important;letter-spacing:-.035em!important;
+ line-height:1.24;color:var(--ne-ui-fg);
+}
+html :is(dialog,.modalForm,.ne-security-dialog) :is(.modalHead p,small){
+ font-size:13px;line-height:1.55;color:var(--ne-ui-muted);
+}
+html :is(dialog,.modalForm,.ne-security-dialog) :is(.primary,.secondary,.stickyActions button){
+ min-height:44px;font-size:14px!important;font-weight:730!important;border-radius:12px;
+}
+html[data-ne-theme="light"] :is(dialog,.modalForm,.authCard,.ne-security-dialog) label{color:#263453}
+html[data-ne-theme="dark"] :is(dialog,.modalForm,.authCard,.ne-security-dialog) label{color:#e8efff}
+/* Mesma fonte e legibilidade nas tabelas/linhas geradas dentro de áreas detalhadas. */
+html[data-ne-theme] .view:not(#dashboard) :is(table,.tableLike,.tableRow,.row){
+ font-size:13px;line-height:1.55;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(th,.tableHead){
+ font-size:12px!important;font-weight:770;letter-spacing:.025em;
+}
+html[data-ne-theme] .view:not(#dashboard) :is(td,.tableCell){
+ font-size:13px;line-height:1.55;
+}
+@media(min-width:901px){
+ html .sidebar.ne-rail-sidebar nav .ne-rail-button{min-height:54px!important}
+ html .sidebar.ne-rail-sidebar nav .ne-rail-button .ne-rail-label{font-size:13.5px!important}
+}
+@media(max-width:900px){
+ html[data-ne-theme] .view:not(#dashboard)>.sectionTitle{min-height:105px;padding:20px}
+ html[data-ne-theme] .view:not(#dashboard)>.sectionTitle :is(h1,h2){font-size:27px!important}
+}
+@media(max-width:570px){
+ html[data-ne-theme] .view:not(#dashboard)>.sectionTitle{padding:17px!important;border-radius:18px!important}
+ html[data-ne-theme] .view:not(#dashboard)>.sectionTitle :is(h1,h2){font-size:25px!important}
+ html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.ne-marketing-card,.hubCard,.ne-owner-kpi){
+  min-height:144px!important;padding:14px!important;border-radius:16px!important;
+ }
+ html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.ne-marketing-card,.hubCard) strong{font-size:15px!important}
+ html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.ne-marketing-card,.hubCard) small{font-size:12px!important}
+ html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.hubCard) :is(.ne-action-icon,.hubIcon,.icon){
+  width:43px!important;height:43px!important;min-width:43px;
+ }
+ html[data-ne-theme] .view:not(#dashboard) :is(.panelhead h2,.sectionHeading h2){font-size:20px!important}
+ html[data-ne-theme] .view:not(#dashboard) :is(.ne-filter-group button,.ne-ops-mini-nav button){min-height:40px}
+}
+@media(prefers-reduced-motion:reduce){
+ html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.hubCard){transition:none}
+}
+
+/* SVGs substituem apenas pictogramas decorativos que já existiam. */
+html[data-ne-theme] .view:not(#dashboard) .ne-ui-icon svg{width:25px;height:25px;display:block;flex:none}
+html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.hubCard) .ne-ui-icon{
+ display:grid!important;place-items:center!important;
+ width:48px!important;height:48px!important;min-width:48px;
+ color:#fff!important;background:var(--ne-card-icon)!important;border-radius:50%!important;
+}
+@media(max-width:570px){
+ html[data-ne-theme] .view:not(#dashboard) :is(.ne-action-card,.ne-finance-action,.ne-stock-action,.hubCard) .ne-ui-icon{
+ width:43px!important;height:43px!important;min-width:43px;
+ }
+ html[data-ne-theme] .view:not(#dashboard) .ne-ui-icon svg{width:23px;height:23px}
+}

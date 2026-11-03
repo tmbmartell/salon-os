@@ -1,0 +1,51 @@
+/* Atendimento v2 · layout operacional objetivo, painéis mais quadrados */
+body:has(#inbox.active) .topbar>div:first-child{display:none}
+body:has(#inbox.active) .topbar{justify-content:flex-end;align-items:center;min-height:0;padding-top:12px;padding-bottom:10px}
+body:has(#inbox.active) .topbar .ne-theme-switcher{margin-left:0}
+#inbox{--inbox-ink:var(--ne-text);--inbox-soft:var(--ne-text-secondary);--inbox-border:var(--ne-outline)}
+#inbox>.sectionTitle{min-height:70px!important;align-items:center!important;gap:14px!important;margin-bottom:12px!important;padding:15px 19px!important;border-radius:13px!important}
+#inbox>.sectionTitle h2{font-size:clamp(23px,2vw,29px)!important;font-weight:800!important;margin:0!important}
+#inbox>.sectionTitle p,#inbox>.sectionTitle .ne-ops-kicker{display:none!important}
+#inbox>.sectionTitle .sectionActions{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+#inbox>.sectionTitle .sectionActions button{border-radius:10px;min-height:40px;padding:9px 14px;font-weight:700;font-size:12px}
+#inbox .ne-ops-mini-nav{margin:0 0 10px;gap:7px}
+#inbox .ne-ops-mini-nav button{border-radius:9px;font-size:12px;min-height:35px;padding:7px 12px}
+#inbox #whatsappBackfillDetails{margin-bottom:12px;border-radius:12px;overflow:hidden}
+#inbox #whatsappBackfillDetails>summary{min-height:42px;padding:11px 14px;font-size:12px;cursor:pointer}
+#inbox #whatsappBackfillDetails>summary small{font-size:11px}
+#inbox .messengerToolbar{display:grid;grid-template-columns:minmax(200px,1fr) minmax(120px,170px) minmax(135px,170px) auto;align-items:center;gap:9px;padding:12px;border-radius:13px;margin-bottom:12px}
+#inbox .messengerToolbar #conversationSearch{min-height:42px;min-width:0;border-radius:9px;padding:10px 13px;font-size:13px}
+#inbox .messengerToolbar select{width:100%;min-width:0;min-height:42px;padding:9px 10px;border-radius:9px;font-size:12px}
+#inbox .messengerToolbar .checkFilter{display:flex;align-items:center;gap:7px;white-space:nowrap;font-weight:650;font-size:12px;color:var(--inbox-ink);padding:0 5px}
+#inbox .messengerToolbar .checkFilter input{height:17px;width:17px;accent-color:#8752b6}
+#inbox .messengerGrid{display:grid;grid-template-columns:minmax(235px,28%) minmax(340px,1fr) minmax(245px,26%);gap:12px;align-items:stretch}
+#inbox .messengerGrid>.panel{min-width:0;min-height:450px!important;height:min(62vh,650px);padding:16px!important;border-radius:13px!important;margin:0!important;overflow:auto}
+#inbox .messengerGrid .panelhead{padding:0 0 12px;border-bottom:1px solid var(--inbox-border);margin-bottom:12px}
+#inbox .messengerGrid .panelhead h2{font-size:16px!important;line-height:1.3}
+#inbox .messengerGrid .panelhead p{font-size:12px!important}
+#inbox .conversationList{display:grid;gap:8px}
+#inbox .chatPanel{display:flex;flex-direction:column;justify-content:center}
+#inbox .chatPanel:has(#chatActive:not(.hidden)){justify-content:stretch}
+#inbox .chatEmpty{max-width:315px;min-width:0;width:calc(100% - 28px);margin:auto;padding:22px 20px;border:1px dashed var(--inbox-border);border-radius:12px;background:var(--ne-surface-alt)!important;color:var(--inbox-ink);text-align:center;display:grid;gap:7px}
+#inbox .chatEmpty strong{font-size:16px;font-weight:800;color:var(--inbox-ink)}
+#inbox .chatEmpty p{font-size:13px;line-height:1.55;margin:0;color:var(--inbox-soft)}
+#inbox .conversationDetailPanel .chatEmpty{width:100%;padding:18px 12px}
+#inbox #conversationList .chatEmpty{width:100%}
+#inbox #conversationList>.muted,#inbox .conversationList>.muted{font-size:13px;line-height:1.5;color:var(--inbox-soft);background:var(--ne-surface-alt);border:1px dashed var(--inbox-border);border-radius:10px;padding:17px;margin:0}
+#inbox #chatActive{width:100%;min-width:0}
+#inbox .chatHead{border-radius:10px 10px 0 0;padding:12px;gap:8px;flex-wrap:wrap}
+#inbox .chatHeadActions{display:flex;gap:6px;flex-wrap:wrap}
+#inbox .chatHeadActions button{min-height:36px;border-radius:9px}
+#inbox .messageList{height:min(37vh,410px);overflow:auto}
+#inbox .messageComposer{display:flex;align-items:flex-end;gap:9px}
+#inbox .messageComposer textarea{min-height:44px;max-height:140px;resize:vertical;border-radius:10px;font-size:13px}
+#inbox .messageComposer button{min-height:42px;border-radius:10px}
+#inbox .detailFields{display:grid;gap:11px}
+#inbox .detailFields label{display:grid;gap:5px;font-weight:700;font-size:12px;color:var(--inbox-soft)}
+#inbox .detailFields :is(input,select){min-height:42px;padding:9px 11px;border-radius:9px;font-size:13px}
+#inbox #saveConversationMeta{border-radius:10px;margin:12px 0;min-height:43px}
+#inbox .conversationDetailPanel .detailClient{margin-bottom:12px}
+#inbox :is(input,textarea,select,button,summary):focus-visible{outline:2px solid #b38cec;outline-offset:2px}
+@media(max-width:1400px){#inbox .messengerGrid{grid-template-columns:minmax(240px,36%) minmax(330px,1fr)}#inbox .messengerGrid>.conversationDetailPanel{grid-column:1/-1;height:auto;min-height:170px!important}}
+@media(max-width:1050px){#inbox .messengerToolbar{grid-template-columns:1fr 1fr}#inbox #conversationSearch{grid-column:1/-1}#inbox .messengerGrid{grid-template-columns:minmax(0,1fr)}#inbox .messengerGrid>.panel{height:auto;min-height:250px!important}#inbox .messengerGrid>.conversationDetailPanel{grid-column:auto}}
+@media(max-width:680px){body:has(#inbox.active) .topbar{flex-wrap:wrap;padding:8px 12px}#inbox>.sectionTitle{flex-wrap:wrap;padding:14px!important}#inbox>.sectionTitle .sectionActions{width:100%}#inbox .messengerToolbar{grid-template-columns:minmax(0,1fr)}#inbox #conversationSearch{grid-column:auto}#inbox .messengerGrid>.panel{padding:12px!important}#inbox .messengerGrid>.chatPanel{min-height:310px!important}#inbox .messengerGrid>.conversationDetailPanel{min-height:180px!important}}
