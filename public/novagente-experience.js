@@ -91,6 +91,7 @@ function applyRole(role){
   if(box)box.remove();
  }
 }
+window.__neApplyRole=applyRole;
 function build(){
  const dash=document.getElementById("dashboard");
  if(!dash||dash.querySelector(".ne-v3"))return;
@@ -234,6 +235,7 @@ async function refresh(){
   const identity=await fetch("/api/auth/me",{credentials:"same-origin",cache:"no-store"});
   if(!identity.ok)return;
   const sessionUser=(await identity.json()).user;
+  applyRole(sessionUser?.role);
   if(!["owner","manager","reception"].includes(sessionUser?.role)){
    showConversations([]);
    return;

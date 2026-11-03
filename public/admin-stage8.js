@@ -123,7 +123,7 @@
     if(!logged)return;
     usersControls.replaceChildren();invitationList.replaceChildren();matrix.replaceChildren();
     try{
-      const [users,rolesMatrix]=await Promise.all([api("/api/admin/users"),api("/api/admin/role-matrix")]);
+      const [users,rolesMatrix,professionals]=await Promise.all([api("/api/admin/users"),api("/api/admin/role-matrix"),api("/api/professionals").catch(()=>[])]);
       for(const u of users){
         const row=make("div","ne-stage8-user-row"),info=make("div","ne-stage8-user-info");
         info.append(make("strong","",u.name),make("small","",u.email+" · "+(u.active?"Ativo":"Inativo")));
@@ -139,6 +139,22 @@
           catch(e){alert(getError(e));select.value=u.role}
         };
         actions.append(select);
+        if(u.role==="professional"){
+          // Vínculo explícito por id: define de quais atendimentos o acesso enxerga.
+          const link=make("select");link.setAttribute("aria-label","Profissional vinculada a "+u.name);
+          const none=make("option","","Sem vínculo");none.value="";link.append(none);
+          for(const p of (Array.isArray(professionals)?professionals:[])){
+            const opt=make("option","",p.name);opt.value=p.id;link.append(opt);
+          }
+          link.value=u.professional_id||"";
+          link.disabled=logged.role!=="owner";
+          link.onchange=async()=>{
+            try{await api("/api/admin/users/"+encodeURIComponent(u.id)+"/professional",json("PATCH",{professional_id:link.value||null}));await loadUsers()}
+            catch(e){alert(getError(e));link.value=u.professional_id||""}
+          };
+          actions.append(link);
+          if(!u.professional_id)info.append(make("small","","Sem vínculo: o acesso não exibe agenda nem clientes até vincular."));
+        }
         if(logged.role==="owner"&&u.id!==logged.id){
           const status=make("button","secondary",u.active?"Desativar":"Ativar");
           status.onclick=async()=>{if(!confirm((u.active?"Desativar":"Ativar")+" acesso de "+u.name+"?"))return;
