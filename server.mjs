@@ -787,7 +787,12 @@ async function api(req,res,url){
     return send(res,201,clientView(created));
   }
 
-  if(req.method==="GET"&&url.pathname==="/api/professionals"){guard("team.read");return send(res,200,all("select * from professionals where tenant_id=? order by name",[tenant]).map(professionalView))}
+  if(req.method==="GET"&&url.pathname==="/api/professionals"){
+    guard("team.read");
+    const privileged=["owner","manager"].includes(user.role);
+    return send(res,200,all("select * from professionals where tenant_id=? order by name",[tenant]).map(professionalView)
+      .map(p=>privileged?p:{...p,phone:null}));
+  }
   if(req.method==="POST"&&url.pathname==="/api/professionals"){
     guard("team.write");
     const b=await parseBody(req),name=safeText(b.name,120);if(!name)return send(res,400,{error:"name_required"});
@@ -846,12 +851,20 @@ async function api(req,res,url){
   }
   if(req.method==="GET"&&url.pathname==="/api/waitlist"){
     guard("appointments.read");
-    const rows=all("select w.*,c.name client_name,c.phone client_phone,s.name service_name,p.name professional_name from waitlist w join clients c on c.id=w.client_id join services s on s.id=w.service_id left join professionals p on p.id=w.professional_id where w.tenant_id=? and w.status='waiting' order by coalesce(w.preferred_date,'9999-12-31'),w.created_at",[tenant]);
+    const pLinkWait=requireProfessionalLink(user);
+    const rows=all("select w.*,c.name client_name,c.phone client_phone,s.name service_name,p.name professional_name from waitlist w join clients c on c.id=w.client_id join services s on s.id=w.service_id left join professionals p on p.id=w.professional_id where w.tenant_id=? and w.status='waiting'"+(pLinkWait?" and w.professional_id=?":"")+" order by coalesce(w.preferred_date,'9999-12-31'),w.created_at",pLinkWait?[tenant,pLinkWait]:[tenant]);
     return send(res,200,rows);
   }
   if(req.method==="POST"&&url.pathname==="/api/waitlist"){
     guard("appointments.write");
-    const b=await parseBody(req),client=one("select id from clients where id=? and tenant_id=?",[safeText(b.client_id,64),tenant]),service=one("select id from services where id=? and tenant_id=?",[safeText(b.service_id,64),tenant]);
+    const b=await parseBody(req),pLinkWaitPost=requireProfessionalLink(user);
+    if(pLinkWaitPost){
+      if(b.professional_id&&String(b.professional_id)!==pLinkWaitPost)return send(res,403,{error:"professional_scope_forbidden"});
+      b.professional_id=pLinkWaitPost;
+    }
+    const client=one("select id from clients where id=? and tenant_id=?",[safeText(b.client_id,64),tenant]);
+    if(client&&pLinkWaitPost&&!clientInScope(tenant,pLinkWaitPost,client.id))return send(res,404,{error:"client_not_found"});
+    const service=one("select id from services where id=? and tenant_id=?",[safeText(b.service_id,64),tenant]);
     const professional=b.professional_id?one("select id from professionals where id=? and tenant_id=?",[safeText(b.professional_id,64),tenant]):null;
     if(!client||!service||(b.professional_id&&!professional))return send(res,400,{error:"invalid_waitlist_reference"});
     const wid=id();run("insert into waitlist(id,tenant_id,client_id,service_id,professional_id,preferred_date,period,notes,status,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,?,?)",[wid,tenant,client.id,service.id,professional?.id||null,safeText(b.preferred_date,10)||null,safeText(b.period||"any",20),safeText(b.notes,500),"waiting",now(),now()]);

@@ -30,8 +30,9 @@ tenant. Vínculos feitos por `users.professional_id` — nunca por nome.
 - Filtro aplicado no **backend** por `tenant_id` + profissional, no mesmo critério usado pela
   comissão: itens do atendimento (`appointment_items`) ou o profissional legado do agendamento.
 - Endpoints cobertos: `/api/appointments` (GET/POST/PATCH), `/api/clients` (lista e busca),
-  `/api/clients/:id/history`, `/api/appointments/tag-suggestions`, `/api/dashboard`,
-  `/api/bootstrap` e fichas técnicas (`/api/clients/:id/technical` GET/POST).
+  `/api/clients/:id/history`, `/api/appointments/tag-suggestions`, `/api/waitlist` (GET/POST),
+  `/api/dashboard`, `/api/bootstrap`, `/api/professionals` (sem telefone para quem não é
+  proprietária/gerência) e fichas técnicas (`/api/clients/:id/technical` GET/POST).
 - Profissional **sem vínculo**: `/api/clients`, `/api/appointments` e histórico devolvem
   **403 `professional_not_linked`**; dashboard volta zerado com `professional_link_required: true`.
 - Profissional não cria atendimento em nome de outra (`403 professional_scope_forbidden`) e não
