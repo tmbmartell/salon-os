@@ -6,7 +6,7 @@ Sistema integrado de gestão para salões e negócios de estética: agenda + CRM
 
 ## Piloto Jander — alinhamento aprovado em 03/11/2026
 
-Este repositório contém uma **candidata técnica**, enquanto a VPS opera uma instância piloto independente. A conexão WAHA foi observada em `WORKING`, mas **não há prova de resposta automática enviada** e o fluxo atual de reserva automática **não atende** à regra do Jander de confirmação pela recepção. Não confundir testes da prévia isolada com homologação em produção.
+Este repositório contém uma **candidata técnica**, enquanto a VPS opera uma instância piloto independente. A conexão WAHA foi observada em `WORKING`, mas **não há prova de resposta automática enviada**. A **R01 foi corrigida em 03/11/2026**: a IA **pode confirmar reservas diretamente** após validar disponibilidade, escolha da cliente e regras do salão; o mecanismo de agendamento existente ainda precisa ser homologado de ponta a ponta. A liberação de horários ocupados e a oferta à fila de espera permanecem sob controle humano (R10). Não confundir testes da prévia isolada com homologação em produção.
 
 - [14 regras aprovadas e critérios de aceite](docs/PILOTO-JANDER-REQUISITOS-APROVADOS.md)
 - [Matriz de lacunas e ordem de execução](docs/PILOTO-JANDER-MATRIZ-LACUNAS-E-ACEITE.md)
