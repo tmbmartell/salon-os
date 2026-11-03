@@ -247,7 +247,9 @@ test("WAHA simulado: HMAC, mensagem, cliente CRM, conversa, agenda, resposta, AC
     await expect(owner,"/api/conversations/"+co.id+"/meta",200,{method:"PATCH",body:{
       status:"open",category:"appointment",priority:"high",assigned_user_id:ownerId,labels:["Solicitou cor"]
     }});
-    const startAt=new Date(Date.now()+16*86400000).toISOString();
+    // Horário fixo de QA dentro da jornada em Porto Velho (UTC-4), como em integration-http.
+    const startDate=new Date(Date.now()+16*86400000);startDate.setUTCHours(14,0,0,0);
+    const startAt=startDate.toISOString();
     const appt=await expect(owner,"/api/appointments",201,{method:"POST",body:{
       client_id:client.id,professional_id:boot.professionals[0].id,
       service_id:boot.services[0].id,start_at:startAt,source:"whatsapp"
