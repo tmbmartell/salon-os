@@ -1,8 +1,19 @@
-# NOVAGENTE Estética — release candidate RC1 (piloto sem WhatsApp)
+# NOVAGENTE Estética — candidata técnica e piloto Jander
 
 Sistema integrado de gestão para salões e negócios de estética: agenda + CRM, serviços, estoque, caixa/financeiro, equipe, marketing, indicadores e administração em **uma base SQLite com isolamento por salão**.
 
 **Status atual:** `v0.9.0-rc.1` é uma *candidata de revisão*, ainda sem publicação, homologação com clientes reais ou merge em `main`. **Não é uma versão comercial pronta para produção.**
+
+## Piloto Jander — alinhamento aprovado em 03/11/2026
+
+Este repositório contém uma **candidata técnica**, enquanto a VPS opera uma instância piloto independente. A conexão WAHA foi observada em `WORKING`, mas **não há prova de resposta automática enviada** e o fluxo atual de reserva automática **não atende** à regra do Jander de confirmação pela recepção. Não confundir testes da prévia isolada com homologação em produção.
+
+- [14 regras aprovadas e critérios de aceite](docs/PILOTO-JANDER-REQUISITOS-APROVADOS.md)
+- [Matriz de lacunas e ordem de execução](docs/PILOTO-JANDER-MATRIZ-LACUNAS-E-ACEITE.md)
+- [Consolidação de código, testes, dependências e bloqueios de release](docs/CONSOLIDACAO-TECNICA-JANDER-2026-11-03.md)
+
+**Importante:** PRs #32 e #33 seguem como dependências; esta branch não deve ser integrada à `main` nem implantada até revisão/homologação. As 14 regras são **requisitos**, não funcionalidades automaticamente entregues.
+
 
 ## O que entra na candidata
 
@@ -75,6 +86,6 @@ Todos os workflows de pull request da candidata rodam para **qualquer alteraçã
 5. Teste supervisionado com proprietária, recepção e profissional em dispositivos físicos.
 6. Monitoramento, revisão de segurança independente e aceite final para o piloto.
 
-**Não há promessa de funcionamento de WhatsApp real, cobranças bancárias reais ou homologação comercial.**
+**A sessão WAHA do piloto foi observada conectada; isso não comprova envio pela IA nem homologação comercial. Não há integração de cobranças bancárias reais homologada.**
 
 Veja `docs/ETAPA-18-CANDIDATA-ENTREGA.md` e `docs/ETAPA-17-PRIVACIDADE-CHECKLIST-ENTREGA.md`.
