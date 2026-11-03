@@ -71,6 +71,26 @@ function lineTitle(name,linkText,view){
  if(linkText){const button=make("button","ne-v3-text-link",linkText);button.type="button";button.addEventListener("click",()=>navigate(view));h.append(button)}
  return h;
 }
+// O painel inicial respeita o perfil: sem atalhos para módulos sem permissão.
+const ROLE_VIEWS={
+ owner:null,manager:null,
+ reception:["inbox","agenda","clients","team","services","productsHub","retail","packages","inventory","suppliers","retention","marketing"],
+ professional:["agenda","clients","team","services"]
+};
+function applyRole(role){
+ const allow=ROLE_VIEWS[role];if(!Array.isArray(allow))return;
+ document.querySelectorAll(".ne-v3-tile").forEach(t=>{if(!allow.includes(t.dataset.target))t.remove()});
+ const financial=["owner","manager","reception"].includes(role);
+ if(!financial){
+  document.querySelector('[data-metric="forecast"]')?.remove();
+  document.querySelector('[data-metric="lowStock"]')?.remove();
+ }
+ if(!allow.includes("inbox")){
+  const list=document.getElementById("neV3Conversations");
+  const box=list?.closest(".ne-v3-listbox");
+  if(box)box.remove();
+ }
+}
 function build(){
  const dash=document.getElementById("dashboard");
  if(!dash||dash.querySelector(".ne-v3"))return;
@@ -142,6 +162,7 @@ function build(){
  if(oldMetric)new MutationObserver(()=>{clearTimeout(updateTimer);updateTimer=setTimeout(refresh,350)}).observe(oldMetric,{childList:true,characterData:true,subtree:true});
  document.querySelectorAll(".sidebar nav [data-view='dashboard']").forEach(x=>x.addEventListener("click",()=>setTimeout(refresh,200)));
  refresh();
+ fetch("/api/auth/me",{credentials:"same-origin",cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>{if(d?.user)applyRole(d.user.role)}).catch(()=>{});
 }
 async function search(query,results){
  const q=query.trim().toLocaleLowerCase("pt-BR");results.replaceChildren();

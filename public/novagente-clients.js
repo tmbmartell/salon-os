@@ -35,7 +35,8 @@ async function loadHistory(id,container){
  const labels={completed:'Finalizado',scheduled:'Agendado',confirmed:'Confirmado',arrived:'Chegou',in_service:'Em atendimento',cancelled:'Cancelado',no_show:'Não compareceu'};
  for(const visit of data.visits){
   const row=make('div','ne-client-visit'),when=new Date(visit.start_at);
-  const date=Number.isNaN(when.getTime())?String(visit.start_at||''):when.toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
+  const tz=window.__neTenantZone||'America/Porto_Velho';
+  const date=Number.isNaN(when.getTime())?String(visit.start_at||''):when.toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short',timeZone:tz});
   row.append(make('p','',date+' · '+(labels[visit.status]||visit.status)),make('p','',visit.service_names||'Serviço não identificado'));
   if(data.show_payments){const pay=payments.get(visit.id);row.append(make('p','',pay?'Pagamento: '+money.format(pay.amount)+' · '+String(pay.method||'não informado'):'Nenhum pagamento vinculado a este atendimento.'))}
   container.append(row);

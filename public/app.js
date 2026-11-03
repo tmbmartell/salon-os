@@ -1,7 +1,27 @@
 import { setupAppointmentUi } from "./appointment-ui.js";
 const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
 const fmt=new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}),dayFmt=new Intl.DateTimeFormat("pt-BR",{weekday:"long",day:"2-digit",month:"2-digit"});
-const state={clients:[],professionals:[],services:[],resources:[],products:[],suppliers:[],phase2:null,dashboard:null,health:null,user:null,whatsapp:null,conversations:[],selectedConversation:null};
+const state={clients:[],professionals:[],services:[],resources:[],products:[],suppliers:[],phase2:null,dashboard:null,health:null,user:null,tenant:null,whatsapp:null,conversations:[],selectedConversation:null};
+// O salão opera em horário local (America/Porto_Velho). A interface nunca deve
+// depender do fuso do navegador para montar o horário do agendamento.
+function tenantZone(){return state.tenant?.timezone||"America/Porto_Velho"}
+function zoneWall(iso,tz=tenantZone()){
+  const parts=new Intl.DateTimeFormat("en-US",{timeZone:tz,hourCycle:"h23",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}).formatToParts(new Date(iso));
+  const o={};for(const x of parts)if(x.type!=="literal")o[x.type]=x.value;
+  return o.year+"-"+o.month+"-"+o.day+"T"+o.hour+":"+o.minute;
+}
+function zoneOffsetMs(date,tz=tenantZone()){
+  const parts=new Intl.DateTimeFormat("en-US",{timeZone:tz,hourCycle:"h23",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"}).formatToParts(date);
+  const o={};for(const x of parts)if(x.type!=="literal")o[x.type]=Number(x.value);
+  return Date.UTC(o.year,o.month-1,o.day,o.hour,o.minute,o.second)-date.getTime();
+}
+function wallToUtcIso(wall,tz=tenantZone()){
+  const [d,t]=String(wall).split("T"),[y,mo,da]=d.split("-").map(Number),[h,mi]=t.split(":").map(Number);
+  const desired=Date.UTC(y,mo-1,da,h,mi);
+  let guess=desired;
+  for(let i=0;i<4;i++){const diff=guess+zoneOffsetMs(new Date(guess),tz)-desired;if(!diff)break;guess-=diff}
+  return new Date(guess).toISOString();
+}
 async function api(path,options={}){const r=await fetch(path,{headers:{"content-type":"application/json",...(options.headers||{})},...options});const j=await r.json().catch(()=>({}));if(!r.ok){if(r.status===401&&!path.startsWith("/api/auth/")&&typeof showAuth==="function")showAuth("login");throw Object.assign(new Error(j.error||"request_failed"),{data:j,status:r.status})}return j}
 function toast(text){const t=$("#toast");t.textContent=text;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200)}
 async function downloadCsvFromApi(path,filename){
@@ -20,14 +40,35 @@ async function downloadCsvFromApi(path,filename){
 function esc(v=""){return String(v??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 function initials(n=""){return n.split(/\s+/).slice(0,2).map(x=>x[0]).join("").toUpperCase()}
 function statusLabel(s){return ({scheduled:"Agendado",confirmed:"Confirmado",arrived:"Chegou",in_service:"Em atendimento",completed:"Finalizado",cancelled:"Cancelado",no_show:"Não compareceu"})[s]||s}
+// Navegação por perfil: esconder módulos sem permissão evita telas vazias e 403.
+const NAV_ALLOWED={
+  owner:null,
+  manager:null,
+  reception:["dashboard","inbox","agenda","clients","people","productsHub","technical","team","services","resources","packages","retail","marketing","inventory","suppliers","retention"],
+  professional:["dashboard","agenda","clients","technical","team","services"]
+};
+function viewAllowed(view){
+  const allow=NAV_ALLOWED[state.user?.role];
+  return !Array.isArray(allow)||allow.includes(view);
+}
+function applyRoleNavigation(){
+  const allow=NAV_ALLOWED[state.user?.role];
+  if(!Array.isArray(allow))return;
+  $$(".sidebar nav [data-view]").forEach(b=>{b.style.display=allow.includes(b.dataset.view)?"":"none"});
+  $$(".sidebar nav .bw-nav-group, .sidebar nav .ne-rail-group").forEach(group=>{
+    const visible=[...group.querySelectorAll("[data-view]")].some(x=>x.style.display!=="none");
+    group.style.display=visible?"":"none";
+  });
+}
 function activate(view,{skipTechnicalLoad=false}={}){
+  if(!viewAllowed(view)){toast("Seu perfil não tem acesso a este módulo.");return}
   $$(".view").forEach(v=>v.classList.toggle("active",v.id===view));$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
   const cfg={dashboard:["Visão geral","O que precisa da sua atenção hoje."],inbox:["Atendimento","WhatsApp, cliente e próxima ação no mesmo lugar."],agenda:["Agenda","O fluxo de atendimento sem conflito de pessoa ou recurso."],clients:["Clientes","Relacionamento e histórico em um só lugar."],people:["Gente","Clientes, equipe, relacionamento e agentes em um só lugar."],productsHub:["Produtos","Venda, estoque, serviços, pacotes e compras conectados."],marketing:["Marketing & Relacionamento","Captação, canais, campanhas e oportunidades de retorno."],technical:["Ficha Técnica","Fórmulas, procedimento e memória clínica da cliente."],team:["Equipe","Quem atende, quando e em quê."],services:["Serviços","Preço, tempo e comissão organizados."],packages:["Pacotes","Venda antecipada com créditos e validade."],retail:["PDV · Produtos","Venda de produtos integrada ao estoque e financeiro."],resources:["Recursos","Cadeiras, salas e equipamentos disponíveis."],finance:["Financeiro & Caixa","Dinheiro entrando e saindo, sem depender de planilha."],inventory:["Estoque & Consumo","Produto real, custo real e alerta antes de faltar."],suppliers:["Fornecedores","Quem vende, quanto demora e como comprar melhor."],retention:["Fidelização & Relacionamento","Pontos, indicações, aniversários e pós-atendimento."],ownerEye:["Olho do Dono","Inteligência prática para decidir antes do problema aparecer."],agents:["Funcionários Artificiais","Recepção, vendas, gestão, financeiro, compras e análise."],admin:["Administração","Backup, segurança, usuários e auditoria."],reports:["Relatórios & Exportação","Período, resultado e arquivos prontos para análise."],intelligence:["JEV · Inteligência","Decisões rápidas com custo controlado."]}[view]||["Salon OS",""];
   $("#pageTitle").textContent=cfg[0];$("#pageSub").textContent=cfg[1];if(view==="agenda"){loadAgendaPhase2();loadWaitlist()}if(view==="team")loadStaff();if(view==="clients")loadClients();if(view==="technical"&&!skipTechnicalLoad)loadTechnical();if(view==="intelligence")loadReceipts();if(view==="inbox")loadInbox();if(view==="finance")loadFinance();if(view==="inventory")loadInventory();if(view==="suppliers")loadSuppliers();if(view==="packages")loadPackages();if(view==="retail")loadRetail();if(view==="retention")loadRetention();if(view==="ownerEye")loadOwnerEye();if(view==="agents")loadAgents();if(view==="admin")loadAdmin();if(view==="reports")loadReports();if(view==="marketing")window.dispatchEvent(new CustomEvent("ne:marketing-open"));
 }
 $$("[data-view]").forEach(b=>b.onclick=()=>activate(b.dataset.view));$$("[data-jump]").forEach(b=>b.onclick=()=>activate(b.dataset.jump));$$("[data-open]").forEach(b=>b.onclick=()=>$("#"+b.dataset.open).showModal());$$("[data-close]").forEach(b=>b.onclick=()=>b.closest("dialog").close());$("#quickAppointment").onclick=()=>$("#appointmentModal").showModal();
-async function bootstrap(){const [boot,health]=await Promise.all([api("/api/bootstrap"),api("/api/health")]);state.health=health;state.user=boot.user;const allowClientsExport=["owner","manager"].includes(state.user?.role);["#exportClients","#marketingExportClients"].forEach(sel=>{const el=$(sel);if(el)el.hidden=!allowClientsExport;});$$(`[data-view="ownerEye"],[data-jump="ownerEye"]`).forEach(el=>{el.hidden=!["owner","manager"].includes(state.user?.role)});state.professionals=boot.professionals;state.services=boot.services;state.resources=boot.resources||[];state.dashboard=boot.dashboard;state.whatsapp=boot.whatsapp;$("#health").textContent=health.jev?"Sistema + JEV online":"Sistema online · JEV fallback";$("#jevState").textContent=health.jev?"JEV online":"fallback ativo";renderDashboard();renderTeam();renderServices();renderResources();await loadClients();fillSelects();updateWahaUi();if(["owner","manager"].includes(state.user?.role))loadReports().catch(()=>{});if(["owner","manager","reception"].includes(state.user?.role))loadFinance().catch(()=>{})}
-function renderDashboard(){const d=state.dashboard;$("#mAppointments").textContent=d.todayAppointments;$("#mForecast").textContent=fmt.format(d.forecast);$("#mClients").textContent=d.clientCount;$("#mPros").textContent=d.profCount;$("#todayList").innerHTML=d.appointments.length?d.appointments.map(a=>`<div class="row"><div class="who"><span class="avatar">${initials(a.client_name)}</span><div><strong>${a.client_name}</strong><small>${a.service_summary||a.service_name} · ${a.professional_summary||a.professional_name}</small></div></div><div><div class="time">${new Date(a.start_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div><span class="status ${a.status}">${statusLabel(a.status)}</span></div></div>`).join(""):`<div class="muted">Nenhum atendimento hoje.</div>`}
+async function bootstrap(){const [boot,health]=await Promise.all([api("/api/bootstrap"),api("/api/health")]);state.health=health;state.user=boot.user;state.tenant=boot.tenant||null;window.__neTenantZone=tenantZone();window.__neRole=boot.user?.role||null;applyRoleNavigation();const allowClientsExport=["owner","manager"].includes(state.user?.role);["#exportClients","#marketingExportClients"].forEach(sel=>{const el=$(sel);if(el)el.hidden=!allowClientsExport;});$$(`[data-view="ownerEye"],[data-jump="ownerEye"]`).forEach(el=>{el.hidden=!["owner","manager"].includes(state.user?.role)});state.professionals=boot.professionals;state.services=boot.services;state.resources=boot.resources||[];state.dashboard=boot.dashboard;state.whatsapp=boot.whatsapp;$("#health").textContent=health.jev?"Sistema + JEV online":"Sistema online · JEV fallback";$("#jevState").textContent=health.jev?"JEV online":"fallback ativo";renderDashboard();renderTeam();renderServices();renderResources();await loadClients();fillSelects();updateWahaUi();if(["owner","manager"].includes(state.user?.role))loadReports().catch(()=>{});if(["owner","manager","reception"].includes(state.user?.role))loadFinance().catch(()=>{})}
+function renderDashboard(){const d=state.dashboard;$("#mAppointments").textContent=d.todayAppointments;$("#mForecast").textContent=fmt.format(d.forecast);$("#mClients").textContent=d.clientCount;$("#mPros").textContent=d.profCount;$("#todayList").innerHTML=d.appointments.length?d.appointments.map(a=>`<div class="row"><div class="who"><span class="avatar">${initials(a.client_name)}</span><div><strong>${a.client_name}</strong><small>${a.service_summary||a.service_name} · ${a.professional_summary||a.professional_name}</small></div></div><div><div class="time">${new Date(a.start_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",timeZone:tenantZone()})}</div><span class="status ${a.status}">${statusLabel(a.status)}</span></div></div>`).join(""):`<div class="muted">Nenhum atendimento hoje.</div>`}
 async function loadClients(q=""){state.clients=await api("/api/clients"+(q?`?q=${encodeURIComponent(q)}`:""));$("#clientCount").textContent=`${state.clients.length} encontrados`;$("#clientList").innerHTML=state.clients.map(c=>{const socials=[c.instagram?`Instagram: ${esc(c.instagram)}`:"",c.facebook?`Facebook: ${esc(c.facebook)}`:""].filter(Boolean).join(" · ");const ref=c.referral_reference?`Referência: ${esc(c.referral_reference)}`:"";const birthday=c.birthday?`Aniversário: ${esc(c.birthday.split("-").reverse().join("/"))}`:"";return `<article data-ne-client-id="${esc(c.id)}"><div class="who"><span class="avatar">${initials(c.name)}</span><div><h3>${esc(c.name)}</h3><p>${esc(c.phone||"Sem WhatsApp")}</p></div></div><div class="clientMeta">${birthday?`<small>${birthday}</small>`:""}${socials?`<small>${socials}</small>`:""}${ref?`<small>${ref}</small>`:""}</div>${c.notes?`<p>${esc(c.notes)}</p>`:""}<div class="tags">${(c.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div></article>`}).join("")||`<p class="muted">Nenhum cliente encontrado.</p>`;fillSelects();fillWaitlistSelects()}
 let searchTimer;$("#clientSearch").oninput=e=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadClients(e.target.value),220)};
 async function downloadClientBase(){try{await downloadCsvFromApi("/api/clients/export","novagente-clientes.csv")}catch(err){toast(err.message||"Falha ao exportar clientes")}}$("#exportClients").onclick=downloadClientBase;if($("#marketingExportClients"))$("#marketingExportClients").onclick=downloadClientBase;
@@ -118,8 +159,8 @@ function renderAgendaCards(){
   });
   const count=$("#neAgendaCount");if(count)count.textContent=visible.length+" "+(visible.length===1?"compromisso":"compromissos")+" nesta visão";
   $("#agendaList").innerHTML=visible.map(a=>{
-    const d=new Date(a.start_at),time=d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-    const date=d.toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"2-digit"});
+    const d=new Date(a.start_at),time=d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",timeZone:tenantZone()});
+    const date=d.toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"2-digit",timeZone:tenantZone()});
     const opts=[a.status,...(neAgendaStatusOptions[a.status]||[])];
     const controls=opts.map(status=>'<option value="'+esc(status)+'" '+(a.status===status?'selected':'')+'>'+esc(statusLabel(status))+'</option>').join("");
     const action=neAgendaQuickActions[a.status];
@@ -163,11 +204,11 @@ $$("[data-ne-agenda-filter]").forEach(btn=>btn.onclick=()=>{state.neAgendaFilter
 $("#neAgendaProfessional").onchange=e=>{state.neAgendaProfessional=e.target.value;renderAgendaCards();decorateAgendaCheckout()};
 $("[data-ne-show-waitlist]").onclick=()=>$("#agenda .ne-waitlist-panel")?.scrollIntoView({behavior:"smooth",block:"start"});
 async function loadReceipts(){const rows=await api("/api/jev/receipts");$("#receiptList").innerHTML=rows.map(r=>`<div class="row"><div><strong>${r.local_route}</strong><small>${r.input_excerpt}</small></div><div style="text-align:right"><span class="status">${r.jev_trace_id?"JEV":"local"}</span><small>${r.latency_ms?`${r.latency_ms} ms`:"sem chamada JEV"}</small></div></div>`).join("")||`<p class="muted">Ainda não há decisões.</p>`}
-$("#commandForm").onsubmit=async e=>{e.preventDefault();const text=$("#commandText").value.trim();if(!text)return;$("#commandResult").textContent="Analisando…";try{const r=await api("/api/assistant/interpret",{method:"POST",body:JSON.stringify({text})}),used=r.route==="ambiguous"&&r.jev;let html="<strong>Rota:</strong> "+r.route+"<br><strong>Fonte:</strong> "+(used?"JEV ("+Math.round((r.jev.probability||0)*100)+"%)":"regra local · zero chamada JEV");if(r.booking){if(r.booking.service)html+="<br><strong>Serviço:</strong> "+r.booking.service.name;if(r.booking.professional)html+=" · "+r.booking.professional.name;if(r.booking.date)html+="<br><strong>Data:</strong> "+r.booking.date;if(r.booking.slots?.length)html+="<div class=\"slotList\">"+r.booking.slots.map(s=>"<button type=\"button\" class=\"slotChip\" data-slot=\""+s.start_at+"\" data-prof=\""+s.professional_id+"\" data-service=\""+s.service_id+"\">"+s.local_time+" · "+s.professional_name+"</button>").join("")+"</div>";else if(r.booking.missing?.length)html+="<br><small>Falta informar: "+r.booking.missing.join(", ")+"</small>";else html+="<br><small>Nenhum horário livre encontrado.</small>"}$("#commandResult").innerHTML=html;$$("[data-slot]").forEach(b=>b.onclick=()=>{$("#apProfessional").value=b.dataset.prof;$("#apService").value=b.dataset.service;const d=new Date(b.dataset.slot);const local=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);$("#appointmentForm").elements.start_at.value=local;appointmentUi.refreshSuggestions();appointmentUi.refreshSummary();$("#appointmentModal").showModal()})}catch{$("#commandResult").textContent="Falha ao interpretar."}};
+$("#commandForm").onsubmit=async e=>{e.preventDefault();const text=$("#commandText").value.trim();if(!text)return;$("#commandResult").textContent="Analisando…";try{const r=await api("/api/assistant/interpret",{method:"POST",body:JSON.stringify({text})}),used=r.route==="ambiguous"&&r.jev;let html="<strong>Rota:</strong> "+r.route+"<br><strong>Fonte:</strong> "+(used?"JEV ("+Math.round((r.jev.probability||0)*100)+"%)":"regra local · zero chamada JEV");if(r.booking){if(r.booking.service)html+="<br><strong>Serviço:</strong> "+r.booking.service.name;if(r.booking.professional)html+=" · "+r.booking.professional.name;if(r.booking.date)html+="<br><strong>Data:</strong> "+r.booking.date;if(r.booking.slots?.length)html+="<div class=\"slotList\">"+r.booking.slots.map(s=>"<button type=\"button\" class=\"slotChip\" data-slot=\""+s.start_at+"\" data-prof=\""+s.professional_id+"\" data-service=\""+s.service_id+"\">"+s.local_time+" · "+s.professional_name+"</button>").join("")+"</div>";else if(r.booking.missing?.length)html+="<br><small>Falta informar: "+r.booking.missing.join(", ")+"</small>";else html+="<br><small>Nenhum horário livre encontrado.</small>"}$("#commandResult").innerHTML=html;$$("[data-slot]").forEach(b=>b.onclick=()=>{$("#apProfessional").value=b.dataset.prof;$("#apService").value=b.dataset.service;$("#appointmentForm").elements.start_at.value=zoneWall(b.dataset.slot);appointmentUi.refreshSuggestions();appointmentUi.refreshSummary();$("#appointmentModal").showModal()})}catch{$("#commandResult").textContent="Falha ao interpretar."}};
 $("#clientForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/clients",{method:"POST",body:JSON.stringify(b)});e.target.reset();$("#clientModal").close();await loadClients();state.dashboard=await api("/api/dashboard");renderDashboard();toast("Cliente cadastrado")}catch(err){toast(err.data?.error==="phone_already_exists"?"Esse WhatsApp já está cadastrado":"Erro ao cadastrar")}};
 $("#professionalForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{const x=await api("/api/professionals",{method:"POST",body:JSON.stringify(b)});state.professionals.push(x);renderTeam();fillSelects();$("#professionalModal").close();e.target.reset();toast("Profissional cadastrado")}catch{toast("Erro ao salvar")}};
 $("#serviceForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{const x=await api("/api/services",{method:"POST",body:JSON.stringify(b)});state.services.push(x);renderServices();fillSelects();$("#serviceModal").close();e.target.reset();toast("Serviço cadastrado")}catch{toast("Erro ao salvar")}};
-$("#appointmentForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));b.tags=appointmentUi.tags();b.items=appointmentUi.items();if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(b.start_at))b.start_at+="-04:00";try{await api("/api/appointments",{method:"POST",body:JSON.stringify(b)});$("#appointmentModal").close();e.target.reset();appointmentUi.reset();fillSelects();await loadAgendaPhase2();state.dashboard=await api("/api/dashboard");renderDashboard();toast("Agendamento criado")}catch(err){const c=err.data?.error;toast(c==="professional_time_conflict"?(err.data?.professional||"Esse profissional")+" já está ocupado":c==="resource_time_conflict"?(err.data.resource||"Esse recurso")+" já está ocupado":c==="invalid_custom_service"?"Preencha nome, duração e valor do serviço avulso":c==="appointment_in_past"?"Não é possível agendar no passado":err.status===409?"Horário indisponível ou folga da profissional":"Erro ao agendar")}};
+$("#appointmentForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));b.tags=appointmentUi.tags();b.items=appointmentUi.items();if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(b.start_at))b.start_at=wallToUtcIso(b.start_at);try{await api("/api/appointments",{method:"POST",body:JSON.stringify(b)});$("#appointmentModal").close();e.target.reset();appointmentUi.reset();fillSelects();await loadAgendaPhase2();state.dashboard=await api("/api/dashboard");renderDashboard();toast("Agendamento criado")}catch(err){const c=err.data?.error;toast(c==="professional_time_conflict"?(err.data?.professional||"Esse profissional")+" já está ocupado":c==="resource_time_conflict"?(err.data.resource||"Esse recurso")+" já está ocupado":c==="invalid_custom_service"?"Preencha nome, duração e valor do serviço avulso":c==="appointment_in_past"?"Não é possível agendar no passado":c==="professional_time_off"?(err.data?.professional||"A profissional")+" está de folga nesse dia":c==="professional_outside_schedule"?(err.data?.professional||"A profissional")+" atende "+(err.data?.window_start||"")+"–"+(err.data?.window_end||"")+" nesse dia":err.status===409?"Horário indisponível":"Erro ao agendar")}};
 
 function updateWahaUi(){
   const w=state.whatsapp||{},label=w.connected?"WhatsApp conectado":w.status==="UNASSIGNED"?"Vincule o WhatsApp":w.configured?(w.status||"WAHA aguardando QR"):"WAHA sem configuração";
@@ -182,7 +223,7 @@ const convCategoryName={general:"Geral",lead:"Lead",appointment:"Agendamento",wa
 function conversationTime(v){
   if(!v)return "";
   const d=new Date(v),today=new Date();
-  return d.toDateString()===today.toDateString()?d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"});
+  return d.toDateString()===today.toDateString()?d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",timeZone:tenantZone()}):d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",timeZone:tenantZone()});
 }
 function filteredConversations(){
   const q=($("#conversationSearch")?.value||"").trim().toLowerCase(),status=$("#conversationStatusFilter")?.value||"",priority=$("#conversationPriorityFilter")?.value||"",unread=!!$("#conversationUnreadFilter")?.checked;
@@ -233,7 +274,7 @@ async function openConversation(cid){
   const co=state.conversations.find(x=>x.id===cid);if(!co)return;state.selectedConversation=co;
   $("#chatEmpty").classList.add("hidden");$("#chatActive").classList.remove("hidden");$("#chatClient").textContent=co.client_name||"Cliente";$("#chatPhone").textContent=co.client_phone||"";updateChatModeButton();renderConversationDetail();
   const msgs=await api("/api/conversations/"+cid+"/messages");co.unread_count=0;renderConversationList();
-  $("#messageList").innerHTML=msgs.map(m=>'<div class="message '+(m.direction==="out"?"out":"in")+'"><div>'+esc(m.body).replace(/\n/g,"<br>")+'</div><small>'+new Date(m.created_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+(m.direction==="out"?" · "+esc(m.delivery_status):"")+'</small></div>').join("")||'<div class="muted">Conversa sem mensagens.</div>';
+  $("#messageList").innerHTML=msgs.map(m=>'<div class="message '+(m.direction==="out"?"out":"in")+'"><div>'+esc(m.body).replace(/\n/g,"<br>")+'</div><small>'+new Date(m.created_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",timeZone:tenantZone()})+(m.direction==="out"?" · "+esc(m.delivery_status):"")+'</small></div>').join("")||'<div class="muted">Conversa sem mensagens.</div>';
   $("#messageList").scrollTop=$("#messageList").scrollHeight;
   loadConversationClientContext(cid);
 }
@@ -327,7 +368,7 @@ async function fetchWaQr(){
     });
     waQrImage.src=next;
     waQrImage.classList.remove("hidden");
-    const stamp=new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+    const stamp=new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",timeZone:tenantZone()});
     waQrNotice("QR atualizado às "+stamp+". No celular, abra WhatsApp → Dispositivos conectados → Conectar dispositivo. Aponte a câmera para o código.");
     return true;
   }catch(error){
@@ -435,7 +476,7 @@ $("#logoutBtn").onclick=async()=>{try{await api("/api/auth/logout",{method:"POST
 initAuth().catch(e=>{console.error(e);$("#health").textContent="Falha ao carregar";toast("Não foi possível carregar o sistema")});
 
 function moneyBR(v){return fmt.format(Number(v||0))}
-function dateTimeBR(v){if(!v)return "—";return new Date(v).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}
+function dateTimeBR(v){if(!v)return "—";return new Date(v).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",timeZone:tenantZone()})}
 const neFinanceIcons={pix:"Pix",cash:"Dinheiro",credit_card:"Crédito",debit_card:"Débito",voucher:"Voucher",other:"Outro"};
 function setFinanceTab(tab){
   const allowed=["cash","entries","commissions","results"],active=allowed.includes(tab)?tab:"cash";
@@ -460,8 +501,13 @@ function cashMethodCards(data){
     else record.out+=Number(row.total||0);
     grouped.set(key,record);
   }
-  $("#neCashMethods").innerHTML=grouped.size?
-    [...grouped.entries()].map(([method,amount])=>'<div class="ne-cash-method"><small>'+esc(neFinanceIcons[method]||method)+'</small><strong>'+moneyBR(amount.in-amount.out)+'</strong><span>'+moneyBR(amount.in)+' entradas · '+moneyBR(amount.out)+' saídas</span></div>').join(""):
+  // No dinheiro físico o saldo inclui o fundo de troco, para bater com o "esperado".
+  const opening=Number(data.session?.opening||0);
+  $("\#neCashMethods").innerHTML=grouped.size?
+    [...grouped.entries()].map(([method,amount])=>{
+      const isCash=method==="cash",net=amount.in-amount.out+(isCash?opening:0);
+      return '<div class="ne-cash-method"><small>'+esc(neFinanceIcons[method]||method)+'</small><strong>'+moneyBR(net)+'</strong><span>'+moneyBR(amount.in)+' entradas · '+moneyBR(amount.out)+' saídas'+(isCash?' · fundo '+moneyBR(opening):'')+'</span></div>';
+    }).join(""):
     '<p class="muted">Nenhum recebimento ou pagamento associado a este caixa.</p>';
 }
 function showCashClose(cash){
