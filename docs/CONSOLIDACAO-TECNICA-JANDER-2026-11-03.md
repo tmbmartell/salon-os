@@ -37,7 +37,7 @@ Local de validação: `/tmp/novagente-estetica-release-20261103`, sem ler creden
 | `npm test` | **110 testes, 110 passaram, 0 falharam** |
 | `npm run release:preflight` (modo CI) | **PASSOU**; `production_ready=false` por desenho |
 | `npm run commercial:smoke` (preview descartável) | **PASSOU** |
-| `npm run booking:smoke` (preview descartável) | **PASSOU**, mas exerce **fluxo antigo de agendamento**: **não** é aceite R01 |
+| `npm run booking:smoke` (preview descartável) | **PASSOU**, exercitando agendamento automático (agora permitido na R01 revisada). Não comprova, por si só, o aceite ponta a ponta do piloto nos canais reais, nem prevenção de conflitos ou segurança operacional. |
 | HTTP local `/api/health` | **OK** |
 | HTTPS `fighting-measurement-missed-mono.trycloudflare.com/api/health` | **HTTP 200** |
 | WAHA | **Conectado / WORKING** |
@@ -45,11 +45,15 @@ Local de validação: `/tmp/novagente-estetica-release-20261103`, sem ler creden
 
 **Cuidado:** nenhum teste automatizado aqui demonstra o envio real da recepcionista de IA, aprovação de campanhas ou integração do Instagram. Testes em preview não substituem aceite operacional.
 
+## Atualização de requisito em 03/11/2026
+
+A responsável do projeto retificou expressamente a **R01**: a IA **está autorizada a confirmar reservas diretamente**, desde que as condições de disponibilidade, escolha da cliente e regras do salão sejam atendidas. Foi retirada a exigência de confirmação humana para cada nova reserva. Os controles R02/R03, R09 e R10 continuam intactos. A primeira versão desta análise apontava conflito com R01; essa conclusão **foi substituída por este adendo**.
+
 ## Bloqueios para homologar o piloto do Jander
 
 **P0 / impeditivos, não mascarar como “pronto”:**
 
-1. **Agendamento automático:** o motor `booking-flow.mjs` ainda pode confirmar reservas automaticamente, e a política `assistant_booking` estava ativa. **Viola R01**; alterar fluxo para solicitação pendente e exigir confirmação explícita de uma recepcionista **antes** de validar atendimento comercial real.
+1. **Agendamento automático (R01 revisada em 03/11/2026):** a IA **pode confirmar reservas sem aprovação individual da recepção**. O motor `booking-flow.mjs` contempla essa capacidade e a política `assistant_booking` estava ativa. Antes do uso real, homologar aceitação da cliente, disponibilidade atualizada e duração, profissional correta, conflitos/concor­rência, duplicidades, auditoria, mensagens e agenda. Uma reserva inválida ou ambígua deve ser encaminhada à recepção. **Não confundir autorização de reservar com poder de liberar horários ocupados/acionar a fila (R10).**
 2. **Campanhas:** `sending_enabled=false`, campanha de exemplo permanece rascunho; precisam de aprovação humana versionada R02 e autorização específica R03, sem enviar antes do aceite.
 3. **Catálogo:** apenas um produto e um serviço cadastrados na instância consultada, sem workflow técnico/gerencial publicado R05/R06.
 4. **WhatsApp:** WAHA funciona, mas não há mensagens enviadas com `sender_type=assistant` na fotografia do banco. Validar entrega e fallback/handoff com teste controlado.
@@ -63,7 +67,7 @@ Local de validação: `/tmp/novagente-estetica-release-20261103`, sem ler creden
 - [ ] Rever a hierarquia das PRs abertas e resolver dependências/conflitos de forma ordenada.
 - [ ] Executar `npm run check`, `npm test` e os smoke tests na **árvore final após cada resolução**.
 - [ ] Revisar diferenças entre servidor, Git e artefatos instalados; **não commitar segredos, dados de clientes, backups, sessão WAHA ou chaves**.
-- [ ] Implementar bloqueio R01 e provar que não há confirmação sem recepção.
+- [ ] Homologar R01: IA confirma reservas válidas diretamente, impede conflitos/duplicidades, registra aceite da cliente e atualiza agenda/CRM/avisos corretamente. Não requer autorização individual da recepção.
 - [ ] Implementar e validar os critérios P0 da matriz de aceite, inclusive R02/R03 e isolamento de acesso.
 - [ ] Validar gateway/WhatsApp/Instagram em ambiente de homologação, com números e contas de teste.
 - [ ] Confirmar política LGPD, conteúdo aprovado e consentimentos para envios.
