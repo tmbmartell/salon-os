@@ -62,7 +62,9 @@ function expectedCash(db,tenant,cashId){
 function cashOverview(db,tenant){
   const session=openCash(db,tenant);
   if(!session)return {status:"closed",session:null,expected:0,by_method:[],withdrawals:0,movements:[]};
-  const summary=all(db,"select payment_method,kind,count(*) count,sum(amount_cents) cents from financial_entries where tenant_id=? and cash_session_id=? and status='paid' group by payment_method,kind",[tenant,session.id]);
+  // Inclui lançamentos pagos do período sem vínculo explícito de sessão (vendas
+  // em Pix/cartão e pacotes antigos) para não esconder recebimentos do caixa.
+  const summary=all(db,"select payment_method,kind,count(*) count,sum(amount_cents) cents from financial_entries where tenant_id=? and status='paid' and (cash_session_id=? or (cash_session_id is null and created_at>=?)) group by payment_method,kind",[tenant,session.id,session.opened_at]);
   const movements=all(db,"select id,kind,amount_cents,reason,created_at from cash_movements where tenant_id=? and cash_session_id=? order by created_at desc limit 30",[tenant,session.id]);
   const withdrawals=Number(one(db,"select coalesce(sum(amount_cents),0) n from cash_movements where tenant_id=? and cash_session_id=? and kind='withdrawal'",[tenant,session.id])?.n||0);
   return {status:"open",session:{id:session.id,opened_at:session.opened_at,opening:Number(session.opening_cents)/100},
@@ -439,12 +441,19 @@ export async function handlePhase2Api(ctx){
       for(const {row,type} of chosen){
         if(type==="service")run(db,"update commissions set status='paid',paid_at=? where id=? and tenant_id=?",[now(),row.id,tenant]);
         else run(db,"update retail_commissions set status='paid',paid_at=? where id=? and tenant_id=?",[now(),row.id,tenant]);
+        // Descrição legível já no lançamento: o extrato e o CSV não devem expor IDs técnicos.
+        const lookup=(sql,args)=>{try{return one(db,sql,args)}catch{return null}};
+        const professional=lookup("select name from professionals where id=? and tenant_id=?",[row.professional_id,tenant])?.name||"Profissional";
+        const clientName=type==="service"
+          ?lookup("select cl.name from appointments a join clients cl on cl.id=a.client_id and cl.tenant_id=a.tenant_id where a.id=? and a.tenant_id=?",[row.appointment_id,tenant])?.name
+          :lookup("select coalesce(cl.name,'Venda balcão') name from retail_sales rs left join clients cl on cl.id=rs.client_id where rs.id=? and rs.tenant_id=?",[row.retail_sale_id,tenant])?.name;
+        const description=(type==="retail"?"Comissão de revenda":"Comissão de serviço")+" · "+professional+(clientName?" · "+clientName:"");
         run(db,"insert into financial_entries(id,tenant_id,kind,category,description,amount_cents,payment_method,status,paid_at,cash_session_id,reference_type,reference_id,created_by,created_at) values(?,?,?,?,?,?,?,'paid',?,?,?,?,?,?)",
-          [uid(),tenant,"expense","commissions",(type==="retail"?"Comissão revenda · ":"Comissão serviço · ")+row.id,row.amount_cents,method,now(),cash?.id||null,type==="retail"?"retail_commission":"commission",row.id,user.id,now()]);
+          [uid(),tenant,"expense","commissions",description,row.amount_cents,method,now(),cash?.id||null,type==="retail"?"retail_commission":"commission",row.id,user.id,now()]);
         count++;
       }
     })}catch(e){return send(res,e.status||400,{error:e.message})}
-    audit(db,user,"commissions.pay","commission",null,{count,total,payment_method:method});
+    audit(db,user,"commissions.pay","commission",null,{count,total,payment_method:method,ids});
     return send(res,200,{count,total:total/100,payment_method:method});
   }
 

@@ -28,7 +28,7 @@ import { checkManualStatusTransition } from "./appointment-status.mjs";
 import { installCommercialAutomation, policy as commercialPolicy, registerIncoming, afterAppointmentCreated, afterAppointmentStatus, receptionistDraft } from "./commercial-automation.mjs";
 import { handleCommercialApi } from "./commercial-api.mjs";
 import { installBookingFlow, bookingTurn, bookingState, handoffBooking, isBookingRequest } from "./booking-flow.mjs";
-import { localTimeToUtc } from "./slot-time.mjs";
+import { localTimeToUtc, localDateOf, localMinutesOf, localStamp } from "./slot-time.mjs";
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||9331);
@@ -344,8 +344,21 @@ function createAppointmentRecord(tenant,user,b){
     }
     let cursor=new Date(start),seq=0;
     const segments=[];
+    const zone=one("select timezone from tenants where id=?",[tenant])?.timezone||"America/Porto_Velho";
+    const toMin=h=>Number(String(h||"00:00").slice(0,2))*60+Number(String(h||"00:00").slice(3,5));
     for(const item of resolved){
       const itemStart=new Date(cursor),minutes=Number(item.service.duration_min||60)*item.qty,itemEnd=new Date(itemStart.getTime()+minutes*60000);
+      // Folga e jornada são validadas no servidor: a agenda não pode aceitar
+      // horário que a própria disponibilidade já esconde.
+      const day=localDateOf(itemStart.toISOString(),zone);
+      const window=staffWindowForDate(db,tenant,item.professional.id,day);
+      if(!window){const e=new Error("professional_time_off");e.status=409;e.professional=item.professional.name;throw e}
+      const startMin=localMinutesOf(itemStart.toISOString(),zone),endMin=localMinutesOf(itemEnd.toISOString(),zone);
+      const crossesDay=localDateOf(itemEnd.toISOString(),zone)!==day;
+      if(crossesDay||startMin<toMin(window.start)-0.001||endMin>toMin(window.end)+0.001){
+        const e=new Error("professional_outside_schedule");e.status=409;e.professional=item.professional.name;
+        e.window_start=window.start;e.window_end=window.end;throw e;
+      }
       if(professionalHasConflict(tenant,item.professional.id,itemStart.toISOString(),itemEnd.toISOString())){const e=new Error("professional_time_conflict");e.status=409;e.professional=item.professional.name;throw e}
       segments.push({...item,sequence:seq++,start_at:itemStart.toISOString(),end_at:itemEnd.toISOString()});
       cursor=itemEnd;
@@ -680,10 +693,11 @@ async function api(req,res,url){
       group by c.id
       order by c.name`,[tenant]);
     const head=["Nome","WhatsApp","E-mail","Aniversário","Instagram","Facebook","Referência / Quem indicou","Origem","Tags","Observações","Atendimentos concluídos","Última visita","Valor movimentado (R$)","Cadastro"];
+    const exportZone=one("select timezone from tenants where id=?",[tenant])?.timezone||"America/Porto_Velho";
     const body="\ufeff"+[head.map(csvCell).join(";"),...rows.map(c=>[
       c.name,c.phone||"",c.email||"",c.birthday||"",c.instagram||"",c.facebook||"",c.referral_reference||"",c.source||"",
-      (()=>{try{return JSON.parse(c.tags||"[]").join(", ")}catch{return ""}})(),c.notes||"",Number(c.visits||0),c.last_visit||"",(Number(c.lifetime_cents||0)/100).toFixed(2),c.created_at
-    ].map(csvCell).join(";"))].join("\r\n");
+      (()=>{try{return JSON.parse(c.tags||"[]").join(", ")}catch{return ""}})(),c.notes||"",Number(c.visits||0),localStamp(c.last_visit,exportZone),(Number(c.lifetime_cents||0)/100).toFixed(2),localStamp(c.created_at,exportZone)
+    ].map(csvCell).join(";"))].join("\r\n")+"\r\n";
     audit(db,user,"clients.export","clients",null,{count:rows.length});
     return send(res,200,body,{"content-type":"text/csv; charset=utf-8","content-disposition":'attachment; filename="novagente-clientes-'+new Date().toISOString().slice(0,10)+'.csv"',"cache-control":"no-store","x-content-type-options":"nosniff"});
   }
@@ -809,7 +823,7 @@ async function api(req,res,url){
     guard("appointments.write");
     const b=await parseBody(req);
     try{const created=createAppointmentRecord(tenant,user,b);try{afterAppointmentCreated(db,tenant,created)}catch(e){console.error("commercial_booking_hook_failed",String(e.message||e).slice(0,140))}return send(res,201,created)}
-    catch(e){return send(res,e.status||500,{error:String(e.message||"appointment_create_failed"),professional:e.professional||null,resource:e.resource||null})}
+    catch(e){return send(res,e.status||500,{error:String(e.message||"appointment_create_failed"),professional:e.professional||null,resource:e.resource||null,window_start:e.window_start||null,window_end:e.window_end||null})}
   }
   const ap=routeMatch(url.pathname,"/api/appointments/:id/status");
   if(req.method==="PATCH"&&ap){

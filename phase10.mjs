@@ -76,7 +76,7 @@ export async function handlePhase10Api({req,res,url,db,user,tenant,send,parseBod
       subtotal+=gross;totalCost+=cost;prepared.push({product:p,qty,unit_price_cents:price,gross_cents:gross,cost_cents:cost});
     }
 
-    const discount=Math.max(0,Math.min(subtotal,cents(b.discount||0))),total=subtotal-discount,cash=method==="cash"?openCash(db,tenant):null;
+    const discount=Math.max(0,Math.min(subtotal,cents(b.discount||0))),total=subtotal-discount,cash=openCash(db,tenant);
     if(method==="cash"&&!cash)return send(res,409,{error:"cash_session_required"});
     const saleId=uid(),financeId=uid(),ts=now();
 
