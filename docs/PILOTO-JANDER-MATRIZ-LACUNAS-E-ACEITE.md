@@ -9,9 +9,9 @@
 - Banco do piloto: 7 clientes, 6 conversas, 72 mensagens, 2 agendamentos, 1 profissional, **1 serviço** e **1 produto** (fotografia, não cadastro definitivo do salão).
 - Mensagens: 45 entradas de cliente, 27 saídas de equipe e **0 saídas identificadas como assistant**. Conexão WAHA não prova execução de atendimento automático.
 - Existem 1 campanha em **draft**, nenhum asset de marketing, 2 tarefas comerciais e 0 itens na fila de espera.
-- `assistant_reply`, `assistant_booking`, `appointment_confirmation_24h`, `appointment_reminder_2h`, `waitlist_offer` estão habilitadas nas políticas observadas; o backend possui flags para IA do WhatsApp. **Isso NÃO comprova conformidade das regras R01, R09, R11 ou R12.**
+- `assistant_reply`, `assistant_booking`, `appointment_confirmation_24h`, `appointment_reminder_2h`, `waitlist_offer` estão habilitadas nas políticas observadas; o backend possui flags para IA do WhatsApp. **A permissão de confirmar reservas pela IA agora está alinhada à R01 revisada, mas não comprova disponibilidade verificada, envio real, segurança do fluxo ou conformidade de R01, R09, R11 e R12.**
 - `commercial-api.mjs` reporta `sending_enabled:false`; `commercial-automation.mjs` agenda tarefas e separa status, mas não prova despacho de campanhas.
-- O código de `booking-flow.mjs` contém execução de agendamento automático em determinadas condições. **Conflita com R01 do Jander:** precisa de um bloqueio real, específico para o piloto, antes de testar IA com clientes.
+- O código de `booking-flow.mjs` contempla agendamento automático em determinadas condições. **A R01 foi revisada em 03/11/2026 e agora permite confirmação direta pela IA**. O risco restante é validar disponibilidade, duplicidade, serviço/profissional, aceitação da cliente, canais, integração com agenda e rastreabilidade, sem permitir liberação de horário ocupado ou oferta automática à fila (R10).
 - `marketing.mjs` suporta rascunhos de campanha e imagens; não há, na inspeção, fluxo aprovado de envio promocional e métricas de campanha fim a fim.
 - `public/manifest.webmanifest` e `public/sw.js` fornecem estrutura de PWA; testar efetivamente a instalação em notebook e celular.
 - O catálogo de estoque `phase2.mjs` não é, por si só, uma base técnica versionada com revisão gerencial da IA.
@@ -20,7 +20,7 @@
 
 | Regra | Situação em 03/11 | Lacuna / risco | Critério de saída |
 |---|---|---|---|
-| R01 — Recepção confirma agenda | **Conflito conhecido** | O fluxo de reserva automatizada existe e `assistant_booking` está habilitado; ainda não há fila obrigatória de aprovação humana. | Criar solicitação pendente e comprovar 0 reservas confirmadas pela IA sem aprovação. |
+| R01 — IA pode confirmar reservas | **Implementação parcial; homologação pendente** | O código permite agendamento automático; falta evidência ponta a ponta de disponibilidade atualizada, idempotência, consentimento/aceite da cliente, prevenção de conflitos e confirmação nos dois canais. | Testar reserva direta válida pela IA com atualização de agenda e CRM, notificação à cliente/profissional, prevenção de horário duplicado e handoff ao humano em conflito. **Não requer aprovação da recepção por reserva**. |
 | R02 — Aprovação de campanhas | **Não implementado de ponta a ponta** | Rascunho existe; falta ciclo de aprovação versionada e despacho condicionado. | Provar que campanhas não aprovadas não enviam, e que edição revoga aprovação. |
 | R03 — Aprovadores restritos | **Pendente** | Criar permissão individual owner/gerência expressamente autorizada, independente de acesso geral à tela. | Teste negativo: recepção não aprova nem chama API diretamente; trilha auditável. |
 | R04 — Apenas descontos aprovados | **Parcial** | Existem regras de escalonamento, mas é preciso vincular todas as respostas de oferta a condições aprovadas. | Testar pedido de desconto não aprovado e expiração de promoção. |
@@ -30,7 +30,7 @@
 | R08 — IA nos 2 canais | **Pendente** | Ausência de integração Instagram; WhatsApp sem envio automático comprovado. | Fluxos de resposta e handoff seguros em ambos os canais. |
 | R09 — Handoff humano manual | **Parcial** | `handling_mode` e `handling_mode_source` existem, mas validar bloqueio definitivo ao reassumir e retorno só por atendente. | Testar mensagens, logout e reinício sem retorno da IA. |
 | R10 — Sem liberação automática / fila | **Parcial** | Existem espera e tarefas; confirmar intervenção humana em todas as rotas. | Nunca oferecer vaga sem confirmação explícita da liberação pela equipe. |
-| R11 — Lembretes 24h/2h pós-confirmação | **Parcial** | Há agendamento de tarefas, mas não prova de despacho e gatilho após validação humana. | Teste de lembrete único e cancelamento/remarcação. |
+| R11 — Lembretes 24h/2h pós-confirmação | **Parcial** | Há agendamento de tarefas, mas não prova de despacho após confirmação válida **pela IA ou recepção**. | Teste de lembrete único depois de ambos os tipos de confirmação, com cancelamento/remarcação. |
 | R12 — Lembrete 2h contextual | **Pendente** | Falta diferenciação fim a fim por confirmação de presença. | Cliente confirmada recebe apenas cordialidade, sem segunda pergunta. |
 | R13 — Aviso WhatsApp + agenda profissional | **Parcial** | Agenda/role profissional existem; envio automático e estado de entrega não validados. | Confirmar aviso e acesso individual, privacidade e log de falha. |
 | R14 — Avisos de remarcação/cancelamento | **Pendente** | Transições de status existem, mas notificação comparativa a profissionais não está demonstrada. | Mensagem de atualização correta, inclusive troca de profissional. |
@@ -40,7 +40,7 @@
 ## Ordem de execução recomendada
 
 ### P0 — Antes de usar a automação com clientes reais
-1. **R01:** bloqueio seguro de confirmação pela IA e fila de aprovação da recepção.
+1. **R01 (revisada):** homologar a confirmação automática pela IA com agenda atualizada, escolha e aceite da cliente, prevenção de duplicidade e bloqueio de slots inválidos; em caso de conflito ou dados insuficientes, transferir para recepção. **Não exigir aprovação humana por reserva**.
 2. **R09:** handoff humano persistente que não é revertido automaticamente.
 3. **R05/R06/R04:** catálogo técnico validado e limites comerciais; resposta segura a dados ausentes.
 4. **R02/R03:** motor de campanhas com aprovação obrigatória e autorização de gestor, com teste negativo de envio.
@@ -63,7 +63,9 @@
 
 | Cenário | Resultado esperado |
 |---|---|
-| Cliente pede coloração e escolhe horário | IA cria pedido; **não confirma**; recepção aprova; então cliente e profissional recebem confirmação. |
+| Cliente pede coloração e escolhe horário disponível | IA pode **confirmar diretamente** após validar disponibilidade e aceite; agenda e CRM atualizam e cliente/profissional são notificadas, sem depender de recepção. |
+| Cliente tenta reservar horário ocupado ou simultâneo | IA não confirma duas reservas no mesmo slot; informa indisponibilidade ou encaminha à recepção. |
+| Cliente pede cancelamento/liberação de horário reservado | IA não libera automaticamente para fila de espera; recepção mantém controle da liberação, conforme R10. |
 | Cliente pergunta por produto sem ficha técnica aprovada | IA não inventa; encaminha à equipe; zero vazamento de rascunho. |
 | Cliente pede desconto fora de oferta | IA escalona; não concede. |
 | Recepcionista tenta enviar campanha sem aprovação | Bloqueio no servidor, mesmo via API; nenhuma mensagem enviada. |
