@@ -11,6 +11,12 @@ import {fileURLToPath} from "node:url";
 import {DatabaseSync} from "node:sqlite";
 
 const here=path.dirname(fileURLToPath(import.meta.url)),root=path.resolve(here,"..");
+// Horário fixo de QA dentro da jornada em Porto Velho (UTC-4).
+function futureBusinessHour(days){
+  const d=new Date(Date.now()+days*86400000);
+  d.setUTCHours(14,0,0,0); // 10:00 em America/Porto_Velho
+  return d.toISOString();
+}
 async function freePort(){
   const server=net.createServer();
   await new Promise((resolve,reject)=>server.once("error",reject).listen(0,"127.0.0.1",resolve));
@@ -115,7 +121,7 @@ test("E2E: servidor + login + CRM + agenda + ficha + estoque + caixa + pós-vend
       method:"POST",body:{title:"Campanha piloto QA",category:"promotion",message:"Somente rascunho",status:"draft"}
     });
     assert.equal(campaign.status,"draft");
-    const startAt=new Date(Date.now()+8*86400000).toISOString();
+    const startAt=futureBusinessHour(8);
     const appointment=await expectStatus(owner,"/api/appointments",201,{
       method:"POST",body:{client_id:customer.id,professional_id:professional.id,
         service_id:service.id,start_at:startAt,source:"homologacao"}
@@ -165,7 +171,7 @@ test("E2E: servidor + login + CRM + agenda + ficha + estoque + caixa + pós-vend
     });
     const combined=await expectStatus(owner,"/api/appointments",201,{
       method:"POST",body:{client_id:customer.id,professional_id:professional.id,service_id:service.id,
-        start_at:new Date(Date.now()+12*86400000).toISOString(),
+        start_at:futureBusinessHour(12),
         items:[{service_id:otherService.id,professional_id:professional.id,qty:1}]}
     });
     const multiPrep=await expectStatus(owner,"/api/checkout/"+combined.id+"/prep",200);
