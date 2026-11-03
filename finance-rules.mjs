@@ -8,6 +8,14 @@ export function cents(value,{allowZero=false}={}){
     throw Object.assign(new Error("invalid_amount"),{status:400});
   return Math.round(number*100);
 }
+// Comissão em %: aceita 0–100 (inclusive), rejeita o resto. Nunca "corrige" 150 para 100.
+export function commissionPct(value,{defaultValue=0}={}){
+  if(value===null||value===undefined||String(value).trim()==="")return defaultValue;
+  const number=Number(String(value).trim().replace(",","."));
+  if(!Number.isFinite(number)||number<0||number>100)
+    throw Object.assign(new Error("A comissão deve estar entre 0% e 100%. Confira o valor informado."),{status:400,code:"invalid_commission_pct"});
+  return Math.round(number*100)/100;
+}
 export function validPaymentMethod(method,{allowEmpty=false}={}){
   const value=String(method||"").trim();
   if(allowEmpty&&!value)return null;

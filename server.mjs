@@ -29,6 +29,7 @@ import { installCommercialAutomation, policy as commercialPolicy, registerIncomi
 import { handleCommercialApi } from "./commercial-api.mjs";
 import { installBookingFlow, bookingTurn, bookingState, handoffBooking, isBookingRequest } from "./booking-flow.mjs";
 import { localTimeToUtc, localDateOf, localMinutesOf, localStamp } from "./slot-time.mjs";
+import { commissionPct } from "./finance-rules.mjs";
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||9331);
@@ -236,17 +237,47 @@ if(!one("select id from resources where tenant_id=? limit 1",[DEFAULT_TENANT])){
 
 function clientView(r){return {...r,tags:jparse(r.tags,[])}}
 function professionalView(r){return {...r,specialties:jparse(r.specialties,[]),active:!!r.active}}
+// Isolamento por profissional: o vínculo é users.professional_id, nunca o nome.
+const APPOINTMENT_SCOPE_SQL="(exists(select 1 from appointment_items ai where ai.appointment_id=a.id and ai.tenant_id=a.tenant_id and ai.professional_id=?) or (a.professional_id=? and not exists(select 1 from appointment_items ax where ax.appointment_id=a.id)))";
+function professionalScope(user){return user?.role==="professional"?(user.professionalId||null):null}
+function requireProfessionalLink(user){
+  if(user?.role!=="professional")return null;
+  if(!user.professionalId){const e=new Error("professional_not_linked");e.status=403;e.code="professional_not_linked";throw e}
+  return user.professionalId;
+}
+function appointmentInScope(tenant,professionalId,appointmentId){
+  return one("select a.id from appointments a where a.tenant_id=? and a.id=? and "+APPOINTMENT_SCOPE_SQL,[tenant,appointmentId,professionalId,professionalId]);
+}
+function clientInScope(tenant,professionalId,clientId){
+  return one(`select c.id from clients c where c.tenant_id=? and c.id=? and exists(
+    select 1 from appointments a where a.tenant_id=c.tenant_id and a.client_id=c.id and ${APPOINTMENT_SCOPE_SQL})`,[tenant,clientId,professionalId,professionalId]);
+}
+// Profissional sem vínculo não recebe dado operacional nenhum; só o time.
+function scopedDashboard(user,tenant){
+  if(user.role==="professional"&&!user.professionalId){
+    return {todayAppointments:0,forecast:0,openConversations:0,clientCount:0,
+      profCount:Number(one("select count(*) n from professionals where tenant_id=? and active=1",[tenant])?.n||0),
+      appointments:[],professional_link_required:true};
+  }
+  return dashboard(tenant,professionalScope(user));
+}
 function serviceView(r){return {...r,price:Number(r.price_cents)/100,active:!!r.active}}
-function dashboard(tenant){
+
+function dashboard(tenant,professionalId=null){
   const d=new Date(),start=new Date(d);start.setHours(0,0,0,0);const end=new Date(start);end.setDate(end.getDate()+1);
+  const scopeArgs=professionalId?[professionalId,professionalId]:[];
   const apps=all(`select a.*,c.name client_name,p.name professional_name,s.name service_name,s.price_cents
     from appointments a join clients c on c.id=a.client_id join professionals p on p.id=a.professional_id join services s on s.id=a.service_id
-    where a.tenant_id=? and a.start_at>=? and a.start_at<? order by a.start_at`,[tenant,start.toISOString(),end.toISOString()]);
+    where a.tenant_id=? and a.start_at>=? and a.start_at<? ${professionalId?"and "+APPOINTMENT_SCOPE_SQL:""} order by a.start_at`,[tenant,start.toISOString(),end.toISOString(),...scopeArgs]);
   const forecast=apps.filter(a=>!["cancelled","no_show"].includes(a.status)).reduce((n,a)=>n+Number(a.price_cents||0),0);
+  const clientCount=professionalId
+    ?Number(one(`select count(distinct c.id) n from clients c where c.tenant_id=? and exists(
+        select 1 from appointments a where a.tenant_id=c.tenant_id and a.client_id=c.id and ${APPOINTMENT_SCOPE_SQL})`,[tenant,professionalId,professionalId])?.n||0)
+    :Number(one("select count(*) n from clients where tenant_id=?",[tenant])?.n||0);
   return {
     todayAppointments:apps.length,forecast:forecast/100,
-    openConversations:Number(one("select count(*) n from conversations where tenant_id=? and status='open'",[tenant])?.n||0),
-    clientCount:Number(one("select count(*) n from clients where tenant_id=?",[tenant])?.n||0),
+    openConversations:professionalId?0:Number(one("select count(*) n from conversations where tenant_id=? and status='open'",[tenant])?.n||0),
+    clientCount,
     profCount:Number(one("select count(*) n from professionals where tenant_id=? and active=1",[tenant])?.n||0),appointments:apps
   };
 }
@@ -670,15 +701,20 @@ async function api(req,res,url){
 
   if(req.method==="GET"&&url.pathname==="/api/bootstrap"){
     guard("dashboard.read");
+    const pscope=professionalScope(user),restricted=user.role==="professional";
+    const professionals=all("select * from professionals where tenant_id=? order by name",[tenant]).map(professionalView)
+      .map(p=>restricted?{...p,phone:null}:p);
     return send(res,200,{
       tenant:one("select * from tenants where id=?",[tenant]),user,
-      professionals:all("select * from professionals where tenant_id=? order by name",[tenant]).map(professionalView),
+      professionals,
       services:all("select * from services where tenant_id=? order by category,name",[tenant]).map(serviceView),
       resources:all("select * from resources where tenant_id=? and active=1 order by type,name",[tenant]),
-      dashboard:dashboard(tenant),whatsapp:await wahaStatus(sessionForTenant(db,tenant))
+      dashboard:scopedDashboard(user,tenant),
+      professional_link_required:restricted&&!pscope,
+      whatsapp:restricted?{configured:false,connected:false,status:"restrito"}:await wahaStatus(sessionForTenant(db,tenant))
     });
   }
-  if(req.method==="GET"&&url.pathname==="/api/dashboard"){guard("dashboard.read");return send(res,200,dashboard(tenant))}
+  if(req.method==="GET"&&url.pathname==="/api/dashboard"){guard("dashboard.read");return send(res,200,scopedDashboard(user,tenant))}
 
   if(req.method==="GET"&&url.pathname==="/api/clients/export"){
     guard("clients.export");
@@ -704,8 +740,9 @@ async function api(req,res,url){
   const clientHistoryRoute=routeMatch(url.pathname,"/api/clients/:id/history");
   if(req.method==="GET"&&clientHistoryRoute){
     guard("clients.read");
-    const clientId=clientHistoryRoute.id;
+    const clientId=clientHistoryRoute.id,pLink=requireProfessionalLink(user);
     if(!one("select id from clients where id=? and tenant_id=?",[clientId,tenant]))return send(res,404,{error:"client_not_found"});
+    if(pLink&&!clientInScope(tenant,pLink,clientId))return send(res,404,{error:"client_not_found"});
     const visits=all(`select a.id,a.start_at,a.status,
       coalesce((select group_concat(s2.name,' + ') from appointment_items ai
         join services s2 on s2.id=ai.service_id and s2.tenant_id=ai.tenant_id
@@ -721,8 +758,11 @@ async function api(req,res,url){
   }
   if(req.method==="GET"&&url.pathname==="/api/clients"){
     guard("clients.read");
-    const q=safeText(url.searchParams.get("q")||"",100);
-    const rows=q?all("select * from clients where tenant_id=? and (name like ? or phone like ? or instagram like ? or facebook like ? or referral_reference like ?) order by name limit 100",[tenant,"%"+q+"%","%"+normalizePhone(q)+"%","%"+q+"%","%"+q+"%","%"+q+"%"]):all("select * from clients where tenant_id=? order by updated_at desc limit 100",[tenant]);
+    const q=safeText(url.searchParams.get("q")||"",100),pLink=requireProfessionalLink(user);
+    const scope=pLink?`and exists(select 1 from appointments a where a.tenant_id=clients.tenant_id and a.client_id=clients.id and ${APPOINTMENT_SCOPE_SQL})`:"";
+    const scopeArgs=pLink?[pLink,pLink]:[];
+    const rows=q?all(`select * from clients where tenant_id=? and (name like ? or phone like ? or instagram like ? or facebook like ? or referral_reference like ?) ${scope} order by name limit 100`,[tenant,"%"+q+"%","%"+normalizePhone(q)+"%","%"+q+"%","%"+q+"%","%"+q+"%",...scopeArgs])
+      :all(`select * from clients where tenant_id=? ${scope} order by updated_at desc limit 100`,[tenant,...scopeArgs]);
     return send(res,200,rows.map(clientView));
   }
   if(req.method==="POST"&&url.pathname==="/api/clients"){
@@ -747,7 +787,12 @@ async function api(req,res,url){
     return send(res,201,clientView(created));
   }
 
-  if(req.method==="GET"&&url.pathname==="/api/professionals"){guard("team.read");return send(res,200,all("select * from professionals where tenant_id=? order by name",[tenant]).map(professionalView))}
+  if(req.method==="GET"&&url.pathname==="/api/professionals"){
+    guard("team.read");
+    const privileged=["owner","manager"].includes(user.role);
+    return send(res,200,all("select * from professionals where tenant_id=? order by name",[tenant]).map(professionalView)
+      .map(p=>privileged?p:{...p,phone:null}));
+  }
   if(req.method==="POST"&&url.pathname==="/api/professionals"){
     guard("team.write");
     const b=await parseBody(req),name=safeText(b.name,120);if(!name)return send(res,400,{error:"name_required"});
@@ -762,9 +807,29 @@ async function api(req,res,url){
     guard("services.write");
     const b=await parseBody(req),name=safeText(b.name,120);if(!name)return send(res,400,{error:"name_required"});
     const sid=id(),price=Math.max(0,Math.round(Number(b.price||0)*100)),dur=Math.max(5,Math.round(Number(b.duration_min||60)));
-    run("insert into services(id,tenant_id,name,category,duration_min,price_cents,commission_pct,created_at) values(?,?,?,?,?,?,?,?)",[sid,tenant,name,safeText(b.category,80),dur,price,Math.max(0,Math.min(100,Number(b.commission_pct||0))),now()]);
-    audit(db,user,"service.create","service",sid,{});
+    let commission;
+    try{commission=commissionPct(b.commission_pct)}catch(e){return send(res,e.status||400,{error:e.code||"invalid_commission_pct",message:e.message})}
+    run("insert into services(id,tenant_id,name,category,duration_min,price_cents,commission_pct,created_at) values(?,?,?,?,?,?,?,?)",[sid,tenant,name,safeText(b.category,80),dur,price,commission,now()]);
+    audit(db,user,"service.create","service",sid,{commission_pct:commission});
     return send(res,201,serviceView(one("select * from services where id=?",[sid])));
+  }
+  const serviceEdit=url.pathname.match(/^\/api\/services\/([^/]+)$/);
+  if(req.method==="PUT"&&serviceEdit){
+    guard("services.write");
+    const sid=decodeURIComponent(serviceEdit[1]),current=one("select * from services where id=? and tenant_id=?",[sid,tenant]);
+    if(!current)return send(res,404,{error:"service_not_found"});
+    const b=await parseBody(req),name=b.name===undefined?current.name:safeText(b.name,120);
+    if(!name)return send(res,400,{error:"name_required"});
+    let commission=Number(current.commission_pct||0);
+    if(b.commission_pct!==undefined){
+      try{commission=commissionPct(b.commission_pct)}catch(e){return send(res,e.status||400,{error:e.code||"invalid_commission_pct",message:e.message})}
+    }
+    const price=b.price===undefined?Number(current.price_cents||0):Math.max(0,Math.round(Number(b.price||0)*100));
+    const dur=b.duration_min===undefined?Number(current.duration_min||60):Math.max(5,Math.round(Number(b.duration_min||60)));
+    run("update services set name=?,category=?,duration_min=?,price_cents=?,commission_pct=?,active=? where id=? and tenant_id=?",
+      [name,b.category===undefined?current.category:safeText(b.category,80),dur,price,commission,b.active===undefined?Number(current.active||1):(b.active?1:0),sid,tenant]);
+    audit(db,user,"service.update","service",sid,{commission_pct:commission});
+    return send(res,200,serviceView(one("select * from services where id=?",[sid])));
   }
 
   if(req.method==="GET"&&url.pathname==="/api/resources"){guard("resources.read");return send(res,200,all("select * from resources where tenant_id=? order by type,name",[tenant]))}
@@ -786,12 +851,20 @@ async function api(req,res,url){
   }
   if(req.method==="GET"&&url.pathname==="/api/waitlist"){
     guard("appointments.read");
-    const rows=all("select w.*,c.name client_name,c.phone client_phone,s.name service_name,p.name professional_name from waitlist w join clients c on c.id=w.client_id join services s on s.id=w.service_id left join professionals p on p.id=w.professional_id where w.tenant_id=? and w.status='waiting' order by coalesce(w.preferred_date,'9999-12-31'),w.created_at",[tenant]);
+    const pLinkWait=requireProfessionalLink(user);
+    const rows=all("select w.*,c.name client_name,c.phone client_phone,s.name service_name,p.name professional_name from waitlist w join clients c on c.id=w.client_id join services s on s.id=w.service_id left join professionals p on p.id=w.professional_id where w.tenant_id=? and w.status='waiting'"+(pLinkWait?" and w.professional_id=?":"")+" order by coalesce(w.preferred_date,'9999-12-31'),w.created_at",pLinkWait?[tenant,pLinkWait]:[tenant]);
     return send(res,200,rows);
   }
   if(req.method==="POST"&&url.pathname==="/api/waitlist"){
     guard("appointments.write");
-    const b=await parseBody(req),client=one("select id from clients where id=? and tenant_id=?",[safeText(b.client_id,64),tenant]),service=one("select id from services where id=? and tenant_id=?",[safeText(b.service_id,64),tenant]);
+    const b=await parseBody(req),pLinkWaitPost=requireProfessionalLink(user);
+    if(pLinkWaitPost){
+      if(b.professional_id&&String(b.professional_id)!==pLinkWaitPost)return send(res,403,{error:"professional_scope_forbidden"});
+      b.professional_id=pLinkWaitPost;
+    }
+    const client=one("select id from clients where id=? and tenant_id=?",[safeText(b.client_id,64),tenant]);
+    if(client&&pLinkWaitPost&&!clientInScope(tenant,pLinkWaitPost,client.id))return send(res,404,{error:"client_not_found"});
+    const service=one("select id from services where id=? and tenant_id=?",[safeText(b.service_id,64),tenant]);
     const professional=b.professional_id?one("select id from professionals where id=? and tenant_id=?",[safeText(b.professional_id,64),tenant]):null;
     if(!client||!service||(b.professional_id&&!professional))return send(res,400,{error:"invalid_waitlist_reference"});
     const wid=id();run("insert into waitlist(id,tenant_id,client_id,service_id,professional_id,preferred_date,period,notes,status,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,?,?)",[wid,tenant,client.id,service.id,professional?.id||null,safeText(b.preferred_date,10)||null,safeText(b.period||"any",20),safeText(b.notes,500),"waiting",now(),now()]);
@@ -802,6 +875,8 @@ async function api(req,res,url){
   if(req.method==="GET"&&url.pathname==="/api/appointments/tag-suggestions"){
     guard("appointments.read");
     const clientId=safeText(url.searchParams.get("client_id"),64),serviceId=safeText(url.searchParams.get("service_id"),64),tags=[];
+    const pLink=requireProfessionalLink(user);
+    if(pLink&&clientId&&!clientInScope(tenant,pLink,clientId))return send(res,404,{error:"client_not_found"});
     const client=clientId?one("select * from clients where id=? and tenant_id=?",[clientId,tenant]):null;
     const service=serviceId?one("select * from services where id=? and tenant_id=?",[serviceId,tenant]):null;
     if(client){
@@ -815,19 +890,29 @@ async function api(req,res,url){
   if(req.method==="GET"&&url.pathname==="/api/appointments"){
     guard("appointments.read");
     const from=url.searchParams.get("from")||new Date(Date.now()-86400000).toISOString(),to=url.searchParams.get("to")||new Date(Date.now()+14*86400000).toISOString();
-    const sql="select a.*,c.name client_name,c.phone client_phone,p.name professional_name,s.name service_name,s.duration_min,s.price_cents,r.name resource_name from appointments a join clients c on c.id=a.client_id and c.tenant_id=a.tenant_id join professionals p on p.id=a.professional_id and p.tenant_id=a.tenant_id join services s on s.id=a.service_id and s.tenant_id=a.tenant_id left join resources r on r.id=a.resource_id and r.tenant_id=a.tenant_id where a.tenant_id=? and a.start_at>=? and a.start_at<=? order by a.start_at";
-    const rows=all(sql,[tenant,from,to]);
+    const pLink=requireProfessionalLink(user);
+    const sql="select a.*,c.name client_name,c.phone client_phone,p.name professional_name,s.name service_name,s.duration_min,s.price_cents,r.name resource_name from appointments a join clients c on c.id=a.client_id and c.tenant_id=a.tenant_id join professionals p on p.id=a.professional_id and p.tenant_id=a.tenant_id join services s on s.id=a.service_id and s.tenant_id=a.tenant_id left join resources r on r.id=a.resource_id and r.tenant_id=a.tenant_id where a.tenant_id=? and a.start_at>=? and a.start_at<=? "+(pLink?"and "+APPOINTMENT_SCOPE_SQL:" ")+" order by a.start_at";
+    const rows=all(sql,pLink?[tenant,from,to,pLink,pLink]:[tenant,from,to]);
     return send(res,200,rows.map(appointmentApiView));
   }
   if(req.method==="POST"&&url.pathname==="/api/appointments"){
     guard("appointments.write");
-    const b=await parseBody(req);
+    const b=await parseBody(req),pLink=requireProfessionalLink(user);
+    if(pLink){
+      // Profissional só agenda para si: nada de criar atendimento em nome de outra.
+      if(!b.professional_id)b.professional_id=pLink;
+      const items=[{professional_id:b.professional_id},...(Array.isArray(b.items)?b.items:[])];
+      if(items.some(x=>String(x.professional_id||pLink)!==pLink))return send(res,403,{error:"professional_scope_forbidden"});
+      b.items=(Array.isArray(b.items)?b.items:[]).map(x=>({...x,professional_id:x.professional_id||pLink}));
+    }
     try{const created=createAppointmentRecord(tenant,user,b);try{afterAppointmentCreated(db,tenant,created)}catch(e){console.error("commercial_booking_hook_failed",String(e.message||e).slice(0,140))}return send(res,201,created)}
     catch(e){return send(res,e.status||500,{error:String(e.message||"appointment_create_failed"),professional:e.professional||null,resource:e.resource||null,window_start:e.window_start||null,window_end:e.window_end||null})}
   }
   const ap=routeMatch(url.pathname,"/api/appointments/:id/status");
   if(req.method==="PATCH"&&ap){
     guard("appointments.write");
+    const pLinkStatus=requireProfessionalLink(user);
+    if(pLinkStatus&&!appointmentInScope(tenant,pLinkStatus,ap.id))return send(res,404,{error:"not_found"});
     const b=await parseBody(req),status=safeText(b.status,32);
     const current=one("select status from appointments where id=? and tenant_id=?",[ap.id,tenant]);
     if(!current)return send(res,404,{error:"not_found"});
@@ -962,7 +1047,7 @@ const handler=async(req,res)=>{
     }
     const index=path.join(publicRoot,"index.html");
     res.writeHead(200,{...baseSecurityHeaders(),"content-type":"text/html; charset=utf-8","cache-control":"no-cache"});fs.createReadStream(index).pipe(res);
-  }catch(e){console.error(e);const status=Number(e.status||500);send(res,status,{error:status===401?"unauthorized":status===403?"forbidden":status===400?"bad_request":"internal_error",message:status<500?String(e.message||e):"internal_error"})}
+  }catch(e){console.error(e);const status=Number(e.status||500),code=e.code||(status===401?"unauthorized":status===403?"forbidden":status===400?"bad_request":"internal_error");send(res,status,{error:code,message:status<500?String(e.message||e):"internal_error"})}
 };
 const listenHosts=[HOST==="0.0.0.0"||HOST==="::"?HOST:"127.0.0.1",...(HOST==="0.0.0.0"||HOST==="::"?[]:[HOST]),...String(process.env.EXTRA_HOSTS||"").split(",").map(x=>x.trim()).filter(Boolean)].filter((x,i,a)=>a.indexOf(x)===i);
 for(const bindHost of listenHosts){

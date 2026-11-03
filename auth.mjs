@@ -52,6 +52,9 @@ export function installAuth(db){
   installMfa(db);
   const sessionCols=db.prepare("pragma table_info(auth_sessions)").all().map(x=>x.name);
   if(!sessionCols.includes("device_label"))db.exec("alter table auth_sessions add column device_label TEXT NOT NULL DEFAULT 'Dispositivo não identificado'");
+  // Vínculo do usuário com o registro da profissional (isolamento por profissional).
+  const userCols=db.prepare("pragma table_info(users)").all().map(x=>x.name);
+  if(!userCols.includes("professional_id"))db.exec("alter table users add column professional_id TEXT");
 }
 
 export function makePasswordHash(password){
@@ -68,13 +71,13 @@ export function verifyPassword(password,stored){
 export function authenticate(req,db){
   const token=cookies(req)[SESSION_COOKIE];
   if(!token)return null;
-  const row=db.prepare(`select s.id session_id,s.tenant_id,s.user_id,s.expires_at,u.name,u.email,u.role,u.active
+  const row=db.prepare(`select s.id session_id,s.tenant_id,s.user_id,s.expires_at,u.name,u.email,u.role,u.active,u.professional_id
     from auth_sessions s join users u on u.id=s.user_id and u.tenant_id=s.tenant_id
     where s.token_hash=? and datetime(s.expires_at)>datetime('now')
       and datetime(s.last_seen_at)>datetime('now','-${SESSION_IDLE_HOURS} hours') limit 1`).get(sha(token));
   if(!row||!row.active)return null;
   db.prepare("update auth_sessions set last_seen_at=? where id=?").run(new Date().toISOString(),row.session_id);
-  return {sessionId:row.session_id,tenantId:row.tenant_id,id:row.user_id,name:row.name,email:row.email,role:row.role};
+  return {sessionId:row.session_id,tenantId:row.tenant_id,id:row.user_id,name:row.name,email:row.email,role:row.role,professionalId:row.professional_id||null};
 }
 export function audit(db,user,action,entityType=null,entityId=null,metadata={}){
   db.prepare("insert into audit_log(id,tenant_id,user_id,action,entity_type,entity_id,metadata,created_at) values(?,?,?,?,?,?,?,?)")

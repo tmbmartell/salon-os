@@ -43,6 +43,7 @@ function summary(db,tenant,from,to){
     commissions:(Number(commissions.total||0)+Number(retailComm.total||0))/100
   };
 }
+const APPOINTMENT_STATUS_LABELS={scheduled:"Agendado",confirmed:"Confirmado",arrived:"Chegou",in_service:"Em atendimento",completed:"Finalizado",cancelled:"Cancelado",no_show:"Não compareceu"};
 function reportData(db,tenant,type,from,to,zone="America/Porto_Velho"){
   const stamp=v=>localStamp(v,zone);
   if(type==="finance"){
@@ -67,7 +68,8 @@ function reportData(db,tenant,type,from,to,zone="America/Porto_Velho"){
   }
   if(type==="appointments"){
     const rows=all(db,"select a.start_at,a.end_at,a.status,c.name client_name,p.name professional_name,s.name service_name,a.source,a.notes from appointments a join clients c on c.id=a.client_id join professionals p on p.id=a.professional_id join services s on s.id=a.service_id where a.tenant_id=? and a.start_at between ? and ? order by a.start_at",[tenant,from,to]);
-    return {name:"agenda",headers:["Início","Fim","Status","Cliente","Profissional","Serviço","Origem","Observações"],rows:rows.map(x=>[stamp(x.start_at),stamp(x.end_at),x.status,x.client_name,x.professional_name,x.service_name,x.source||"",x.notes||""])};
+    // Status traduzido só na exportação; o banco continua com o valor técnico.
+    return {name:"agenda",headers:["Início","Fim","Status","Cliente","Profissional","Serviço","Origem","Observações"],rows:rows.map(x=>[stamp(x.start_at),stamp(x.end_at),APPOINTMENT_STATUS_LABELS[x.status]||x.status,x.client_name,x.professional_name,x.service_name,x.source||"",x.notes||""])};
   }
   if(type==="stock"){
     const rows=all(db,"select p.name,p.sku,p.unit,p.stock_qty,p.min_qty,p.ideal_qty,p.avg_cost_cents,s.name supplier_name from products p left join suppliers s on s.id=p.supplier_id where p.tenant_id=? order by p.name",[tenant]);

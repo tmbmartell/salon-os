@@ -115,7 +115,7 @@ export async function handlePhase5Api({req,res,url,db,user,tenant,send,parseBody
   }
   if(req.method==="GET"&&url.pathname==="/api/admin/users"){
     guard("admin.read");
-    return send(res,200,all(db,"select id,name,email,role,active,created_at,updated_at from users where tenant_id=? order by role,name",[tenant]));
+    return send(res,200,all(db,"select id,name,email,role,active,professional_id,created_at,updated_at from users where tenant_id=? order by role,name",[tenant]));
   }
   const roleRoute=url.pathname.match(/^\/api\/admin\/users\/([^/]+)\/role$/);
   if(req.method==="PATCH"&&roleRoute){
@@ -133,12 +133,24 @@ export async function handlePhase5Api({req,res,url,db,user,tenant,send,parseBody
       // Revoga os cookies existentes após mudança de privilégio; o funcionário
       // deverá autenticar novamente para obter sessão com o novo papel.
       transaction(db,()=>{
-        run(db,"update users set role=?,updated_at=? where id=? and tenant_id=?",[role,now(),id,tenant]);
+        run(db,"update users set role=?,professional_id=case when ?='professional' then professional_id else null end,updated_at=? where id=? and tenant_id=?",[role,role,now(),id,tenant]);
         run(db,"delete from auth_sessions where user_id=? and tenant_id=?",[id,tenant]);
       });
     }
     audit(db,user,"admin.user.role","user",id,{from:target.role,to:role,sessions_revoked:role!==target.role});
     return send(res,200,{ok:true,id,role});
+  }
+  const linkRoute=url.pathname.match(/^\/api\/admin\/users\/([^/]+)\/professional$/);
+  if(req.method==="PATCH"&&linkRoute){
+    guard("admin.write");
+    const id=decodeURIComponent(linkRoute[1]),target=one(db,"select * from users where id=? and tenant_id=?",[id,tenant]);
+    if(!target)return send(res,404,{error:"user_not_found"});
+    const b=await parseBody(req),raw=b.professional_id==null?"":String(b.professional_id).trim();
+    if(target.role!=="professional"&&raw)return send(res,409,{error:"user_not_professional"});
+    if(raw&&!one(db,"select id from professionals where id=? and tenant_id=?",[raw,tenant]))return send(res,400,{error:"professional_not_found"});
+    run(db,"update users set professional_id=?,updated_at=? where id=? and tenant_id=?",[raw||null,now(),id,tenant]);
+    audit(db,user,"admin.user.professional_link","user",id,{professional_id:raw||null});
+    return send(res,200,{ok:true,id,professional_id:raw||null});
   }
   const activeRoute=url.pathname.match(/^\/api\/admin\/users\/([^/]+)\/active$/);
   if(req.method==="PATCH"&&activeRoute){

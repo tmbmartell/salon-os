@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { commissionPct } from "./finance-rules.mjs";
 
 const uid=()=>crypto.randomUUID();
 const now=()=>new Date().toISOString();
@@ -50,7 +51,9 @@ export async function handlePhase10Api({req,res,url,db,user,tenant,send,parseBod
   if(config&&req.method==="PATCH"){
     guard("retail.manage");const pid=decodeURIComponent(config[1]),p=one(db,"select id from products where id=? and tenant_id=?",[pid,tenant]);
     if(!p)return send(res,404,{error:"product_not_found"});
-    const b=await parseBody(req),price=cents(b.sale_price),pct=Math.max(0,Math.min(100,Number(b.sale_commission_pct||0)));
+    const b=await parseBody(req),price=cents(b.sale_price);
+    let pct;
+    try{pct=commissionPct(b.sale_commission_pct)}catch(e){return send(res,e.status||400,{error:e.code||"invalid_commission_pct",message:e.message})}
     run(db,"update products set sale_price_cents=?,sale_commission_pct=?,updated_at=? where id=? and tenant_id=?",[price,pct,now(),pid,tenant]);
     audit(db,user,"retail.product.config","product",pid,{sale_price_cents:price,sale_commission_pct:pct});
     return send(res,200,{ok:true,sale_price:price/100,sale_commission_pct:pct});
