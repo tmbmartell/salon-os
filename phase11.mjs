@@ -53,8 +53,19 @@ function reportData(db,tenant,type,from,to){
     return {name:"estoque",headers:["Produto","SKU","Unidade","Estoque","Mínimo","Ideal","Custo médio","Fornecedor"],rows:rows.map(x=>[x.name,x.sku||"",x.unit,x.stock_qty,x.min_qty,x.ideal_qty,(Number(x.avg_cost_cents||0)/100).toFixed(4),x.supplier_name||""])};
   }
   if(type==="commissions"){
-    const rows=all(db,"select c.created_at,c.status,p.name professional_name,s.name service_name,c.gross_cents,c.pct,c.amount_cents from commissions c join professionals p on p.id=c.professional_id join services s on s.id=c.service_id where c.tenant_id=? and c.created_at between ? and ? order by c.created_at desc",[tenant,from,to]);
-    return {name:"comissoes",headers:["Data","Status","Profissional","Serviço","Base","Percentual","Comissão"],rows:rows.map(x=>[x.created_at,x.status,x.professional_name,x.service_name,(Number(x.gross_cents||0)/100).toFixed(2),x.pct,(Number(x.amount_cents||0)/100).toFixed(2)])};
+    // Incluir comissões tanto de serviços como de vendas de produtos, sem duplicá-las.
+    const rows=all(db,`select c.created_at,c.status,p.name professional_name,s.name service_name,
+        c.gross_cents,c.pct,c.amount_cents
+      from commissions c join professionals p on p.id=c.professional_id and p.tenant_id=c.tenant_id
+      join services s on s.id=c.service_id and s.tenant_id=c.tenant_id
+      where c.tenant_id=? and c.created_at between ? and ?
+      union all
+      select rc.created_at,rc.status,p.name professional_name,'Venda de produtos' service_name,
+        null gross_cents,null pct,rc.amount_cents
+      from retail_commissions rc join professionals p on p.id=rc.professional_id and p.tenant_id=rc.tenant_id
+      where rc.tenant_id=? and rc.created_at between ? and ?
+      order by 1 desc`,[tenant,from,to,tenant,from,to]);
+    return {name:"comissoes",headers:["Data","Status","Profissional","Serviço / Origem","Base","Percentual","Comissão"],rows:rows.map(x=>[x.created_at,x.status,x.professional_name,x.service_name,x.gross_cents==null?"":(Number(x.gross_cents)/100).toFixed(2),x.pct==null?"":x.pct,(Number(x.amount_cents||0)/100).toFixed(2)])};
   }
   if(type==="staff"){
     const period=from.slice(0,7);

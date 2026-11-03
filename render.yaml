@@ -1,0 +1,30 @@
+# Etapa 19 — preview DESCARTÁVEL, exclusivamente com dados fictícios.
+# Criar no Dashboard do Render somente quando a usuária conectar a conta.
+# Render Free NÃO persiste SQLite / mídias após reinício ou ociosidade.
+services:
+  - type: web
+    name: novagente-estetica-preview
+    runtime: node
+    plan: free
+    region: ohio
+    branch: feat/novagente-estetica-demo-gratuita-etapa19
+    buildCommand: npm run check && npm run release:preflight
+    startCommand: npm run demo:start
+    healthCheckPath: /api/health
+    autoDeployTrigger: off
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: NOVAGENTE_FREE_PREVIEW
+        value: "yes"
+      - key: NOVAGENTE_ENABLE_RECEPTIONIST_AI
+        value: "false"
+      - key: NOVAGENTE_DEMO_OWNER_EMAIL
+        sync: false
+      - key: NOVAGENTE_DEMO_OWNER_PASSWORD
+        sync: false
+      - key: NOVAGENTE_SETUP_TOKEN
+        generateValue: true
+      # Chave MFA temporária gerada no start para banco de dados descartável.

@@ -6,18 +6,29 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import { installAuth, authenticate, handleAuthApi, requirePermission, audit } from "./auth.mjs";
-import { installWhatsApp, wahaStatus, ensureWahaSession, wahaQr, verifyWebhook, listConversations, conversationMessages, markConversationRead, sendConversationMessage, ingestWahaEvent, sendText, registerTenantSession, sessionForTenant, tenantForWahaEvent, syncWahaHistory } from "./whatsapp.mjs";
+import { installAuth, authenticate, handleAuthApi, requirePermission, can, audit } from "./auth.mjs";
+import { isFreePreview, provisionFreePreview } from "./free-preview.mjs";
+import { browserMutationAllowed, requestIp } from "./request-security.mjs";
+import { installWhatsAppBackfill, handleWhatsAppBackfillApi } from "./whatsapp-backfill.mjs";
+import { installWhatsApp, wahaConfigured, wahaStatus, ensureWahaSession, wahaQr, verifyWebhook, listConversations, conversationMessages, markConversationRead, sendConversationMessage, ingestWahaEvent, sendText, registerTenantSession, sessionForTenant, tenantForWahaEvent, syncWahaHistory } from "./whatsapp.mjs";
 import { installPhase2, handlePhase2Api } from "./phase2.mjs";
 import { installPhase3, handlePhase3Api } from "./phase3.mjs";
+import { handleOwnerEyeApi } from "./owner-eye.mjs";
 import { installPhase4, ensureAgentProfiles, handlePhase4Api, getAgentConfig } from "./phase4.mjs";
 import { installPhase5, handlePhase5Api } from "./phase5.mjs";
+import { installTenantAdministration, handleTenantAdministrationApi } from "./tenant-admin.mjs";
 import { installPhase6, handlePhase6Api } from "./phase6.mjs";
+import { installMarketing, handleMarketingApi } from "./marketing.mjs";
 import { installPhase7, handlePhase7Api } from "./phase7.mjs";
 import { installPhase8, handlePhase8Api } from "./phase8.mjs";
 import { installPhase9, handlePhase9Api, staffWindowForDate } from "./phase9.mjs";
 import { installPhase10, handlePhase10Api } from "./phase10.mjs";
 import { installPhase11, handlePhase11Api } from "./phase11.mjs";
+import { checkManualStatusTransition } from "./appointment-status.mjs";
+import { installCommercialAutomation, policy as commercialPolicy, registerIncoming, afterAppointmentCreated, afterAppointmentStatus, receptionistDraft } from "./commercial-automation.mjs";
+import { handleCommercialApi } from "./commercial-api.mjs";
+import { installBookingFlow, bookingTurn, bookingState, handoffBooking, isBookingRequest } from "./booking-flow.mjs";
+import { localTimeToUtc } from "./slot-time.mjs";
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||9331);
@@ -25,10 +36,20 @@ const HOST=process.env.HOST||"127.0.0.1";
 const DB_PATH=process.env.SALON_DB||path.join(__dirname,"data","salon.sqlite");
 const JEV_BASE=String(process.env.JEV_CONTROL_PLANE_URL||"http://100.68.82.8:9320").replace(/\/+$/,"");
 const DEFAULT_TENANT="11111111-1111-4111-8111-111111111111";
+// O atendimento automático exige habilitação operacional, política ativa e recepcionista ligada.
+const WAHA_AGENT_ENABLED=process.env.NOVAGENTE_ENABLE_RECEPTIONIST_AI==="true";
+function liveReceptionistEnabled(tenantId){
+  const enabled=one("select enabled from agent_profiles where tenant_id=? and agent_key='receptionist'",[tenantId]);
+  return WAHA_AGENT_ENABLED
+    && process.env.NOVAGENTE_AUTOMATION_V2_APPROVED==="true"
+    && Number(enabled?.enabled)===1
+    && commercialPolicy(db,tenantId,"assistant_reply");
+}
+
 
 fs.mkdirSync(path.dirname(DB_PATH),{recursive:true});
 const db=new DatabaseSync(DB_PATH);
-db.exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;");
+db.exec("PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;");
 
 function id(){return crypto.randomUUID()}
 function now(){return new Date().toISOString()}
@@ -58,9 +79,9 @@ function parseBody(req,maxBytes=1_000_000){
   });
 }
 function safeText(v,max=500){return String(v??"").trim().slice(0,max)}
-function csvCell(v){const s=String(v??"").replace(/\r?\n/g," ");return /[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+function csvCell(v){let s=String(v??"").replace(/[\r\n]/g," ");if(/^[\s]*[=+@\-\t]/.test(s))s="\u0027"+s;return /[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
 const trafficBuckets=new Map();
-function clientIp(req){return safeText(String(req.headers["x-forwarded-for"]||req.socket?.remoteAddress||"unknown").split(",")[0],120)}
+function clientIp(req){return requestIp(req)}
 function trafficLimit(req,url){
   const publicAuth=url.pathname.startsWith("/api/auth/");
   const windowMs=publicAuth?15*60*1000:60*1000,limit=publicAuth?60:600,nowMs=Date.now();
@@ -151,6 +172,7 @@ function ensureSeed(){
   if(one("select id from tenants where id=?",[DEFAULT_TENANT]))return;
   run("insert into tenants(id,name,slug,timezone,created_at) values(?,?,?,?,?)",[DEFAULT_TENANT,"Studio Aurora","studio-aurora","America/Porto_Velho",now()]);
   run("insert into users(id,tenant_id,name,email,role,created_at) values(?,?,?,?,?,?)",[id(),DEFAULT_TENANT,"Dona do Salão","dona@studio.local","owner",now()]);
+  if(process.env.NOVAGENTE_EMPTY_INITIAL_TENANT==="true")return; // ambiente de pareamento sem clientes/horários fictícios
   const profs=[
     ["Ana Ribeiro","Cabeleireira",["Coloração","Corte","Tratamentos"],"09:00","18:00"],
     ["Bia Costa","Nail Designer",["Manicure","Gel"],"09:00","19:00"],
@@ -178,14 +200,20 @@ function ensureSeed(){
 }
 ensureSeed();
 installAuth(db);
+provisionFreePreview(db,DEFAULT_TENANT);
 installWhatsApp(db);
+installWhatsAppBackfill(db);
 installLlmConfig(db);
-registerTenantSession(db,DEFAULT_TENANT);
+if(!sessionForTenant(db,DEFAULT_TENANT))registerTenantSession(db,DEFAULT_TENANT);
 installPhase2(db);
 installPhase3(db);
 installPhase4(db);
 installPhase5(db);
+installTenantAdministration(db);
 installPhase6(db);
+installMarketing(db);
+installCommercialAutomation(db);
+installBookingFlow(db);
 installPhase7(db);
 installPhase8(db);
 installPhase9(db);
@@ -274,8 +302,7 @@ function dateFromText(text,timeZone="America/Porto_Velho"){
   return null;
 }
 function localIso(date,time,timeZone="America/Porto_Velho"){
-  const offset=timeZone==="America/Porto_Velho"?"-04:00":"Z";
-  return new Date(date+"T"+time+":00"+offset).toISOString();
+  return localTimeToUtc(date,time,timeZone);
 }
 function appointmentItemsFor(appointmentId){
   return all("select ai.*,s.name service_name,p.name professional_name from appointment_items ai join services s on s.id=ai.service_id join professionals p on p.id=ai.professional_id where ai.appointment_id=? order by ai.sequence",[appointmentId]);
@@ -292,6 +319,7 @@ function createAppointmentRecord(tenant,user,b){
   const resource=b.resource_id?one("select * from resources where id=? and tenant_id=? and active=1",[safeText(b.resource_id,64),tenant]):null;
   if(!client||(b.resource_id&&!resource)){const e=new Error("invalid_client_or_resource");e.status=400;throw e}
   const start=new Date(b.start_at);if(Number.isNaN(start.getTime())){const e=new Error("invalid_start_at");e.status=400;throw e}
+  if(start.getTime()<Date.now()){const e=new Error("appointment_in_past");e.status=400;throw e}
   const rawItems=[{service_id:b.service_id,professional_id:b.professional_id,qty:b.primary_qty||1},...(Array.isArray(b.items)?b.items.slice(0,20):[])];
   if(!rawItems.length){const e=new Error("appointment_items_required");e.status=400;throw e}
   db.exec("BEGIN IMMEDIATE");
@@ -326,6 +354,16 @@ function createAppointmentRecord(tenant,user,b){
       const rc=one("select id from appointments where tenant_id=? and resource_id=? and status not in ('cancelled','no_show') and start_at<? and end_at>? limit 1",[tenant,resource.id,cursor.toISOString(),start.toISOString()]);
       if(rc){const e=new Error("resource_time_conflict");e.status=409;e.resource=resource.name;throw e}
     }
+    if(b.source==="assistant"){
+      if(segments.length!==1){const e=new Error("assistant_single_service_only");e.status=400;throw e}
+      const zone=one("select timezone from tenants where id=?",[tenant])?.timezone||"America/Porto_Velho";
+      const dateParts=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:zone,year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(start).filter(x=>x.type!=="literal").map(x=>[x.type,x.value]));
+      const localDate=dateParts.year+"-"+dateParts.month+"-"+dateParts.day;
+      const verified=availabilityFor(tenant,{date:localDate,serviceId:segments[0].service.id,professionalId:segments[0].professional.id,resourceId:resource?.id||null,limit:100});
+      if(!verified.some(slot=>slot.start_at===start.toISOString()&&slot.professional_id===segments[0].professional.id)){
+        const e=new Error("assistant_slot_no_longer_available");e.status=409;throw e;
+      }
+    }
     const selected=(Array.isArray(b.tags)?b.tags:[]).map(x=>safeText(x,40)).filter(Boolean),tagSet=new Set(selected);
     const prior=Number(one("select count(*) n from appointments where tenant_id=? and client_id=? and status='completed'",[tenant,client.id])?.n||0);
     tagSet.add(prior?"Retorno":"Primeira visita");
@@ -350,7 +388,7 @@ function availabilityFor(tenant,{date,serviceId,professionalId=null,resourceId=n
   const service=one("select * from services where id=? and tenant_id=? and active=1",[serviceId,tenant]);if(!service)return [];
   const tz=one("select timezone from tenants where id=?",[tenant])?.timezone||"America/Porto_Velho";
   let pros;
-  if(professionalId)pros=all("select * from professionals where id=? and tenant_id=? and active=1",[professionalId,tenant]);
+  if(professionalId)pros=all("select p.* from professionals p where p.id=? and p.tenant_id=? and p.active=1 and (exists(select 1 from professional_services ps where ps.professional_id=p.id and ps.service_id=?) or not exists(select 1 from professional_services px where px.service_id=?))",[professionalId,tenant,serviceId,serviceId]);
   else pros=all("select p.* from professionals p where p.tenant_id=? and p.active=1 and (exists(select 1 from professional_services ps where ps.professional_id=p.id and ps.service_id=?) or not exists(select 1 from professional_services px where px.service_id=?)) order by p.name",[tenant,serviceId,serviceId]);
   const resource=resourceId?one("select * from resources where id=? and tenant_id=? and active=1",[resourceId,tenant]):null;
   const out=[],step=30,dur=Number(service.duration_min);
@@ -358,7 +396,9 @@ function availabilityFor(tenant,{date,serviceId,professionalId=null,resourceId=n
     const window=staffWindowForDate(db,tenant,p.id,date);if(!window)continue;
     const sh=Number(window.start.slice(0,2))*60+Number(window.start.slice(3,5)),eh=Number(window.end.slice(0,2))*60+Number(window.end.slice(3,5));
     for(let min=sh;min+dur<=eh;min+=step){
-      const hh=String(Math.floor(min/60)).padStart(2,"0"),mm=String(min%60).padStart(2,"0"),start=localIso(date,hh+":"+mm,tz),end=new Date(new Date(start).getTime()+dur*60000).toISOString();
+      const hh=String(Math.floor(min/60)).padStart(2,"0"),mm=String(min%60).padStart(2,"0");
+      let start;try{start=localIso(date,hh+":"+mm,tz)}catch{continue}
+      const end=new Date(new Date(start).getTime()+dur*60000).toISOString();
       const pc=professionalHasConflict(tenant,p.id,start,end);
       if(pc)continue;
       if(resource){
@@ -394,9 +434,25 @@ function parseExternalReceptionist(text,meta={}){
   return {text:String(p.reply).trim().slice(0,3500),intent:intents.has(p.intent)?p.intent:"other",handoff:!!p.handoff,reason:String(p.reason||"").slice(0,200),confidence:Math.max(0,Math.min(1,Number(p.confidence||0))),entities:p.entities&&typeof p.entities==="object"?p.entities:{},meta};
 }
 async function receptionistAgentReply({tenantId,client,conversation,text,intent}){
+  const safety=receptionistDraft({text});
+  if(safety.handoff){
+    handoffBooking(db,tenantId,conversation.id);
+    return {handoff:true,reason:safety.reason,meta:{source:"commercial_safety_guard",intent:safety.intent}};
+  }
   const profile=one("select enabled from agent_profiles where tenant_id=? and agent_key='receptionist'",[tenantId]);
   if(Number(profile?.enabled)===0)return {handoff:true,reason:"receptionist_paused",meta:{source:"paused"}};
   const cfg=getAgentConfig(db,tenantId,"receptionist"),svc=cfg.service||{},llm=getLlmConfig(db,tenantId);
+  if(svc.allow_booking_flow!==false&&commercialPolicy(db,tenantId,"assistant_booking")){
+    const booking=bookingTurn({db,tenant:tenantId,client,conversation,message:text,availability:availabilityFor,
+      createAppointment:createAppointmentRecord,afterCreate:afterAppointmentCreated,
+      onAudit:(action,aid,extra)=>audit(db,{tenantId,id:null},action,"appointment",aid,extra)});
+    if(booking.handoff)return {handoff:true,reason:booking.reason||"booking_handoff",meta:{source:"booking_flow"}};
+    if(booking.handled)return {text:booking.text,meta:{source:"booking_flow",appointment_id:booking.appointment_id||null,booked:!!booking.booked}};
+  }else if(isBookingRequest(text)||bookingState(db,tenantId,conversation.id)?.status==="offered"){
+    handoffBooking(db,tenantId,conversation.id);
+    return {handoff:true,reason:"booking_disabled",meta:{source:"booking_flow"}};
+  }
+
   let brain=null,externalError="";
   if(llm.enabled&&llm.provider!=="internal"){
     try{
@@ -476,9 +532,20 @@ async function readRawJson(req){
 
 async function api(req,res,url){
   if(req.method==="GET"&&url.pathname==="/api/health"){
-    let jev=false;try{const r=await fetch(JEV_BASE+"/health",{signal:AbortSignal.timeout(1500)});const j=await r.json();jev=!!j.jev_enabled}catch{}
+    let jev=false;
+    // No piloto offline, não consultar instâncias opcionais não configuradas.
+    if(process.env.JEV_CONTROL_PLANE_URL){
+      try{const r=await fetch(JEV_BASE+"/health",{signal:AbortSignal.timeout(1500)});const j=await r.json();jev=!!j.jev_enabled}catch{}
+    }
     const wa=await wahaStatus();
-    return send(res,200,{ok:true,service:"Salon OS",version:"1.9.1",jev,whatsapp:{configured:wa.configured,connected:wa.connected,status:wa.status}});
+    const databaseOk=!!db.prepare("select 1 ok").get()?.ok;
+    return send(res,databaseOk?200:503,{
+      ok:databaseOk,service:"NOVAGENTE Estética",version:"pilot-qa",
+      mode:isFreePreview()?"free_preview_disposable":wa.connected?"whatsapp_connected":"offline_without_whatsapp",
+      disposable_demo:isFreePreview(),
+      database:{connected:databaseOk},
+      optional_integrations:{jev_connected:jev,whatsapp:{configured:wa.configured,connected:wa.connected,status:wa.status}}
+    });
   }
 
   if(url.pathname.startsWith("/api/auth/")){
@@ -487,15 +554,17 @@ async function api(req,res,url){
   }
 
   if(req.method==="POST"&&url.pathname==="/api/whatsapp/waha/webhook"){
-    const wa=await wahaStatus();
-    if(!wa.configured)return send(res,503,{ok:false,error:"waha_not_configured"});
+    // Não consultar o provedor externo antes de autenticar o pedido de entrada.
+    if(!wahaConfigured())return send(res,503,{ok:false,error:"waha_not_configured"});
     const parsed=await readRawJson(req),raw=parsed.raw,body=parsed.body;
     const signature=req.headers["x-webhook-hmac"],algorithm=req.headers["x-webhook-hmac-algorithm"];
     if(!verifyWebhook(raw,signature,algorithm))return send(res,401,{error:"invalid_webhook_signature"});
     const targetTenant=tenantForWahaEvent(db,body);if(!targetTenant)return send(res,200,{ok:true,accepted:false,reason:"unmapped_session"});
-    const receptionProfile=one("select enabled from agent_profiles where tenant_id=? and agent_key='receptionist'",[targetTenant]),receptionConfig=getAgentConfig(db,targetTenant,"receptionist");
-    const defaultHandlingMode=Number(receptionProfile?.enabled)!==0&&receptionConfig.service?.auto_activate_new_conversations!==false?"ai":"human";
-    const out=await ingestWahaEvent({db,tenantId:targetTenant,event:body,interpret,autoReply:receptionistAgentReply,defaultHandlingMode});
+    const receptionConfig=getAgentConfig(db,targetTenant,"receptionist");
+    const commercialAiEnabled=liveReceptionistEnabled(targetTenant);
+    const defaultHandlingMode=commercialAiEnabled&&receptionConfig.service?.auto_activate_new_conversations!==false?"ai":"human";
+    const out=await ingestWahaEvent({db,tenantId:targetTenant,event:body,interpret,autoReply:commercialAiEnabled?receptionistAgentReply:null,allowAi:commercialAiEnabled,defaultHandlingMode});
+    if(out.accepted&&out.type==="message"&&out.clientId){try{registerIncoming(db,targetTenant,out.clientId,String(body?.payload?.body||""),{messageId:body?.payload?.id?.id||body?.payload?.id?._serialized||null,source:"whatsapp"});}catch(e){console.error("commercial_ingest_failed",String(e.message||e).slice(0,140))}}
     return send(res,200,{ok:true,...out});
   }
 
@@ -503,6 +572,28 @@ async function api(req,res,url){
   if(!user)return send(res,401,{error:"unauthorized"});
   const tenant=user.tenantId;
   const guard=p=>requirePermission(user,p);
+  const commercialResult=await handleCommercialApi({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit,isDemo:isFreePreview(),
+    bookingPreview:({clientId,text})=>{
+      const c=one("select * from clients where tenant_id=? and id=?",[tenant,clientId]);
+      if(!c){const e=new Error("client_not_found");e.status=404;throw e}
+      let conv=one("select * from conversations where tenant_id=? and client_id=? and channel='demo_booking' order by created_at desc limit 1",[tenant,c.id]);
+      if(!conv){
+        const cid=id(),ts=now();
+        run("insert into conversations(id,tenant_id,client_id,channel,status,created_at,last_message_at,handling_mode,updated_at) values(?,?,?,?,?,?,?,?,?)",[cid,tenant,c.id,"demo_booking","open",ts,ts,"human",ts]);
+        conv=one("select * from conversations where id=? and tenant_id=?",[cid,tenant]);
+      }
+      const request=String(text||"").slice(0,1000),ts=now();
+      run("insert into messages(id,tenant_id,conversation_id,direction,sender_type,body,message_type,created_at) values(?,?,?,?,?,?,?,?)",[id(),tenant,conv.id,"in","client",request,"text",ts]);
+      const safety=receptionistDraft({text:request});
+      const result=safety.handoff?(handoffBooking(db,tenant,conv.id),{handoff:true,reason:safety.reason,text:safety.text}):
+        bookingTurn({db,tenant,client:c,conversation:conv,message:request,availability:availabilityFor,
+          createAppointment:createAppointmentRecord,afterCreate:afterAppointmentCreated,
+          onAudit:(action,aid,extra)=>audit(db,user,action,"appointment",aid,extra)});
+      if(result?.text)run("insert into messages(id,tenant_id,conversation_id,direction,sender_type,body,message_type,created_at) values(?,?,?,?,?,?,?,?)",[id(),tenant,conv.id,"out","assistant",result.text,"text",now()]);
+      return {...result,booking_state:bookingState(db,tenant,conv.id)?.status||null,conversation_id:conv.id,simulation:true,sending_enabled:false};
+    }});
+
+  if(commercialResult!==false)return commercialResult;
   if(req.method==="GET"&&url.pathname==="/api/agents/receptionist/llm"){
     guard("agents.read");
     const cfg=getLlmConfig(db,tenant);
@@ -533,14 +624,26 @@ async function api(req,res,url){
   }
   const phase2Result=await handlePhase2Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit});
   if(phase2Result!==false)return phase2Result;
+  const ownerResult=await handleOwnerEyeApi({req,res,url,db,user,tenant,send,requirePermission});
+  if(ownerResult!==false)return ownerResult;
   const phase3Result=await handlePhase3Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit});
   if(phase3Result!==false)return phase3Result;
   const phase4Result=await handlePhase4Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit,sendText:(phone,text)=>sendText(phone,text,sessionForTenant(db,tenant)),routeAmbiguous:jevDecision});
   if(phase4Result!==false)return phase4Result;
+  const tenantAdmin=await handleTenantAdministrationApi({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit});
+  if(tenantAdmin!==false)return tenantAdmin;
   const phase5Result=await handlePhase5Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit});
   if(phase5Result!==false)return phase5Result;
   const phase6Result=await handlePhase6Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit});
   if(phase6Result!==false)return phase6Result;
+  const marketingResult=await handleMarketingApi({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit,
+    storageDir:path.join(path.dirname(DB_PATH),"marketing-assets"),
+    sendImage:(response,buffer,mime)=>{
+      response.writeHead(200,{...baseSecurityHeaders(),"content-type":mime,"content-length":buffer.length,
+        "content-disposition":"inline","cache-control":"private, no-store"});
+      response.end(buffer);
+    }});
+  if(marketingResult!==false)return marketingResult;
   const phase7Result=await handlePhase7Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit});
   if(phase7Result!==false)return phase7Result;
   const phase8Result=await handlePhase8Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit});
@@ -565,7 +668,7 @@ async function api(req,res,url){
   if(req.method==="GET"&&url.pathname==="/api/dashboard"){guard("dashboard.read");return send(res,200,dashboard(tenant))}
 
   if(req.method==="GET"&&url.pathname==="/api/clients/export"){
-    guard("clients.read");
+    guard("clients.export");
     const rows=all(`select c.*,
       count(distinct case when a.status='completed' then a.id end) visits,
       max(case when a.status='completed' then a.start_at end) last_visit,
@@ -581,7 +684,26 @@ async function api(req,res,url){
       c.name,c.phone||"",c.email||"",c.birthday||"",c.instagram||"",c.facebook||"",c.referral_reference||"",c.source||"",
       (()=>{try{return JSON.parse(c.tags||"[]").join(", ")}catch{return ""}})(),c.notes||"",Number(c.visits||0),c.last_visit||"",(Number(c.lifetime_cents||0)/100).toFixed(2),c.created_at
     ].map(csvCell).join(";"))].join("\r\n");
-    return send(res,200,body,{"content-type":"text/csv; charset=utf-8","content-disposition":'attachment; filename="clientes-salon-os-'+new Date().toISOString().slice(0,10)+'.csv"'});
+    audit(db,user,"clients.export","clients",null,{count:rows.length});
+    return send(res,200,body,{"content-type":"text/csv; charset=utf-8","content-disposition":'attachment; filename="novagente-clientes-'+new Date().toISOString().slice(0,10)+'.csv"',"cache-control":"no-store","x-content-type-options":"nosniff"});
+  }
+  const clientHistoryRoute=routeMatch(url.pathname,"/api/clients/:id/history");
+  if(req.method==="GET"&&clientHistoryRoute){
+    guard("clients.read");
+    const clientId=clientHistoryRoute.id;
+    if(!one("select id from clients where id=? and tenant_id=?",[clientId,tenant]))return send(res,404,{error:"client_not_found"});
+    const visits=all(`select a.id,a.start_at,a.status,
+      coalesce((select group_concat(s2.name,' + ') from appointment_items ai
+        join services s2 on s2.id=ai.service_id and s2.tenant_id=ai.tenant_id
+        where ai.appointment_id=a.id and ai.tenant_id=a.tenant_id),s.name) service_names
+      from appointments a join services s on s.id=a.service_id and s.tenant_id=a.tenant_id
+      where a.tenant_id=? and a.client_id=? order by a.start_at desc limit 50`,[tenant,clientId]);
+    // Dados financeiros ficam restritos aos perfis com finance.read.
+    const showPayments=can(user,"finance.read");
+    const payments=showPayments?all(`select cr.appointment_id,cr.created_at,cr.total_cents,cr.payment_method
+      from checkout_records cr join appointments a on a.id=cr.appointment_id and a.tenant_id=cr.tenant_id
+      where cr.tenant_id=? and a.client_id=? order by cr.created_at desc limit 50`,[tenant,clientId]).map(x=>({appointment_id:x.appointment_id,date:x.created_at,amount:Number(x.total_cents||0)/100,method:x.payment_method})):[];
+    return send(res,200,{visits,payments,show_payments:showPayments});
   }
   if(req.method==="GET"&&url.pathname==="/api/clients"){
     guard("clients.read");
@@ -593,11 +715,22 @@ async function api(req,res,url){
     guard("clients.write");
     const b=await parseBody(req),name=safeText(b.name,120),phone=normalizePhone(b.phone);
     if(!name)return send(res,400,{error:"name_required"});
-    if(phone){const existing=one("select * from clients where tenant_id=? and phone=?",[tenant,phone]);if(existing)return send(res,409,{error:"phone_already_exists",client:clientView(existing)})}
-    const cid=id();
-    run("insert into clients(id,tenant_id,name,phone,email,birthday,instagram,facebook,referral_reference,tags,notes,source,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",[cid,tenant,name,phone,safeText(b.email,160),safeText(b.birthday,20),safeText(b.instagram,160),safeText(b.facebook,160),safeText(b.referral_reference,180),JSON.stringify(Array.isArray(b.tags)?b.tags.slice(0,20):[]),safeText(b.notes,1000),safeText(b.source||"manual",40)||"manual",now(),now()]);
-    audit(db,user,"client.create","client",cid,{});
-    return send(res,201,clientView(one("select * from clients where id=?",[cid])));
+    // Checagem e INSERT sob o mesmo lock: evita dois cadastros de telefone
+    // idêntico quando recepção e gerência usam instâncias diferentes.
+    let created,duplicate;
+    db.exec("BEGIN IMMEDIATE");
+    try{
+      duplicate=phone?one("select * from clients where tenant_id=? and phone=?",[tenant,phone]):null;
+      if(!duplicate){
+        const cid=id();
+        run("insert into clients(id,tenant_id,name,phone,email,birthday,instagram,facebook,referral_reference,tags,notes,source,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",[cid,tenant,name,phone,safeText(b.email,160),safeText(b.birthday,20),safeText(b.instagram,160),safeText(b.facebook,160),safeText(b.referral_reference,180),JSON.stringify(Array.isArray(b.tags)?b.tags.slice(0,20):[]),safeText(b.notes,1000),safeText(b.source||"manual",40)||"manual",now(),now()]);
+        created=one("select * from clients where id=? and tenant_id=?",[cid,tenant]);
+      }
+      db.exec("COMMIT");
+    }catch(error){db.exec("ROLLBACK");throw error}
+    if(duplicate)return send(res,409,{error:"phone_already_exists",client:clientView(duplicate)});
+    audit(db,user,"client.create","client",created.id,{});
+    return send(res,201,clientView(created));
   }
 
   if(req.method==="GET"&&url.pathname==="/api/professionals"){guard("team.read");return send(res,200,all("select * from professionals where tenant_id=? order by name",[tenant]).map(professionalView))}
@@ -615,7 +748,7 @@ async function api(req,res,url){
     guard("services.write");
     const b=await parseBody(req),name=safeText(b.name,120);if(!name)return send(res,400,{error:"name_required"});
     const sid=id(),price=Math.max(0,Math.round(Number(b.price||0)*100)),dur=Math.max(5,Math.round(Number(b.duration_min||60)));
-    run("insert into services(id,tenant_id,name,category,duration_min,price_cents,commission_pct,created_at) values(?,?,?,?,?,?,?,?)",[sid,tenant,name,safeText(b.category,80),dur,price,Math.max(0,Number(b.commission_pct||0)),now()]);
+    run("insert into services(id,tenant_id,name,category,duration_min,price_cents,commission_pct,created_at) values(?,?,?,?,?,?,?,?)",[sid,tenant,name,safeText(b.category,80),dur,price,Math.max(0,Math.min(100,Number(b.commission_pct||0))),now()]);
     audit(db,user,"service.create","service",sid,{});
     return send(res,201,serviceView(one("select * from services where id=?",[sid])));
   }
@@ -668,28 +801,47 @@ async function api(req,res,url){
   if(req.method==="GET"&&url.pathname==="/api/appointments"){
     guard("appointments.read");
     const from=url.searchParams.get("from")||new Date(Date.now()-86400000).toISOString(),to=url.searchParams.get("to")||new Date(Date.now()+14*86400000).toISOString();
-    const sql="select a.*,c.name client_name,c.phone client_phone,p.name professional_name,s.name service_name,s.duration_min,s.price_cents,r.name resource_name from appointments a join clients c on c.id=a.client_id join professionals p on p.id=a.professional_id join services s on s.id=a.service_id left join resources r on r.id=a.resource_id where a.tenant_id=? and a.start_at>=? and a.start_at<=? order by a.start_at";
+    const sql="select a.*,c.name client_name,c.phone client_phone,p.name professional_name,s.name service_name,s.duration_min,s.price_cents,r.name resource_name from appointments a join clients c on c.id=a.client_id and c.tenant_id=a.tenant_id join professionals p on p.id=a.professional_id and p.tenant_id=a.tenant_id join services s on s.id=a.service_id and s.tenant_id=a.tenant_id left join resources r on r.id=a.resource_id and r.tenant_id=a.tenant_id where a.tenant_id=? and a.start_at>=? and a.start_at<=? order by a.start_at";
     const rows=all(sql,[tenant,from,to]);
     return send(res,200,rows.map(appointmentApiView));
   }
   if(req.method==="POST"&&url.pathname==="/api/appointments"){
     guard("appointments.write");
     const b=await parseBody(req);
-    try{return send(res,201,createAppointmentRecord(tenant,user,b))}
+    try{const created=createAppointmentRecord(tenant,user,b);try{afterAppointmentCreated(db,tenant,created)}catch(e){console.error("commercial_booking_hook_failed",String(e.message||e).slice(0,140))}return send(res,201,created)}
     catch(e){return send(res,e.status||500,{error:String(e.message||"appointment_create_failed"),professional:e.professional||null,resource:e.resource||null})}
   }
   const ap=routeMatch(url.pathname,"/api/appointments/:id/status");
   if(req.method==="PATCH"&&ap){
     guard("appointments.write");
-    const b=await parseBody(req),allowed=["scheduled","confirmed","arrived","in_service","completed","cancelled","no_show"],status=safeText(b.status,32);
-    if(!allowed.includes(status))return send(res,400,{error:"invalid_status"});
-    const info=run("update appointments set status=?,updated_at=? where id=? and tenant_id=?",[status,now(),ap.id,tenant]);
-    if(!info.changes)return send(res,404,{error:"not_found"});
-    audit(db,user,"appointment.status","appointment",ap.id,{status});
+    const b=await parseBody(req),status=safeText(b.status,32);
+    const current=one("select status from appointments where id=? and tenant_id=?",[ap.id,tenant]);
+    if(!current)return send(res,404,{error:"not_found"});
+    const transition=checkManualStatusTransition(current.status,status);
+    if(!transition.ok)return send(res,transition.code==="invalid_status"?400:409,{error:transition.code,current_status:current.status});
+    if(transition.unchanged)return send(res,200,{ok:true,status,unchanged:true});
+    const info=run("update appointments set status=?,updated_at=? where id=? and tenant_id=? and status=?",[status,now(),ap.id,tenant,current.status]);
+    if(!info.changes)return send(res,409,{error:"status_changed_reload"});
+    audit(db,user,"appointment.status","appointment",ap.id,{from:current.status,to:status});
+    try{afterAppointmentStatus(db,tenant,ap.id,status)}catch(e){console.error("commercial_status_hook_failed",String(e.message||e).slice(0,140))}
     return send(res,200,{ok:true,status});
   }
 
   if(req.method==="GET"&&url.pathname==="/api/conversations"){guard("conversations.read");return send(res,200,listConversations(db,tenant))}
+  const clientContextRoute=routeMatch(url.pathname,"/api/conversations/:id/client-context");
+  if(req.method==="GET"&&clientContextRoute){
+    guard("conversations.read");guard("clients.read");
+    const co=one("select id,client_id from conversations where id=? and tenant_id=?",[clientContextRoute.id,tenant]);
+    if(!co)return send(res,404,{error:"conversation_not_found"});
+    if(!co.client_id)return send(res,200,{client:null,appointments:[]});
+    const client=one("select id,name,phone,tags,source from clients where id=? and tenant_id=?",[co.client_id,tenant]);
+    if(!client)return send(res,200,{client:null,appointments:[]});
+    const visits=all(`select a.id,a.start_at,a.status,s.name service_name,p.name professional_name
+      from appointments a left join services s on s.id=a.service_id and s.tenant_id=a.tenant_id
+      left join professionals p on p.id=a.professional_id and p.tenant_id=a.tenant_id
+      where a.tenant_id=? and a.client_id=? order by a.start_at desc limit 5`,[tenant,co.client_id]);
+    return send(res,200,{client:{...client,tags:jparse(client.tags,[])},appointments:visits});
+  }
   if(req.method==="GET"&&url.pathname==="/api/conversations/options"){
     guard("conversations.read");
     const users=all("select id,name,role from users where tenant_id=? and active=1 order by name",[tenant]);
@@ -715,6 +867,7 @@ async function api(req,res,url){
     guard("conversations.write");
     const b=await parseBody(req),mode=safeText(b.mode,16);
     if(!["human","ai"].includes(mode))return send(res,400,{error:"invalid_mode"});
+    if(mode==="ai"&&!liveReceptionistEnabled(tenant))return send(res,403,{error:"ai_not_enabled"});
     const info=run("update conversations set handling_mode=?,handling_mode_source='manual',updated_at=? where id=? and tenant_id=?",[mode,now(),modeRoute.id,tenant]);
     if(!info.changes)return send(res,404,{error:"conversation_not_found"});
     audit(db,user,"conversation.mode","conversation",modeRoute.id,{mode});
@@ -728,6 +881,8 @@ async function api(req,res,url){
     catch(e){return send(res,e.status||503,{error:String(e.message||"whatsapp_send_failed")})}
   }
 
+  const backfillResult=await handleWhatsAppBackfillApi({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit});
+  if(backfillResult!==false)return backfillResult;
   if(req.method==="POST"&&url.pathname==="/api/whatsapp/sync"){
     guard("conversations.write");
     try{
@@ -736,7 +891,22 @@ async function api(req,res,url){
       return send(res,200,{ok:true,...out});
     }catch(e){return send(res,503,{error:"whatsapp_sync_failed",detail:String(e.message||e).slice(0,180)})}
   }
-  if(req.method==="GET"&&url.pathname==="/api/whatsapp/status"){guard("conversations.read");return send(res,200,await wahaStatus(sessionForTenant(db,tenant)))}
+  if(req.method==="GET"&&url.pathname==="/api/whatsapp/status"){
+    guard("conversations.read");
+    const activeSession=sessionForTenant(db,tenant);
+    const active=liveReceptionistEnabled(tenant),llm=getLlmConfig(db,tenant);
+    return send(res,200,{...await wahaStatus(activeSession),session:activeSession,
+      ai_enabled:active,auto_reply_ready:active,reply_engine:active&&(llm.enabled&&llm.provider!=="internal"&&llm.has_api_key?"configured_llm":"internal_or_rules_fallback")||"disabled"});
+  }
+  if(req.method==="POST"&&url.pathname==="/api/whatsapp/session/link"){
+    if(user.role!=="owner")return send(res,403,{error:"owner_only"});
+    const b=await parseBody(req),session=safeText(b.session,64);
+    try{
+      const linked=registerTenantSession(db,tenant,session);
+      audit(db,user,"whatsapp.session.link","whatsapp",null,{session:linked});
+      return send(res,200,{ok:true,session:linked,...await wahaStatus(linked),ai_enabled:WAHA_AGENT_ENABLED});
+    }catch(e){return send(res,e.status||400,{error:String(e.message||"session_link_failed")})}
+  }
   if(req.method==="POST"&&url.pathname==="/api/whatsapp/session/prepare"){
     if(!["owner","manager"].includes(user.role))return send(res,403,{error:"forbidden"});
     try{const session=sessionForTenant(db,tenant),out=await ensureWahaSession(session);audit(db,user,"whatsapp.session.prepare","whatsapp",null,{status:out.status,session});return send(res,200,out)}
@@ -759,10 +929,15 @@ async function api(req,res,url){
 }
 
 const MIME={".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".svg":"image/svg+xml",".png":"image/png",".json":"application/json; charset=utf-8",".webmanifest":"application/manifest+json; charset=utf-8"};
+// Proteção de origem em operações mutáveis de navegadores.
+// O webhook WAHA usa autenticação HMAC própria e é tratado separadamente.
+function sameOriginMutation(req,url){return browserMutationAllowed(req,url)}
+
 const handler=async(req,res)=>{
   try{
     const url=new URL(req.url||"/","http://localhost");
-    if(url.pathname.startsWith("/api/")){const retry=trafficLimit(req,url);if(retry)return send(res,429,{error:"rate_limited",retry_after:retry},{"retry-after":String(retry)});return await api(req,res,url)}
+    if(url.pathname.startsWith("/api/")){if(!sameOriginMutation(req,url))return send(res,403,{error:"cross_origin_request_denied"});const retry=trafficLimit(req,url);if(retry)return send(res,429,{error:"rate_limited",retry_after:retry},{"retry-after":String(retry)});return await api(req,res,url)}
+    if(url.pathname==="/export.json"||url.pathname.endsWith("/export.json"))return send(res,403,{error:"forbidden"});
     let rel=url.pathname==="/"?"index.html":url.pathname.slice(1);
     rel=path.normalize(rel).replace(/^(\.\.[/\\])+/, "");
     const publicRoot=path.join(__dirname,"public"),file=path.join(publicRoot,rel);
@@ -775,7 +950,7 @@ const handler=async(req,res)=>{
     res.writeHead(200,{...baseSecurityHeaders(),"content-type":"text/html; charset=utf-8","cache-control":"no-cache"});fs.createReadStream(index).pipe(res);
   }catch(e){console.error(e);const status=Number(e.status||500);send(res,status,{error:status===401?"unauthorized":status===403?"forbidden":status===400?"bad_request":"internal_error",message:status<500?String(e.message||e):"internal_error"})}
 };
-const listenHosts=["127.0.0.1",HOST,...String(process.env.EXTRA_HOSTS||"").split(",").map(x=>x.trim()).filter(Boolean)].filter((x,i,a)=>a.indexOf(x)===i);
+const listenHosts=[HOST==="0.0.0.0"||HOST==="::"?HOST:"127.0.0.1",...(HOST==="0.0.0.0"||HOST==="::"?[]:[HOST]),...String(process.env.EXTRA_HOSTS||"").split(",").map(x=>x.trim()).filter(Boolean)].filter((x,i,a)=>a.indexOf(x)===i);
 for(const bindHost of listenHosts){
   const server=http.createServer(handler);
   server.listen(PORT,bindHost,()=>console.log(`Salon OS listening on http://${bindHost}:${PORT}`));

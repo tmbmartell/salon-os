@@ -111,6 +111,9 @@ function syncNotes(db,tenant){
 }
 
 export async function handlePhase3Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit}){
+  // Endpoints gerenciais legados também precisam do mesmo isolamento de perfis.
+  if(url.pathname.startsWith("/api/intelligence/")&&!["owner","manager"].includes(user.role))
+    return send(res,403,{error:"owner_view_forbidden"});
   const guard=p=>requirePermission(user,p);
   if(req.method==="GET"&&url.pathname==="/api/intelligence/overview"){guard("analytics.read");return send(res,200,overview(db,tenant))}
   if(req.method==="GET"&&url.pathname==="/api/intelligence/clients"){guard("analytics.read");return send(res,200,clientIntelligence(db,tenant))}

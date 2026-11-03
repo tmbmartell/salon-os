@@ -1,0 +1,71 @@
+/* NOVAGENTE Estética · Etapa 23: experiência operacional coesa */
+:root{--ne-ink:#172035;--ne-muted:#718099;--ne-edge:#e6e9f1;--ne-bg:#f4f5fa;--ne-lavender:#7341a3;--ne-shadow:0 10px 32px rgba(24,30,53,.055)}
+body{background:var(--ne-bg)}
+main{background:linear-gradient(135deg,#f5f6fa 0%,#f9f9fc 64%,#f4f5fa 100%);min-width:0}
+.topbar{padding:24px 28px 18px;min-height:98px;align-items:center;gap:18px}
+.topbar h1{font-size:clamp(23px,2.3vw,32px);color:#172035;letter-spacing:-.04em}
+.topbar .eyebrow{font-size:10px;color:#8c63a6}
+.topbar p:not(.eyebrow){font-size:12px;color:#778198}
+.view{padding:0 26px 45px;min-width:0}
+.view:not(#dashboard)>.sectionTitle{padding:17px 20px;background:linear-gradient(115deg,#fff,#fbfaff);border:1px solid var(--ne-edge);box-shadow:var(--ne-shadow);border-radius:18px;margin:0 0 16px;min-height:82px}
+.view:not(#dashboard)>.sectionTitle h2{font-size:clamp(21px,2vw,27px);letter-spacing:-.04em;color:#192039}
+.view:not(#dashboard)>.sectionTitle p{color:#7d859b;font-size:12px;line-height:1.5}
+.view:not(#dashboard)>.sectionTitle button.primary{background:#7536ad}
+.view .panel,.view .hubCard,.view .metrics>article{background:#fff;border:1px solid var(--ne-edge);box-shadow:var(--ne-shadow);border-radius:17px}
+.view .panelhead h2{font-size:16px;color:#252846}
+.view .panelhead p{font-size:12px}
+.view .primary{background:#7739a6}
+.view .primary:hover{background:#5a248c}
+.view .secondary{background:#f4f0fa;color:#673396}
+.view .secondary:hover{background:#e9dcf7}
+.view .link{color:#6a36a2}
+.view button{transition:background-color .16s, box-shadow .16s,transform .16s}
+.view button:focus-visible{outline:3px solid #a475e8;outline-offset:2px}
+.view button:not(:disabled):active{transform:scale(.99)}
+.view .metrics>article{position:relative;overflow:hidden;border-color:#e9e6f1}
+.view .metrics>article:before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:linear-gradient(#d792ec,#7650ba)}
+.view .metrics strong{color:#2b2349}
+.view .hubCard{min-height:145px;background:linear-gradient(140deg,#fff,#f8f4ff);border-color:#e8dff5}
+.view .hubCard:hover{border-color:#ab91d1;box-shadow:0 14px 33px #633a9819;transform:translateY(-2px)}
+.view .bw-disclosure-summary{background:linear-gradient(120deg,#fff,#faf8ff);border-color:#e7e0f2}
+.view .bw-disclosure-summary:hover{background:#f8f2ff;border-color:#b69adc}
+.view .bw-disclosure-arrow{background:#efe6fb;color:#7038a0}
+#inbox .sectionTitle{margin-bottom:12px}
+#inbox .messengerToolbar{padding:10px 14px;background:#fff;border:1px solid var(--ne-edge);border-radius:16px;margin-bottom:13px;box-shadow:var(--ne-shadow);gap:10px}
+#inbox .messengerToolbar input,#inbox .messengerToolbar select{border-color:#e7e3ee;border-radius:10px;background:#fafafd}
+#inbox .messengerGrid{display:grid;grid-template-columns:minmax(255px,30%) minmax(300px,1fr) minmax(230px,26%);gap:12px;align-items:stretch}
+#inbox .messengerGrid>.panel{min-width:0;min-height:525px;border-radius:18px;box-shadow:var(--ne-shadow);margin-bottom:0}
+#inbox .inboxListPanel{background:#fbf9fe}
+#inbox .chatPanel{background:#fff}
+#inbox .chatHead{background:linear-gradient(100deg,#faf6ff,#fff);border-bottom:1px solid #eee8f5;border-radius:12px 12px 0 0}
+#inbox .message.out{background:#e8dcfa;color:#352350}
+#inbox .message.in{background:#f3f4f8;color:#263248}
+#inbox .bw-conversation-card{border-color:#e9e3f0;border-radius:13px}
+#inbox .bw-conversation-card:hover,#inbox .bw-conversation-card.active{background:#f6efff;border-color:#ae8bda}
+#inbox .bw-response-label{background:#ede5fb;color:#6e459d}
+#inbox .conversationDetailPanel{background:#fefeff}
+#inbox .conversationDetailPanel .detailFields label{font-size:11px;color:#68758e}
+#inbox .conversationDetailPanel select,#inbox .conversationDetailPanel input{border:1px solid #e7e2f2;background:#faf9fd;border-radius:10px;min-width:0}
+#inbox .ne-wa-connection{margin-top:16px}
+#clients>.panel{padding:18px}
+#clients .searchrow{padding:0 0 16px;margin-bottom:6px;border-bottom:1px solid #f0edf6}
+#clients .searchrow input{background:#f9f9fd;border:1px solid #e4e2ed;padding:13px 16px}
+#clients #clientList{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+#clients #clientList article{position:relative;min-width:0;background:linear-gradient(125deg,#fff 50%,#fcf9ff);border:1px solid #e9e4f3;border-radius:17px;padding:18px}
+#clients #clientList article:hover{border-color:#ae93d2;box-shadow:0 10px 24px #6b3e9716}
+#agenda .ne-work-toolbar,#finance .ne-finance-actions{gap:12px}
+#agenda .ne-action-card,#finance .ne-finance-action{border-radius:17px;border-color:#e8e3ef;box-shadow:var(--ne-shadow);background:linear-gradient(125deg,#fff,#fbf9ff)}
+#agenda .ne-action-card:hover,#finance .ne-finance-action:hover{border-color:#ab88d7;box-shadow:0 9px 24px #6c489a17}
+#finance .ne-finance-action.is-active{border-color:#965fc8;background:linear-gradient(125deg,#f3e9ff,#fff)}
+#inventory .ne-stock-action,#marketing .ne-marketing-card{border-radius:16px;box-shadow:var(--ne-shadow)}
+.ne-ops-kicker{display:inline-flex;align-items:center;gap:6px;letter-spacing:.07em;text-transform:uppercase;color:#7a57a6;font-size:10px;font-weight:800;margin-bottom:6px}
+.ne-ops-kicker:before{content:"";width:6px;height:6px;border-radius:50%;background:#ad67c4}
+.ne-ops-headline{display:flex;align-items:center;gap:13px}
+.ne-ops-headline .ne-ops-icon{display:grid;place-items:center;width:43px;height:43px;flex:none;border-radius:13px;background:#eee3fc;color:#6e339f;font-size:22px}
+.ne-ops-mini-nav{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.ne-ops-mini-nav button{background:#fff;color:#554568;border:1px solid #e7e0f0;border-radius:999px;padding:8px 13px;font-size:11px;font-weight:700}
+.ne-ops-mini-nav button:hover{background:#f3eaff;border-color:#ae8ad9}
+@media(max-width:1350px){#inbox .messengerGrid{grid-template-columns:minmax(260px,38%) 1fr}#inbox .conversationDetailPanel{grid-column:1/-1;min-height:0!important}#clients #clientList{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:900px){.topbar{padding:18px 16px 12px}.view{padding:0 12px 90px}.view:not(#dashboard)>.sectionTitle{padding:14px;margin-bottom:10px}#inbox .messengerGrid{grid-template-columns:minmax(0,1fr)}#inbox .messengerGrid>.panel{min-height:0}#inbox .conversationDetailPanel{grid-column:auto}#clients #clientList{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:540px){#clients #clientList{grid-template-columns:1fr}.ne-ops-mini-nav{gap:5px}.ne-ops-mini-nav button{padding:8px 10px}}
+@media(prefers-reduced-motion:reduce){.view button{transition:none}}
