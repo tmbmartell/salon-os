@@ -14,9 +14,15 @@ export function installPhase7(db){
   ].join(";"));
 }
 
-function rows(db,tenant,clientId){
-  const sql="select r.*,p.name professional_name,s.name service_name from technical_records r left join professionals p on p.id=r.professional_id and p.tenant_id=r.tenant_id left join services s on s.id=r.service_id and s.tenant_id=r.tenant_id where r.tenant_id=? and r.client_id=? order by r.created_at desc";
-  return all(db,sql,[tenant,clientId]).map(x=>({...x,data:JSON.parse(x.data||"{}")}));
+function rows(db,tenant,clientId,onlyProfessional=null){
+  const sql="select r.*,p.name professional_name,s.name service_name from technical_records r left join professionals p on p.id=r.professional_id and p.tenant_id=r.tenant_id left join services s on s.id=r.service_id and s.tenant_id=r.tenant_id where r.tenant_id=? and r.client_id=?"+(onlyProfessional?" and r.professional_id=?":"")+" order by r.created_at desc";
+  return all(db,sql,onlyProfessional?[tenant,clientId,onlyProfessional]:[tenant,clientId]).map(x=>({...x,data:JSON.parse(x.data||"{}")}));
+}
+// Escopo do profissional: vínculo por id e somente clientes que ele atende.
+function clientOfProfessional(db,tenant,professionalId,clientId){
+  return db.prepare(`select 1 x from appointments a where a.tenant_id=? and a.client_id=? and
+    (exists(select 1 from appointment_items ai where ai.appointment_id=a.id and ai.tenant_id=a.tenant_id and ai.professional_id=?)
+     or (a.professional_id=? and not exists(select 1 from appointment_items ax where ax.appointment_id=a.id)))`).get(tenant,clientId,professionalId,professionalId);
 }
 
 export async function handlePhase7Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit}){
@@ -24,20 +30,25 @@ export async function handlePhase7Api({req,res,url,db,user,tenant,send,parseBody
   const m=url.pathname.match(/^\/api\/clients\/([^/]+)\/technical$/);
   if(m&&req.method==="GET"){
     guard("technical.read");
-    const cid=decodeURIComponent(m[1]);
+    const cid=decodeURIComponent(m[1]),restricted=user.role==="professional";
+    if(restricted&&!user.professionalId)return send(res,403,{error:"professional_not_linked"});
     if(!one(db,"select id from clients where id=? and tenant_id=?",[cid,tenant]))return send(res,404,{error:"client_not_found"});
-    return send(res,200,rows(db,tenant,cid));
+    if(restricted&&!clientOfProfessional(db,tenant,user.professionalId,cid))return send(res,404,{error:"client_not_found"});
+    return send(res,200,rows(db,tenant,cid,restricted?user.professionalId:null));
   }
   if(m&&req.method==="POST"){
     guard("technical.write");
-    const cid=decodeURIComponent(m[1]),client=one(db,"select * from clients where id=? and tenant_id=?",[cid,tenant]);
+    const cid=decodeURIComponent(m[1]),restricted=user.role==="professional";
+    if(restricted&&!user.professionalId)return send(res,403,{error:"professional_not_linked"});
+    const client=one(db,"select * from clients where id=? and tenant_id=?",[cid,tenant]);
     if(!client)return send(res,404,{error:"client_not_found"});
+    if(restricted&&!clientOfProfessional(db,tenant,user.professionalId,cid))return send(res,404,{error:"client_not_found"});
     const b=await parseBody(req),title=txt(b.title||"Registro técnico",180);
     if(!title)return send(res,400,{error:"title_required"});
     const appointmentId=txt(b.appointment_id,64)||null;
     const appointment=appointmentId?one(db,"select id,client_id,professional_id,service_id from appointments where id=? and tenant_id=? and client_id=?",[appointmentId,tenant,cid]):null;
     if(appointmentId&&!appointment)return send(res,400,{error:"invalid_appointment_reference"});
-    const proId=txt(b.professional_id||appointment?.professional_id,64)||null;
+    const proId=restricted?user.professionalId:(txt(b.professional_id||appointment?.professional_id,64)||null);
     const serviceId=txt(b.service_id||appointment?.service_id,64)||null;
     const professional=proId?one(db,"select id from professionals where id=? and tenant_id=?",[proId,tenant]):null;
     const service=serviceId?one(db,"select id from services where id=? and tenant_id=?",[serviceId,tenant]):null;
