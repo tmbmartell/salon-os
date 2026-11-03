@@ -296,7 +296,8 @@ async function fetchWaQr(){
     if(!["image/png","image/jpeg","image/webp"].includes(type))throw Error("Formato do QR inválido");
     const image=await response.blob();
     if(image.size<100||image.size>1000000)throw Error("Imagem do QR inválida");
-    // The site's CSP allows data images but not blob URLs.
+    // The site's CSP permits data:image/* but intentionally disallows blob: URLs.
+    // FileReader converts the authenticated PNG to a CSP-compatible data URL.
     const next=await new Promise((resolve,reject)=>{
       const reader=new FileReader();
       reader.onload=()=>resolve(reader.result);
@@ -304,6 +305,7 @@ async function fetchWaQr(){
       reader.readAsDataURL(image);
     });
     if(typeof next!=="string"||!next.startsWith("data:"+type+";base64,"))throw Error("QR Code com formato inesperado");
+    // Keep the old QR visible until the newly decoded PNG is fully loaded.
     const preloaded=new Image();
     await new Promise((resolve,reject)=>{
       preloaded.onload=resolve;
