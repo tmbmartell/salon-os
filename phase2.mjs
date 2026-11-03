@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import {quantity,allocateConsumption} from "./inventory-rules.mjs";
-import {cents,validPaymentMethod,cashCloseResult} from "./finance-rules.mjs";
+import {cents,validPaymentMethod,cashCloseResult,commissionPct} from "./finance-rules.mjs";
 import { afterCheckoutRetention } from "./phase6.mjs";
 import { consumePackageCredit, availablePackageCredits } from "./phase8.mjs";
 
@@ -358,8 +358,10 @@ export async function handlePhase2Api(ctx){
       ideal=quantity(b.ideal_qty??0,unit);
     }catch(e){return send(res,e.status||400,{error:e.message})}
     const pid=uid();
+    let saleCommission;
+    try{saleCommission=commissionPct(b.sale_commission_pct)}catch(e){return send(res,e.status||400,{error:e.code||"invalid_commission_pct",message:e.message})}
     run(db,"insert into products(id,tenant_id,name,sku,unit,stock_qty,min_qty,ideal_qty,avg_cost_cents,sale_price_cents,sale_commission_pct,supplier_id,active,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
-      [pid,tenant,name,txt(b.sku,80),unit,stock,min,ideal,money(b.avg_cost||0),money(b.sale_price||0),Math.max(0,Math.min(100,Number(b.sale_commission_pct||0))),supplierId,now(),now()]);
+      [pid,tenant,name,txt(b.sku,80),unit,stock,min,ideal,money(b.avg_cost||0),money(b.sale_price||0),saleCommission,supplierId,now(),now()]);
     audit(db,user,"product.create","product",pid,{unit,stock_qty:stock});
     return send(res,201,products(db,tenant).find(x=>x.id===pid));
   }
