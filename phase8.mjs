@@ -84,7 +84,9 @@ export async function handlePhase8Api({req,res,url,db,user,tenant,send,parseBody
     guard("packages.sell");const id=decodeURIComponent(sell[1]),pack=one(db,"select * from service_packages where id=? and tenant_id=? and active=1",[id,tenant]);if(!pack)return send(res,404,{error:"package_not_found"});
     const b=await parseBody(req),client=one(db,"select id,name from clients where id=? and tenant_id=?",[txt(b.client_id,64),tenant]);if(!client)return send(res,404,{error:"client_not_found"});
     const method=txt(b.payment_method||"pix",32),allowed=["pix","credit_card","debit_card","cash","other"];if(!allowed.includes(method))return send(res,400,{error:"invalid_payment_method"});
-    const cash=method==="cash"?openCash(db,tenant):null;if(method==="cash"&&!cash)return send(res,409,{error:"cash_session_required"});
+    // Pix/cartão também pertencem ao movimento do caixa do turno; só o dinheiro
+    // físico entra no "esperado em dinheiro".
+    const cash=openCash(db,tenant);if(method==="cash"&&!cash)return send(res,409,{error:"cash_session_required"});
     const allocation=allocateItems(db,tenant,id,Number(pack.price_cents)),cpid=uid(),fid=uid(),purchased=now(),expires=new Date(Date.now()+Number(pack.validity_days)*86400000).toISOString();
     db.exec("BEGIN IMMEDIATE");try{
       run(db,"insert into financial_entries(id,tenant_id,kind,category,description,amount_cents,payment_method,status,paid_at,cash_session_id,client_id,reference_type,reference_id,created_by,created_at,metadata) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",

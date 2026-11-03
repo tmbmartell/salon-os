@@ -60,7 +60,15 @@ export async function handlePhase9Api({req,res,url,db,user,tenant,send,parseBody
   const guard=p=>requirePermission(user,p);
   if(req.method==="GET"&&url.pathname==="/api/staff/overview"){
     guard("staff.read");const period=txt(url.searchParams.get("period")||new Date().toISOString().slice(0,7),7);
-    return send(res,200,{period,metrics:staffMetrics(db,tenant,period),time_off:timeOffRows(db,tenant)});
+    const privileged=["owner","manager"].includes(user.role);
+    if(!privileged){
+      // A recepção pode consultar a equipe, mas nunca desempenho financeiro,
+      // comissões, metas individuais nem justificativas de afastamento.
+      const basics=all(db,"select id,name,role,specialties from professionals where tenant_id=? and active=1 order by name",[tenant])
+        .map(p=>({...p,specialties:(()=>{try{return JSON.parse(p.specialties||"[]")}catch{return []}})()}));
+      return send(res,200,{period,limited:true,metrics:basics,time_off:[]});
+    }
+    return send(res,200,{period,limited:false,metrics:staffMetrics(db,tenant,period),time_off:timeOffRows(db,tenant)});
   }
   const schedule=url.pathname.match(/^\/api\/staff\/([^/]+)\/schedule$/);
   if(schedule&&req.method==="GET"){
@@ -79,7 +87,7 @@ export async function handlePhase9Api({req,res,url,db,user,tenant,send,parseBody
     }catch(e){db.exec("ROLLBACK");throw e}
     audit(db,user,"staff.schedule.update","professional",id,{days:days.length});return send(res,200,scheduleRows(db,tenant,id));
   }
-  if(req.method==="GET"&&url.pathname==="/api/staff/time-off"){guard("staff.read");return send(res,200,timeOffRows(db,tenant))}
+  if(req.method==="GET"&&url.pathname==="/api/staff/time-off"){guard("staff.read");if(!["owner","manager"].includes(user.role))return send(res,403,{error:"staff_private_data_forbidden"});return send(res,200,timeOffRows(db,tenant))}
   if(req.method==="POST"&&url.pathname==="/api/staff/time-off"){
     guard("staff.manage");const b=await parseBody(req),pid=txt(b.professional_id,64);if(!one(db,"select id from professionals where id=? and tenant_id=?",[pid,tenant]))return send(res,404,{error:"professional_not_found"});
     const start=txt(b.start_date,10),end=txt(b.end_date||b.start_date,10),type=txt(b.type||"day_off",40);if(!/^\d{4}-\d{2}-\d{2}$/.test(start)||!/^\d{4}-\d{2}-\d{2}$/.test(end)||end<start)return send(res,400,{error:"invalid_dates"});

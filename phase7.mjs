@@ -15,7 +15,7 @@ export function installPhase7(db){
 }
 
 function rows(db,tenant,clientId){
-  const sql="select r.*,p.name professional_name,s.name service_name from technical_records r left join professionals p on p.id=r.professional_id left join services s on s.id=r.service_id where r.tenant_id=? and r.client_id=? order by r.created_at desc";
+  const sql="select r.*,p.name professional_name,s.name service_name from technical_records r left join professionals p on p.id=r.professional_id and p.tenant_id=r.tenant_id left join services s on s.id=r.service_id and s.tenant_id=r.tenant_id where r.tenant_id=? and r.client_id=? order by r.created_at desc";
   return all(db,sql,[tenant,clientId]).map(x=>({...x,data:JSON.parse(x.data||"{}")}));
 }
 
@@ -34,12 +34,21 @@ export async function handlePhase7Api({req,res,url,db,user,tenant,send,parseBody
     if(!client)return send(res,404,{error:"client_not_found"});
     const b=await parseBody(req),title=txt(b.title||"Registro técnico",180);
     if(!title)return send(res,400,{error:"title_required"});
-    const professional=b.professional_id?one(db,"select id from professionals where id=? and tenant_id=?",[txt(b.professional_id,64),tenant]):null;
-    const service=b.service_id?one(db,"select id from services where id=? and tenant_id=?",[txt(b.service_id,64),tenant]):null;
-    if((b.professional_id&&!professional)||(b.service_id&&!service))return send(res,400,{error:"invalid_reference"});
+    const appointmentId=txt(b.appointment_id,64)||null;
+    const appointment=appointmentId?one(db,"select id,client_id,professional_id,service_id from appointments where id=? and tenant_id=? and client_id=?",[appointmentId,tenant,cid]):null;
+    if(appointmentId&&!appointment)return send(res,400,{error:"invalid_appointment_reference"});
+    const proId=txt(b.professional_id||appointment?.professional_id,64)||null;
+    const serviceId=txt(b.service_id||appointment?.service_id,64)||null;
+    const professional=proId?one(db,"select id from professionals where id=? and tenant_id=?",[proId,tenant]):null;
+    const service=serviceId?one(db,"select id from services where id=? and tenant_id=?",[serviceId,tenant]):null;
+    if((proId&&!professional)||(serviceId&&!service))return send(res,400,{error:"invalid_reference"});
+    if(appointment && ((proId&&proId!==appointment.professional_id)||(serviceId&&serviceId!==appointment.service_id))){
+      const item=one(db,"select id from appointment_items where appointment_id=? and tenant_id=? and service_id=? and professional_id=?",[appointment.id,tenant,serviceId,proId]);
+      if(!item)return send(res,400,{error:"appointment_service_mismatch"});
+    }
     const id=uid();
     run(db,"insert into technical_records(id,tenant_id,client_id,appointment_id,professional_id,service_id,title,formula,observations,allergies_snapshot,data,created_by,created_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",
-      [id,tenant,cid,txt(b.appointment_id,64)||null,professional?.id||null,service?.id||null,title,txt(b.formula,5000),txt(b.observations,5000),txt(client.allergies,2000),JSON.stringify(b.data&&typeof b.data==="object"?b.data:{}),user.id,now()]);
+      [id,tenant,cid,appointmentId,professional?.id||null,service?.id||null,title,txt(b.formula,5000),txt(b.observations,5000),txt(client.allergies,2000),JSON.stringify(b.data&&typeof b.data==="object"?b.data:{}),user.id,now()]);
     audit(db,user,"technical.create","technical_record",id,{client_id:cid});
     return send(res,201,{id,client_id:cid,title});
   }
