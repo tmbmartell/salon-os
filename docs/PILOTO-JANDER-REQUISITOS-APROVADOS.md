@@ -15,7 +15,7 @@ Os valores **apresentados**, e não aqui considerados aceitos ou contratados, fo
 
 | ID | Regra aprovada | Critério de aceite mínimo |
 |---|---|---|
-| **R01 — Agendamento assistido** | A IA conversa, coleta dados, consulta e **sugere horários**; a **recepção confirma todos** os agendamentos. | Nenhuma ação da IA cria agendamento confirmado ou comunica confirmação sem ação de recepcionista autorizada; pedido permanece **pendente** até decisão humana; agenda é atualizada apenas após aprovação. |
+| **R01 — Confirmação de reservas pela IA** | A IA **pode criar e confirmar reservas diretamente**, sem aprovação individual da recepção, depois de conferir disponibilidade real, serviço, duração, profissional, regras do salão e a escolha/aceite da cliente. A recepção também pode confirmar manualmente. | Reserva confirmada somente em slot válido e ainda disponível; proteção contra concorrência/duplicidade; confirmação e dados consistentes na agenda/CRM e na mensagem à cliente; trilha da confirmação por IA ou humano. Havendo informação insuficiente, conflito ou exceção comercial, encaminhar à recepção em vez de prometer horário. |
 | **R02 — Campanhas aprovadas** | **Cada campanha** requer aprovação humana antes de ser enviada. | Nenhum disparo ativo de campanha antes de aprovação vinculada à versão exata de mensagem, oferta, público, janela e canal; qualquer edição relevante invalida aprovação. |
 | **R03 — Aprovadores** | Apenas **proprietário** e **pessoas expressamente autorizadas da gerência** podem aprovar campanhas. | Verificação de permissão por usuário em backend; recepcionista pode editar/preparar mas não aprovar; trilha de auditoria com autor, versão, aprovador e data. |
 | **R04 — Descontos e negociação** | IA usa **somente preços e promoções aprovados**; não negocia desconto livre. | Pedido de condição adicional é escalado à equipe; promoções expiram e respeitam elegibilidade; nenhuma oferta inventada. |
@@ -25,14 +25,18 @@ Os valores **apresentados**, e não aqui considerados aceitos ou contratados, fo
 | **R08 — IA nos dois canais** | A IA atende **tanto Instagram Direct quanto WhatsApp**, com as mesmas regras comerciais e de segurança. | Política única para handoff, catálogo, descontos e agendamentos; considerar as permissões e restrições específicas de cada canal. |
 | **R09 — Handoff humano persistente** | Após a recepção assumir uma conversa, a IA **só volta com devolução manual pela atendente**. | Timeout, novas mensagens, logout ou reinício do sistema não reativam IA; devolução explícita é auditada; novo atendimento não sobrescreve controle humano anterior. |
 | **R10 — Ausência de confirmação/fila** | Se a cliente não confirma presença, **alertar a recepção**; só a equipe libera o horário e autoriza a oferta à fila de espera. | Ausência de resposta **não é cancelamento**; sem liberação automática, sem dupla reserva, com identificação do profissional que autorizou. |
-| **R11 — Lembretes após confirmação** | Enviar automaticamente lembretes de **24h e 2h**, conforme configuração do salão, **somente após confirmação da recepção**. | Cancelamento/remarcação reavalia tarefas; envio único/idempotente, horário e consentimentos observados, falha visível à recepção; nunca enviar lembrete de reserva não confirmada. |
+| **R11 — Lembretes após confirmação** | Enviar automaticamente lembretes de **24h e 2h**, conforme configuração do salão, após confirmação válida do agendamento **pela IA ou pela recepção**. | Cancelamento/remarcação reavalia tarefas; envio único/idempotente, horário e consentimentos observados, falha visível à recepção; nunca enviar lembrete de reserva não confirmada. |
 | **R12 — Lembrete 2h contextual** | Se a cliente **já confirmou presença**, o lembrete de 2h será **curto, cordial e sem pedir nova confirmação**. | Estado de confirmação diferencia texto; cliente ainda pendente pode receber solicitação de confirmação segundo política configurada. |
-| **R13 — Aviso à profissional** | Após a recepção confirmar, a profissional recebe **notificação WhatsApp automática** e visualiza horário na sua **agenda individual**. | Somente profissional vinculado e autorizado recebe dados mínimos; entrega/erro registrados; permissões da agenda individual testadas. |
+| **R13 — Aviso à profissional** | Após a confirmação do agendamento **pela IA ou pela recepção**, a profissional recebe **notificação WhatsApp automática** e visualiza o horário na sua **agenda individual**. | Somente profissional vinculado e autorizado recebe dados mínimos; entrega/erro registrados; permissões da agenda individual testadas. |
 | **R14 — Atualização/cancelamento** | Quando a recepção altera, remarca ou cancela um agendamento confirmado, a profissional recebe novo aviso. | Remarcação mostra horário antigo e novo; troca de profissional alerta anterior e nova profissional; cancelamento não gera oferta automática à fila; idempotência e erro monitoráveis. |
+
+## Esclarecimento da mudança de R01 (03/11/2026)
+
+A **autorização para confirmar novas reservas não é autorização para cancelar, liberar horários ocupados, remarcar por conta própria, dar descontos extras ou disparar campanhas**. Esses comportamentos mantêm suas regras específicas. Para a R01, registrar aceite da cliente e confirmar somente se agenda e requisitos comerciais permitirem.
 
 ## Regras transversais de segurança e governança
 
-1. Toda operação que marca presença, confirma ou libera vagas deve ter autorização humana correspondente.
+1. **Confirmação de reservas:** a IA está autorizada pela regra R01 a confirmar agendamentos dentro das condições aprovadas pelo salão, respeitando disponibilidade e aceite da cliente; não exige autorização humana por reserva. **Liberação de horário já ocupado e oferta à fila de espera** continuam exigindo decisão humana (R10).
 2. Mensagens de **resposta a cliente** e **campanhas promocionais ativas** são tipos diferentes: resposta autorizada não libera disparos em massa.
 3. Campanhas devem ter opt-in/base legal aplicável, lista de supressão, rastreio e limites compatíveis com os canais; aprovação comercial não substitui consentimento.
 4. Nenhuma funcionalidade deve usar informação técnica de produtos em rascunho/rejeitada; não oferecer aconselhamento médico.
@@ -43,7 +47,7 @@ Os valores **apresentados**, e não aqui considerados aceitos ou contratados, fo
 
 **Expressamente levantados/apresentados na reunião:** necessidade de conexão WhatsApp + Instagram, campanhas/Black Friday/aniversários, IA para dúvidas sobre marcas e serviços, lembretes e fila, acesso computador/celular, equipe habituada ao Saikon, teste paralelo, suporte/personalização, preços apresentados. Houve demonstração/discurso de agendamento automático e notificações aos profissionais.
 
-**Regras refinadas e aprovadas depois pela responsável do projeto:** controle humano em R01–R03/R09–R14, conteúdo validado R04–R06, integração R07–R08. As decisões pós-reunião **prevalecem sobre exemplos genéricos** da apresentação para este piloto.
+**Regras refinadas e aprovadas depois pela responsável do projeto:** em 03/11/2026, a responsável **corrigiu expressamente R01 para permitir confirmação de reservas pela IA**, substituindo a decisão anterior de agendamento exclusivamente confirmado pela recepção. Mantêm-se a aprovação humana de campanhas R02/R03, o handoff R09, o controle humano da liberação e fila R10, as políticas de lembretes R11/R12 e notificações R13/R14, e conteúdo validado R04–R06. A decisão mais recente de R01 prevalece sobre a versão anterior.
 
 **Ainda não decidido:** estratégia de importação **parcial ou completa** dos dados do Saikon; abrangência da personalização visual; termos de suporte e custo de integração com canais/provedores. Nenhuma escolha de migração deve ser assumida como aprovada.
 
