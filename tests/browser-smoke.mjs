@@ -57,18 +57,15 @@ try{
   await page.locator("#loginForm button").click();
   await page.locator("#authGate").waitFor({state:"hidden",timeout:25000});
   await page.waitForFunction(()=>{
-    const node=document.querySelector("#mPros");
-    return node&&node.textContent.trim()!=="—";
+    const node=document.querySelector("#dashToday");
+    return node&&node.textContent.trim()!=="";
   },{timeout:25000});
   assert.equal(errors.length,0,"Erros JS no login/primeira tela: "+errors.join(" | "));
   await page.screenshot({path:path.join(artifact,"02-visao-geral-desktop.png"),fullPage:true});
   async function open(view){
     const button=page.locator('.sidebar [data-view="'+view+'"]');
-    const group=button.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " bw-nav-group ")]');
-    if(await group.count()){
-      const trigger=group.locator(".bw-nav-trigger");
-      if(await trigger.getAttribute("aria-expanded")==="false")await trigger.click();
-    }
+    const group=button.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " navGroup ")]');
+    if(await group.count()&&!(await group.getAttribute("class")).split(/\s+/).includes("open"))await group.locator(".navGroupBtn").click();
     await button.click();
     await page.locator("#"+view+".view.active").waitFor({timeout:12000});
     await sleep(300);
@@ -81,7 +78,7 @@ try{
   assert.equal(await page.locator("#neBackfillDate").inputValue(),"2026-04-01");
   await page.screenshot({path:path.join(artifact,"07-importacao-whatsapp-desktop.png"),fullPage:true});
   await open("agenda");
-  assert.ok(await page.locator("#agendaList").count()>0);
+  await page.locator("#agGrid .agCol, #agGrid > *").first().waitFor({timeout:12000});
   await open("inventory");
   await page.locator('[data-ne-stock-tab="recipes"]').click();
   await page.locator('[data-ne-stock-panel="recipes"]:not(.hidden)').waitFor();

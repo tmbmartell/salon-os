@@ -1,0 +1,47 @@
+/* Novagente Estética — tokens de design (claro / escuro / movimento) */
+/* O azul pastel é cor de preenchimento: sempre com texto escuro por cima.
+   Para texto colorido sobre fundo, use --nv-primary-ink. */
+
+:root {
+  --nv-primary:#b8d8ea; --nv-primary-hover:#a5cce2; --nv-on-primary:#24323d; --nv-primary-soft:#e8f3f9; --nv-primary-ink:#2f5f7c;
+  --nv-bg:#fafbfc; --nv-surface:#ffffff; --nv-surface-2:#f2f5f7; --nv-line:#e3e9ed;
+  --nv-ink:#26323b; --nv-ink-2:#53626d; --nv-ink-3:#677582;
+  --nv-ok:#25694a; --nv-ok-soft:#ddf2e6; --nv-warn:#7a5a0c; --nv-warn-soft:#fbf0cc; --nv-bad:#a23b48; --nv-bad-soft:#f9dfe1;
+
+  --nv-font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --nv-font-ui: "Figtree", "Segoe UI", system-ui, sans-serif;
+
+  --nv-radius-s: 10px;
+  --nv-radius-m: 16px;
+  --nv-radius-l: 24px;
+
+  --nv-dur-instant: 90ms;   /* hover, foco, cor */
+  --nv-dur-fast: 160ms;     /* botão, chip, switch */
+  --nv-dur-base: 240ms;     /* cartão, lista, aviso */
+  --nv-dur-slow: 400ms;     /* modal, painel */
+  --nv-ease-out: cubic-bezier(0.22, 1, 0.36, 1);       /* entrar */
+  --nv-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);    /* mover */
+  --nv-ease-spring: cubic-bezier(0.34, 1.2, 0.64, 1);  /* confirmar */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+  --nv-primary:#b8d8ea; --nv-primary-hover:#cbe3f1; --nv-on-primary:#1c2830; --nv-primary-soft:#2c414f; --nv-primary-ink:#cfe6f3;
+  --nv-bg:#1a2229; --nv-surface:#222c34; --nv-surface-2:#2b3640; --nv-line:#3a4752;
+  --nv-ink:#eef3f6; --nv-ink-2:#c3ced6; --nv-ink-3:#96a4af;
+  --nv-ok:#a9e3c3; --nv-ok-soft:#263f35; --nv-warn:#f3de9a; --nv-warn-soft:#423a20; --nv-bad:#f5b8c0; --nv-bad-soft:#4a2f35;
+  color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --nv-primary:#b8d8ea; --nv-primary-hover:#cbe3f1; --nv-on-primary:#1c2830; --nv-primary-soft:#2c414f; --nv-primary-ink:#cfe6f3;
+  --nv-bg:#1a2229; --nv-surface:#222c34; --nv-surface-2:#2b3640; --nv-line:#3a4752;
+  --nv-ink:#eef3f6; --nv-ink-2:#c3ced6; --nv-ink-3:#96a4af;
+  --nv-ok:#a9e3c3; --nv-ok-soft:#263f35; --nv-warn:#f3de9a; --nv-warn-soft:#423a20; --nv-bad:#f5b8c0; --nv-bad-soft:#4a2f35;
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --nv-dur-instant: 1ms; --nv-dur-fast: 1ms; --nv-dur-base: 1ms; --nv-dur-slow: 1ms; }
+}

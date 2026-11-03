@@ -17,7 +17,7 @@ const expectedFiles=[
   "phase8.mjs","phase9.mjs","phase10.mjs","phase11.mjs",
   "pilot-backup.mjs","scripts/pilot-backup.mjs",
   "public/index.html","public/app.js","public/security-center.js",
-  "public/beauty-ui.css","public/novagente-logo.svg",
+  "public/novagente-components.css","public/tokens.css",
   "public/mfa-security-ui.js","public/whatsapp-backfill-ui.js",
   "docs/ETAPA-17-PRIVACIDADE-CHECKLIST-ENTREGA.md",
   ".github/workflows/security.yml",".github/workflows/browser-qa.yml"

@@ -1,6 +1,8 @@
 import { setupAppointmentUi } from "./appointment-ui.js";
+import { setupDashboard } from "./dashboard-board.js";
+import { setupAgenda } from "./agenda-board.js";
 const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
-const fmt=new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}),dayFmt=new Intl.DateTimeFormat("pt-BR",{weekday:"long",day:"2-digit",month:"2-digit"});
+const fmt=new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"});
 const state={clients:[],professionals:[],services:[],resources:[],products:[],suppliers:[],phase2:null,dashboard:null,health:null,user:null,tenant:null,whatsapp:null,conversations:[],selectedConversation:null};
 // O salão opera em horário local (America/Porto_Velho). A interface nunca deve
 // depender do fuso do navegador para montar o horário do agendamento.
@@ -23,7 +25,7 @@ function wallToUtcIso(wall,tz=tenantZone()){
   return new Date(guess).toISOString();
 }
 async function api(path,options={}){const r=await fetch(path,{headers:{"content-type":"application/json",...(options.headers||{})},...options});const j=await r.json().catch(()=>({}));if(!r.ok){if(r.status===401&&!path.startsWith("/api/auth/")&&typeof showAuth==="function")showAuth("login");throw Object.assign(new Error(j.error||"request_failed"),{data:j,status:r.status})}return j}
-function toast(text){const t=$("#toast");t.textContent=text;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200)}
+let toastTimer;function toast(text){const t=$("#toast");t.textContent=text;t.classList.toggle("err",/n[ãa]o |erro|falha/i.test(text));t.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove("show"),2500)}
 async function downloadCsvFromApi(path,filename){
   const response=await fetch(path,{credentials:"same-origin",cache:"no-store"});
   if(!response.ok){
@@ -55,7 +57,7 @@ function applyRoleNavigation(){
   const allow=NAV_ALLOWED[state.user?.role];
   if(!Array.isArray(allow))return;
   $$(".sidebar nav [data-view]").forEach(b=>{b.style.display=allow.includes(b.dataset.view)?"":"none"});
-  $$(".sidebar nav .bw-nav-group, .sidebar nav .ne-rail-group").forEach(group=>{
+  $$(".sidebar nav .navGroup, .sidebar nav .bw-nav-group, .sidebar nav .ne-rail-group").forEach(group=>{
     const visible=[...group.querySelectorAll("[data-view]")].some(x=>x.style.display!=="none");
     group.style.display=visible?"":"none";
   });
@@ -67,12 +69,16 @@ function applyRoleNavigation(){
 function activate(view,{skipTechnicalLoad=false}={}){
   if(!viewAllowed(view)){toast("Seu perfil não tem acesso a este módulo.");return}
   $$(".view").forEach(v=>v.classList.toggle("active",v.id===view));$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
-  const cfg={dashboard:["Visão geral","O que precisa da sua atenção hoje."],inbox:["Atendimento","WhatsApp, cliente e próxima ação no mesmo lugar."],agenda:["Agenda","O fluxo de atendimento sem conflito de pessoa ou recurso."],clients:["Clientes","Relacionamento e histórico em um só lugar."],people:["Gente","Clientes, equipe, relacionamento e agentes em um só lugar."],productsHub:["Produtos","Venda, estoque, serviços, pacotes e compras conectados."],marketing:["Marketing & Relacionamento","Captação, canais, campanhas e oportunidades de retorno."],technical:["Ficha Técnica","Fórmulas, procedimento e memória clínica da cliente."],team:["Equipe","Quem atende, quando e em quê."],services:["Serviços","Preço, tempo e comissão organizados."],packages:["Pacotes","Venda antecipada com créditos e validade."],retail:["PDV · Produtos","Venda de produtos integrada ao estoque e financeiro."],resources:["Recursos","Cadeiras, salas e equipamentos disponíveis."],finance:["Financeiro & Caixa","Dinheiro entrando e saindo, sem depender de planilha."],inventory:["Estoque & Consumo","Produto real, custo real e alerta antes de faltar."],suppliers:["Fornecedores","Quem vende, quanto demora e como comprar melhor."],retention:["Fidelização & Relacionamento","Pontos, indicações, aniversários e pós-atendimento."],ownerEye:["Olho do Dono","Inteligência prática para decidir antes do problema aparecer."],agents:["Funcionários Artificiais","Recepção, vendas, gestão, financeiro, compras e análise."],admin:["Administração","Backup, segurança, usuários e auditoria."],reports:["Relatórios & Exportação","Período, resultado e arquivos prontos para análise."],intelligence:["JEV · Inteligência","Decisões rápidas com custo controlado."]}[view]||["Salon OS",""];
-  $("#pageTitle").textContent=cfg[0];$("#pageSub").textContent=cfg[1];if(view==="agenda"){loadAgendaPhase2();loadWaitlist()}if(view==="team")loadStaff();if(view==="clients")loadClients();if(view==="technical"&&!skipTechnicalLoad)loadTechnical();if(view==="intelligence")loadReceipts();if(view==="inbox")loadInbox();if(view==="finance")loadFinance();if(view==="inventory")loadInventory();if(view==="suppliers")loadSuppliers();if(view==="packages")loadPackages();if(view==="retail")loadRetail();if(view==="retention")loadRetention();if(view==="ownerEye")loadOwnerEye();if(view==="agents")loadAgents();if(view==="admin")loadAdmin();if(view==="reports")loadReports();if(view==="marketing")window.dispatchEvent(new CustomEvent("ne:marketing-open"));
+  document.body.dataset.view=view;$$(".navGroup").forEach(g=>g.classList.toggle("open",!!g.querySelector('[data-view="'+view+'"]')));
+  const cfg={dashboard:["Início",""],inbox:["Conversas","WhatsApp, cliente e próxima ação no mesmo lugar."],agenda:["Agenda","O fluxo de atendimento sem conflito de pessoa ou recurso."],clients:["Clientes","Relacionamento e histórico em um só lugar."],people:["Pessoas","Clientes, equipe, relacionamento e agentes em um só lugar."],productsHub:["Produtos","Venda, estoque, serviços, pacotes e compras conectados."],marketing:["Marketing & Relacionamento","Captação, canais, campanhas e oportunidades de retorno."],technical:["Ficha Técnica","Fórmulas, procedimento e memória clínica da cliente."],team:["Equipe","Quem atende, quando e em quê."],services:["Serviços","Preço, tempo e comissão organizados."],packages:["Pacotes","Venda antecipada com créditos e validade."],retail:["Vender produto","Venda de produtos integrada ao estoque e financeiro."],resources:["Cadeiras e salas","Cadeiras, salas e equipamentos disponíveis."],finance:["Gastos e caixa","Dinheiro entrando e saindo, sem depender de planilha."],inventory:["Estoque & Consumo","Produto real, custo real e alerta antes de faltar."],suppliers:["Fornecedores","Quem vende, quanto demora e como comprar melhor."],retention:["Fidelização & Relacionamento","Pontos, indicações, aniversários e pós-atendimento."],ownerEye:["Olho do Dono","Inteligência prática para decidir antes do problema aparecer."],agents:["Assistentes de IA","Recepção, vendas, gestão, financeiro, compras e análise."],admin:["Administração","Backup, segurança, usuários e auditoria."],reports:["Relatórios & Exportação","Período, resultado e arquivos prontos para análise."],intelligence:["JEV · Inteligência","Decisões rápidas com custo controlado."]}[view]||["Novagente Estética",""];
+  $("#pageTitle").textContent=cfg[0];$("#pageSub").textContent=cfg[1];if(view==="dashboard")dashboardBoard.load();if(view==="agenda"){loadAgendaPhase2();loadWaitlist()}if(view==="team")loadStaff();if(view==="clients")loadClients();if(view==="technical"&&!skipTechnicalLoad)loadTechnical();if(view==="intelligence")loadReceipts();if(view==="inbox")loadInbox();if(view==="finance")loadFinance();if(view==="inventory")loadInventory();if(view==="suppliers")loadSuppliers();if(view==="packages")loadPackages();if(view==="retail")loadRetail();if(view==="retention")loadRetention();if(view==="ownerEye")loadOwnerEye();if(view==="agents")loadAgents();if(view==="admin")loadAdmin();if(view==="reports")loadReports();if(view==="marketing")window.dispatchEvent(new CustomEvent("ne:marketing-open"));
 }
-$$("[data-view]").forEach(b=>b.onclick=()=>activate(b.dataset.view));$$("[data-jump]").forEach(b=>b.onclick=()=>activate(b.dataset.jump));$$("[data-open]").forEach(b=>b.onclick=()=>$("#"+b.dataset.open).showModal());$$("[data-close]").forEach(b=>b.onclick=()=>b.closest("dialog").close());$("#quickAppointment").onclick=()=>$("#appointmentModal").showModal();
-async function bootstrap(){const [boot,health]=await Promise.all([api("/api/bootstrap"),api("/api/health")]);state.health=health;state.user=boot.user;state.tenant=boot.tenant||null;window.__neTenantZone=tenantZone();window.__neRole=boot.user?.role||null;applyRoleNavigation();window.__neApplyRole?.(boot.user?.role);const allowClientsExport=["owner","manager"].includes(state.user?.role);["#exportClients","#marketingExportClients"].forEach(sel=>{const el=$(sel);if(el)el.hidden=!allowClientsExport;});$$(`[data-view="ownerEye"],[data-jump="ownerEye"]`).forEach(el=>{el.hidden=!["owner","manager"].includes(state.user?.role)});state.professionals=boot.professionals;state.services=boot.services;state.resources=boot.resources||[];state.dashboard=boot.dashboard;state.whatsapp=boot.whatsapp;$("#health").textContent=health.jev?"Sistema + JEV online":"Sistema online · JEV fallback";$("#jevState").textContent=health.jev?"JEV online":"fallback ativo";renderDashboard();renderTeam();renderServices();renderResources();await loadClients();fillSelects();updateWahaUi();if(["owner","manager"].includes(state.user?.role))loadReports().catch(()=>{});if(["owner","manager","reception"].includes(state.user?.role))loadFinance().catch(()=>{})}
-function renderDashboard(){const d=state.dashboard;$("#mAppointments").textContent=d.todayAppointments;$("#mForecast").textContent=fmt.format(d.forecast);$("#mClients").textContent=d.clientCount;$("#mPros").textContent=d.profCount;$("#todayList").innerHTML=d.appointments.length?d.appointments.map(a=>`<div class="row"><div class="who"><span class="avatar">${initials(a.client_name)}</span><div><strong>${a.client_name}</strong><small>${a.service_summary||a.service_name} · ${a.professional_summary||a.professional_name}</small></div></div><div><div class="time">${new Date(a.start_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",timeZone:tenantZone()})}</div><span class="status ${a.status}">${statusLabel(a.status)}</span></div></div>`).join(""):`<div class="muted">Nenhum atendimento hoje.</div>`}
+$$("[data-view]").forEach(b=>b.onclick=()=>activate(b.dataset.view));$$("[data-jump]").forEach(b=>b.onclick=()=>activate(b.dataset.jump));$$("[data-open]").forEach(b=>b.onclick=()=>$("#"+b.dataset.open).showModal());$$("[data-close]").forEach(b=>b.onclick=()=>b.closest("dialog").close());$("#quickAppointment").onclick=()=>activate("agenda");
+$$(".navGroupBtn").forEach(b=>b.onclick=()=>b.parentElement.classList.toggle("open"));$("#appBack").onclick=()=>document.body.classList.toggle("navCollapsed");const setDrawer=open=>document.body.classList.toggle("navOpen",open);$("#mobileMenu").onclick=()=>setDrawer(!document.body.classList.contains("navOpen"));$("#navScrim").onclick=()=>setDrawer(false);$$(".sidebar [data-view]").forEach(b=>b.addEventListener("click",()=>setDrawer(false)));document.addEventListener("keydown",e=>{if(e.key==="Escape")setDrawer(false)});$("#appFullscreen").onclick=()=>document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();$("#appDate").textContent=new Date().toLocaleDateString("pt-BR");
+function applyTheme(mode){if(mode==="auto")delete document.documentElement.dataset.theme;else document.documentElement.dataset.theme=mode;try{mode==="auto"?localStorage.removeItem("nv-theme"):localStorage.setItem("nv-theme",mode)}catch{}$$("[data-theme-set]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.themeSet===mode)))}
+$$("[data-theme-set]").forEach(b=>b.onclick=()=>applyTheme(b.dataset.themeSet));applyTheme(document.documentElement.dataset.theme||"auto");
+async function bootstrap(){const [boot,health]=await Promise.all([api("/api/bootstrap"),api("/api/health")]);state.health=health;state.user=boot.user;state.tenant=boot.tenant||null;window.__neTenantZone=tenantZone();window.__neRole=boot.user?.role||null;applyRoleNavigation();window.__neApplyRole?.(boot.user?.role);const allowClientsExport=["owner","manager"].includes(state.user?.role);["#exportClients","#marketingExportClients"].forEach(sel=>{const el=$(sel);if(el)el.hidden=!allowClientsExport;});$$(`[data-view="ownerEye"],[data-jump="ownerEye"]`).forEach(el=>{el.hidden=!["owner","manager"].includes(state.user?.role)});$$("[data-deny]").forEach(el=>el.classList.toggle("hidden",el.dataset.deny.split(" ").includes(boot.user?.role)));if(boot.tenant?.name)$("#appTenant").textContent=boot.tenant.name.toUpperCase();$("#appUser").textContent=String(boot.user?.name||"").toUpperCase();$("#appAvatar").textContent=initials(boot.user?.name||"");state.professionals=boot.professionals;state.services=boot.services;state.resources=boot.resources||[];state.dashboard=boot.dashboard;state.whatsapp=boot.whatsapp;$("#health").textContent=health.jev?"Sistema + JEV online":"Sistema online · JEV fallback";$("#jevState").textContent=health.jev?"JEV online":"fallback ativo";renderDashboard();renderTeam();renderServices();renderResources();await loadClients();fillSelects();updateWahaUi();if(["owner","manager"].includes(state.user?.role))loadReports().catch(()=>{});if(["owner","manager","reception"].includes(state.user?.role))loadFinance().catch(()=>{});activate("dashboard")}
+function renderDashboard(){const d=state.dashboard,hour=new Date().getHours(),first=String(state.user?.name||"").split(/\s+/)[0],n=d.appointments.length;$("#dashGreeting").textContent=(hour<12?"Bom dia":hour<18?"Boa tarde":"Boa noite")+(first?", "+first:"");$("#dashToday").textContent=new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long",timeZone:tenantZone()})+" · "+(n?n+(n===1?" atendimento hoje":" atendimentos hoje"):"nenhum atendimento hoje");$("#todayList").innerHTML=d.appointments.length?d.appointments.map(a=>`<div class="todayRow"><span class="time">${new Date(a.start_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",timeZone:tenantZone()})}</span><div><b>${esc(a.client_name)}</b><small>${esc(a.service_summary||a.service_name)} · ${esc(a.professional_summary||a.professional_name)}</small></div><span class="status ${esc(a.status)}">${statusLabel(a.status)}</span></div>`).join(""):`<div class="homeEmpty"><p>Nenhum atendimento marcado para hoje.</p><button type="button" class="secondary" id="todayMark">Marcar agendamento</button></div>`;if($("#todayMark"))$("#todayMark").onclick=()=>activate("agenda")}
 async function loadClients(q=""){state.clients=await api("/api/clients"+(q?`?q=${encodeURIComponent(q)}`:""));$("#clientCount").textContent=`${state.clients.length} encontrados`;$("#clientList").innerHTML=state.clients.map(c=>{const socials=[c.instagram?`Instagram: ${esc(c.instagram)}`:"",c.facebook?`Facebook: ${esc(c.facebook)}`:""].filter(Boolean).join(" · ");const ref=c.referral_reference?`Referência: ${esc(c.referral_reference)}`:"";const birthday=c.birthday?`Aniversário: ${esc(c.birthday.split("-").reverse().join("/"))}`:"";return `<article data-ne-client-id="${esc(c.id)}"><div class="who"><span class="avatar">${initials(c.name)}</span><div><h3>${esc(c.name)}</h3><p>${esc(c.phone||"Sem WhatsApp")}</p></div></div><div class="clientMeta">${birthday?`<small>${birthday}</small>`:""}${socials?`<small>${socials}</small>`:""}${ref?`<small>${ref}</small>`:""}</div>${c.notes?`<p>${esc(c.notes)}</p>`:""}<div class="tags">${(c.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div></article>`}).join("")||`<p class="muted">Nenhum cliente encontrado.</p>`;fillSelects();fillWaitlistSelects()}
 let searchTimer;$("#clientSearch").oninput=e=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadClients(e.target.value),220)};
 async function downloadClientBase(){try{await downloadCsvFromApi("/api/clients/export","novagente-clientes.csv")}catch(err){toast(err.message||"Falha ao exportar clientes")}}$("#exportClients").onclick=downloadClientBase;if($("#marketingExportClients"))$("#marketingExportClients").onclick=downloadClientBase;
@@ -110,6 +116,10 @@ function renderServices(){
 function renderResources(){$("#resourceList").innerHTML=state.resources.map(r=>`<article><span class="chip">${({chair:"Cadeira",washbasin:"Lavatório",room:"Sala",equipment:"Equipamento",other:"Outro"})[r.type]||r.type}</span><h3>${r.name}</h3><p>Entra no cálculo de disponibilidade da agenda.</p></article>`).join("")||`<p class="muted">Nenhum recurso cadastrado.</p>`}
 function fillSelects(){const c=$("#apClient"),p=$("#apProfessional"),s=$("#apService"),r=$("#apResource");if(!c||!p||!s||!r)return;c.innerHTML='<option value="">Selecione…</option>'+state.clients.map(x=>`<option value="${x.id}">${x.name}</option>`).join("");p.innerHTML='<option value="">Selecione…</option>'+state.professionals.map(x=>`<option value="${x.id}">${x.name}</option>`).join("");s.innerHTML='<option value="">Selecione…</option>'+state.services.map(x=>`<option value="${x.id}">${x.name} · ${fmt.format(x.price)}</option>`).join("");r.innerHTML='<option value="">Sem recurso específico</option>'+state.resources.map(x=>`<option value="${x.id}">${x.name}</option>`).join("")}
 const appointmentUi=setupAppointmentUi({getState:()=>state,api,esc,fmt,$,$$});
+function openAppointmentAt(professionalId,start){if(professionalId)$("#apProfessional").value=professionalId;$("#appointmentForm").elements.start_at.value=new Date(start.getTime()-start.getTimezoneOffset()*60000).toISOString().slice(0,16);appointmentUi.refreshSummary();$("#appointmentModal").showModal()}
+async function refreshDashboardData(){state.dashboard=await api("/api/dashboard");renderDashboard()}
+const dashboardBoard=setupDashboard({api,esc,fmt,toast,$});
+const agendaBoard=setupAgenda({api,esc,fmt,toast,$,$$,statusLabel,initials,openNew:openAppointmentAt,openCheckout:id=>openCheckout(id),afterChange:refreshDashboardData});
 
 function fillWaitlistSelects(){
   const c=$("#wlClient"),s=$("#wlService"),p=$("#wlProfessional");if(!c||!s||!p)return;
@@ -124,91 +134,9 @@ async function loadWaitlist(){
 }
 $("#waitlistForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/waitlist",{method:"POST",body:JSON.stringify(b)});$("#waitlistModal").close();e.target.reset();await loadWaitlist();toast("Cliente adicionado à lista de espera")}catch{toast("Não foi possível adicionar à lista de espera")}};
 
-const neAgendaStatusOptions={
-  scheduled:["confirmed","arrived","in_service","cancelled","no_show"],
-  confirmed:["arrived","in_service","cancelled","no_show"],
-  arrived:["in_service","cancelled"],
-  in_service:[],completed:[],cancelled:[],no_show:[]
-};
-const neAgendaQuickActions={
-  scheduled:{status:"confirmed",label:"Confirmar horário"},
-  confirmed:{status:"arrived",label:"Cliente chegou"},
-  arrived:{status:"in_service",label:"Iniciar atendimento"}
-};
-function renderAgendaCards(){
-  const all=Array.isArray(state.agendaAppointments)?state.agendaAppointments:[];
-  const select=$("#neAgendaProfessional"),profId=state.neAgendaProfessional||"";
-  if(select){
-    const selected=profId;
-    select.innerHTML='<option value="">Todos os profissionais</option>'+state.professionals.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join("");
-    select.value=selected;
-  }
-  const filter=state.neAgendaFilter||"today";
-  const day=new Date(),dayStart=new Date(day.getFullYear(),day.getMonth(),day.getDate()).getTime();
-  const tomorrow=dayStart+24*60*60*1000;
-  const closed=new Set(["completed","cancelled","no_show"]);
-  const visible=all.filter(a=>{
-    const start=new Date(a.start_at).getTime();
-    if(!Number.isFinite(start))return false;
-    if(profId&&a.professional_id!==profId)return false;
-    if(filter==="today")return start>=dayStart&&start<tomorrow;
-    if(filter==="upcoming")return start>=tomorrow&&!closed.has(a.status);
-    if(filter==="closed")return closed.has(a.status);
-    return true;
-  });
-  $$("[data-ne-agenda-filter]").forEach(b=>{
-    const active=b.dataset.neAgendaFilter===filter;
-    b.classList.toggle("active",active);
-    b.setAttribute("aria-pressed",String(active));
-  });
-  const count=$("#neAgendaCount");if(count)count.textContent=visible.length+" "+(visible.length===1?"compromisso":"compromissos")+" nesta visão";
-  $("#agendaList").innerHTML=visible.map(a=>{
-    const d=new Date(a.start_at),time=d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",timeZone:tenantZone()});
-    const date=d.toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"2-digit",timeZone:tenantZone()});
-    const opts=[a.status,...(neAgendaStatusOptions[a.status]||[])];
-    const controls=opts.map(status=>'<option value="'+esc(status)+'" '+(a.status===status?'selected':'')+'>'+esc(statusLabel(status))+'</option>').join("");
-    const action=neAgendaQuickActions[a.status];
-    const fast=action?'<button type="button" class="primary" data-ne-agenda-next="'+esc(a.id)+'" data-next-status="'+action.status+'">'+action.label+'</button>':"";
-    return '<details class="ne-agenda-card"><summary><span class="ne-agenda-time">'+time+'<small>'+esc(date)+'</small></span><span class="ne-agenda-summary"><strong>'+esc(a.client_name||"Cliente")+'</strong><small>'+esc(a.service_summary||a.service_name||"Serviço")+' · '+esc(a.professional_summary||a.professional_name||"Profissional")+'</small></span><span class="ne-agenda-status">'+esc(statusLabel(a.status))+'</span><span class="ne-agenda-chevron" aria-hidden="true">⌄</span></summary>'+
-      '<div class="ne-agenda-details"><div class="ne-agenda-meta"><span>Serviço <strong>'+esc(a.service_summary||a.service_name||"—")+'</strong></span><span>Valor <strong>'+fmt.format(a.price)+'</strong></span>'+(a.resource_name?'<span>Recurso <strong>'+esc(a.resource_name)+'</strong></span>':"")+'</div>'+
-      '<div class="ne-agenda-controls"><label for="ne-ag-status-'+esc(a.id)+'">Situação</label><select id="ne-ag-status-'+esc(a.id)+'" data-status="'+esc(a.id)+'" '+(opts.length===1?'disabled':'')+'>'+controls+'</select>'+fast+
-      '<button type="button" class="secondary" data-ne-technical="'+esc(a.id)+'">Ficha técnica</button></div></div></details>';
-  }).join("")||'<div class="ne-empty-view"><strong>Nenhum atendimento nesta visão.</strong><p>Escolha outro filtro ou abra um novo agendamento.</p></div>';
-  $$("[data-status]",$("#agendaList")).forEach(sel=>sel.onchange=()=>changeAgendaStatus(sel.dataset.status,sel.value));
-  $$("[data-ne-agenda-next]",$("#agendaList")).forEach(btn=>btn.onclick=()=>changeAgendaStatus(btn.dataset.neAgendaNext,btn.dataset.nextStatus));
-  $$("[data-ne-technical]",$("#agendaList")).forEach(btn=>btn.onclick=async()=>{
-    const a=state.agendaAppointments?.find(x=>x.id===btn.dataset.neTechnical);
-    if(!a)return;
-    activate("technical",{skipTechnicalLoad:true});
-    await loadTechnical(a.client_id);
-    const hidden=$("#neTechnicalAppointmentId");if(hidden)hidden.value=a.id;
-    const client=$("#technicalFormClient"),service=$("#technicalService"),pro=$("#technicalProfessional");
-    if(client)client.value=a.client_id;
-    if(service)service.value=a.service_id;
-    if(pro)pro.value=a.professional_id;
-  });
-}
-async function changeAgendaStatus(id,status){
-  try{
-    await api("/api/appointments/"+encodeURIComponent(id)+"/status",{method:"PATCH",body:JSON.stringify({status})});
-    toast("Atendimento atualizado");
-    await loadAgendaPhase2();
-    state.dashboard=await api("/api/dashboard");renderDashboard();
-  }catch(err){
-    toast(err.data?.error==="checkout_required"?"Finalize e receba pelo caixa":err.status===409?"A situação mudou. Recarregando agenda.":"Não foi possível atualizar o atendimento");
-    await loadAgendaPhase2().catch(()=>{});
-  }
-}
-async function loadAgenda(){
-  const from=new Date(Date.now()-30*86400000).toISOString(),to=new Date(Date.now()+30*86400000).toISOString();
-  state.agendaAppointments=await api("/api/appointments?from="+encodeURIComponent(from)+"&to="+encodeURIComponent(to));
-  renderAgendaCards();
-}
-$$("[data-ne-agenda-filter]").forEach(btn=>btn.onclick=()=>{state.neAgendaFilter=btn.dataset.neAgendaFilter;renderAgendaCards();decorateAgendaCheckout()});
-$("#neAgendaProfessional").onchange=e=>{state.neAgendaProfessional=e.target.value;renderAgendaCards();decorateAgendaCheckout()};
-$("[data-ne-show-waitlist]").onclick=()=>$("#agenda .ne-waitlist-panel")?.scrollIntoView({behavior:"smooth",block:"start"});
+function loadAgenda(){return agendaBoard.load()}
 async function loadReceipts(){const rows=await api("/api/jev/receipts");$("#receiptList").innerHTML=rows.map(r=>`<div class="row"><div><strong>${r.local_route}</strong><small>${r.input_excerpt}</small></div><div style="text-align:right"><span class="status">${r.jev_trace_id?"JEV":"local"}</span><small>${r.latency_ms?`${r.latency_ms} ms`:"sem chamada JEV"}</small></div></div>`).join("")||`<p class="muted">Ainda não há decisões.</p>`}
-$("#commandForm").onsubmit=async e=>{e.preventDefault();const text=$("#commandText").value.trim();if(!text)return;$("#commandResult").textContent="Analisando…";try{const r=await api("/api/assistant/interpret",{method:"POST",body:JSON.stringify({text})}),used=r.route==="ambiguous"&&r.jev;let html="<strong>Rota:</strong> "+r.route+"<br><strong>Fonte:</strong> "+(used?"JEV ("+Math.round((r.jev.probability||0)*100)+"%)":"regra local · zero chamada JEV");if(r.booking){if(r.booking.service)html+="<br><strong>Serviço:</strong> "+r.booking.service.name;if(r.booking.professional)html+=" · "+r.booking.professional.name;if(r.booking.date)html+="<br><strong>Data:</strong> "+r.booking.date;if(r.booking.slots?.length)html+="<div class=\"slotList\">"+r.booking.slots.map(s=>"<button type=\"button\" class=\"slotChip\" data-slot=\""+s.start_at+"\" data-prof=\""+s.professional_id+"\" data-service=\""+s.service_id+"\">"+s.local_time+" · "+s.professional_name+"</button>").join("")+"</div>";else if(r.booking.missing?.length)html+="<br><small>Falta informar: "+r.booking.missing.join(", ")+"</small>";else html+="<br><small>Nenhum horário livre encontrado.</small>"}$("#commandResult").innerHTML=html;$$("[data-slot]").forEach(b=>b.onclick=()=>{$("#apProfessional").value=b.dataset.prof;$("#apService").value=b.dataset.service;$("#appointmentForm").elements.start_at.value=zoneWall(b.dataset.slot);appointmentUi.refreshSuggestions();appointmentUi.refreshSummary();$("#appointmentModal").showModal()})}catch{$("#commandResult").textContent="Falha ao interpretar."}};
+$("#commandForm").onsubmit=async e=>{e.preventDefault();const text=$("#commandText").value.trim();if(!text)return;$("#commandResult").textContent="Pensando…";try{const r=await api("/api/assistant/interpret",{method:"POST",body:JSON.stringify({text})});let html="<strong>Entendi:</strong> "+({appointment_book:"você quer marcar um horário",appointment_cancel:"você quer cancelar um horário",appointment_reschedule:"você quer remarcar um horário",price:"você quer saber um preço",service:"você quer saber sobre um serviço",human:"você quer falar com uma pessoa"}[r.route]||"ainda não sei ajudar com isso");if(r.booking){if(r.booking.service)html+="<br><strong>Serviço:</strong> "+r.booking.service.name;if(r.booking.professional)html+=" · "+r.booking.professional.name;if(r.booking.date)html+="<br><strong>Data:</strong> "+r.booking.date;if(r.booking.slots?.length)html+="<div class=\"slotList\">"+r.booking.slots.map(s=>"<button type=\"button\" class=\"slotChip\" data-slot=\""+s.start_at+"\" data-prof=\""+s.professional_id+"\" data-service=\""+s.service_id+"\">"+s.local_time+" · "+s.professional_name+"</button>").join("")+"</div>";else if(r.booking.missing?.length)html+="<br><small>Falta informar: "+r.booking.missing.join(", ")+"</small>";else html+="<br><small>Nenhum horário livre encontrado.</small>"}$("#commandResult").innerHTML=html;$$("[data-slot]").forEach(b=>b.onclick=()=>{$("#apProfessional").value=b.dataset.prof;$("#apService").value=b.dataset.service;$("#appointmentForm").elements.start_at.value=zoneWall(b.dataset.slot);appointmentUi.refreshSuggestions();appointmentUi.refreshSummary();$("#appointmentModal").showModal()})}catch{$("#commandResult").textContent="Não consegui responder agora. Tente de novo."}};
 $("#clientForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/clients",{method:"POST",body:JSON.stringify(b)});e.target.reset();$("#clientModal").close();await loadClients();state.dashboard=await api("/api/dashboard");renderDashboard();toast("Cliente cadastrado")}catch(err){toast(err.data?.error==="phone_already_exists"?"Esse WhatsApp já está cadastrado":"Erro ao cadastrar")}};
 $("#professionalForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{const x=await api("/api/professionals",{method:"POST",body:JSON.stringify(b)});state.professionals.push(x);renderTeam();fillSelects();$("#professionalModal").close();e.target.reset();toast("Profissional cadastrado")}catch{toast("Erro ao salvar")}};
 $("#serviceForm").onsubmit=async e=>{
@@ -709,14 +637,7 @@ $("#financePayForm").onsubmit=async e=>{
     form.reset();$("#financePayModal").close();await loadFinance();toast("Pagamento confirmado");
   }catch(err){toast(err.data?.error==="already_paid"?"Esse lançamento já foi pago":err.data?.error==="cash_session_required"?"Abra o caixa para pagar em dinheiro":err.data?.error==="insufficient_cash"?"Saldo físico insuficiente para esse pagamento":"Não foi possível registrar o pagamento")}
 };
-function decorateAgendaCheckout(){
-  $$("[data-status]").forEach(sel=>{
-    const status=sel.value,id=sel.dataset.status;if(["completed","cancelled","no_show"].includes(status)||sel.parentElement.querySelector("[data-checkout]"))return;
-    const b=document.createElement("button");b.type="button";b.className="secondary checkoutBtn";b.dataset.checkout=id;b.textContent="Finalizar e receber";
-    b.onclick=()=>openCheckout(id);sel.parentElement.appendChild(b);
-  });
-}
-async function loadAgendaPhase2(){await loadAgenda();decorateAgendaCheckout()}
+async function loadAgendaPhase2(){await loadAgenda()}
 $("#checkoutForm").onsubmit=async e=>{
   e.preventDefault();
   const b=Object.fromEntries(new FormData(e.target));
@@ -1053,7 +974,7 @@ async function loadAdmin(){
     $("#adminUsersCount").textContent=(d.users||[]).length;
     $("#adminAuditCount").textContent=(d.audits||[]).length;
     $("#adminBackupAge").textContent=d.backup?.latest?ageHuman(d.backup.latest.mtime):"—";
-    $("#adminBackupName").textContent=d.backup?.latest?.name||"nenhum backup";$("#adminRestore").textContent=d.restore?.ok?"OK":"ATENÇÃO";$("#adminRestoreDate").textContent=d.restore?.checked_at?ageHuman(d.restore.checked_at)+" atrás":(d.restore?.error||"não verificada");
+    $("#adminBackupName").textContent=d.backup?.latest?.name||"nenhum backup";$("#adminRestore").textContent=d.restore?.ok?"OK":"ATENÇÃO";$("#adminRestoreDate").textContent=d.restore?.checked_at?ageHuman(d.restore.checked_at)+" atrás":(d.restore?.error==="not_checked"||!d.restore?.error?"ainda não verificada":esc(d.restore.error));
     const mem=d.system?.memory||{},disk=d.system?.disk||{};
     $("#adminSystemInfo").innerHTML=[
       ["Memória usada",bytesHuman(mem.used)+" / "+bytesHuman(mem.total)],

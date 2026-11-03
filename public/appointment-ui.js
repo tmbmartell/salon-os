@@ -63,12 +63,20 @@ export function setupAppointmentUi({getState,api,esc,fmt,$,$$}){
   $("#addAppointmentService")?.addEventListener("click",()=>addItem());
   $$("[data-ap-tag]").forEach(b=>b.addEventListener("click",()=>{const t=b.dataset.apTag;if(ui.autoTags.has(t))return;ui.selectedTags.has(t)?ui.selectedTags.delete(t):ui.selectedTags.add(t);renderTags()}));
   $("#addAppointmentTag")?.addEventListener("click",()=>{
-    const tag=window.prompt("Nome da nova tag:");
-    if(!tag||!tag.trim())return;
-    const clean=tag.trim().slice(0,40);ui.selectedTags.add(clean);
-    const btn=document.createElement("button");btn.type="button";btn.dataset.apTag=clean;btn.textContent=clean;
-    btn.addEventListener("click",()=>{ui.selectedTags.has(clean)?ui.selectedTags.delete(clean):ui.selectedTags.add(clean);renderTags()});
-    $("#addAppointmentTag").before(btn);renderTags();
+    const add=$("#addAppointmentTag");add.hidden=true;
+    const input=document.createElement("input");input.className="newTagInput";input.maxLength=40;input.placeholder="Nome da tag";input.setAttribute("aria-label","Nome da nova tag");
+    let done=false;
+    const finish=save=>{
+      if(done)return;done=true;const clean=input.value.trim();input.remove();add.hidden=false;
+      if(!save||!clean)return;
+      ui.selectedTags.add(clean);
+      const btn=document.createElement("button");btn.type="button";btn.dataset.apTag=clean;btn.textContent=clean;
+      btn.addEventListener("click",()=>{ui.selectedTags.has(clean)?ui.selectedTags.delete(clean):ui.selectedTags.add(clean);renderTags()});
+      add.before(btn);renderTags();
+    };
+    input.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();finish(true)}if(e.key==="Escape"){e.preventDefault();e.stopPropagation();finish(false)}});
+    input.addEventListener("blur",()=>finish(true));
+    add.before(input);input.focus();
   });
   $("#apClient")?.addEventListener("change",refreshSuggestions);
   $("#apService")?.addEventListener("change",refreshSuggestions);

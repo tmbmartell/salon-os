@@ -1,39 +1,32 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {fileURLToPath} from "node:url";
 const base=new URL("../public/",import.meta.url);
 const html=readFileSync(new URL("index.html",base),"utf8");
-const css=readFileSync(new URL("novagente-design-system.css",base),"utf8");
-const icons=readFileSync(new URL("novagente-design-icons.js",base),"utf8");
-test("Design System global is loaded after prior theme and dashboard layers",()=>{
- const ds=html.indexOf('novagente-design-system.css?v=');
- assert.ok(ds>html.indexOf('novagente-approved-home.css?v='),"global style layer must be last");
- assert.ok(ds>html.indexOf('novagente-contrast-audit.css?v='));
- assert.ok(ds>0);
+const tokens=readFileSync(new URL("tokens.css",base),"utf8");
+const components=readFileSync(new URL("novagente-components.css",base),"utf8");
+// Interface Novagente: tokens.css + styles.css definem tema e layout;
+// novagente-components.css só estiliza os componentes funcionais (ne-*).
+test("Design tokens load first and component layer follows the base styles",()=>{
+ const t=html.indexOf('href="/tokens.css"'),s=html.indexOf('href="/styles.css"'),c=html.indexOf('novagente-components.css?v=');
+ assert.ok(t>0&&s>t&&c>s,"tokens → styles → components");
 });
-test("Font tokens and unified controls apply to all modules and dialogs",()=>{
- for(const phrase of ["--ne-ui-font","--ne-type-display","--ne-type-body","--ne-control-h",
-  ".view:not(#dashboard)","dialog",".modalForm",".sidebar.ne-rail-sidebar",
-  ".bw-submenu",".ne-filter-group",".ne-action-card",".ne-finance-action",
-  ".hubCard",".ne-owner-kpi",".ne-stock-product",".ne-agenda-card"]){
-  assert.ok(css.includes(phrase),phrase+" missing from global design system");
- }
+test("Old visual layers that redraw the menu and home are not loaded",()=>{
+ for(const f of ["beauty-ui.js","novagente-experience.js","novagente-sidebar.js","novagente-theme.js","novagente-design-system.css","novagente-density-compact.css","novagente-approved-home.css"])
+  assert.equal(html.includes(f),false,f+" must not be loaded");
 });
-test("Both themes have dedicated palette and enough visual role variables",()=>{
- for(const theme of ['html[data-ne-theme="light"]','html[data-ne-theme="dark"]'])assert.ok(css.includes(theme));
- for(const role of ["--ne-ui-fg","--ne-ui-muted","--ne-ui-edge","--ne-ui-panel","--ne-pastel-violet","--ne-pastel-green"])assert.ok(css.includes(role));
+test("Both themes are defined by tokens, with an automatic mode",()=>{
+ assert.ok(tokens.includes('[data-theme="dark"]'));
+ assert.ok(tokens.includes("prefers-color-scheme: dark"));
+ for(const role of ["--nv-ink","--nv-surface","--nv-line","--nv-primary"])assert.ok(tokens.includes(role),role);
 });
-test("Pictograms are SVG (not dependent on external icon service)",()=>{
- assert.ok(icons.includes("createElementNS"));
- assert.ok(icons.includes("aria-hidden"));
- assert.ok(icons.includes("neIconEnhanced"));
- assert.ok(html.includes('novagente-design-icons.js?v='));
+test("Functional components are styled without layout overrides",()=>{
+ for(const c of [".ne-finance-action",".ne-marketing-card",".ne-owner-kpi",".ne-stock-product",".ne-mfa-box"])assert.ok(components.includes(c),c);
+ assert.equal(/(^|[},\s])\.(sidebar|shell|topbar)\b/.test(components),false,"no menu/layout rules");
+ for(const v of ["--ne-surface","--ne-outline","--ne-text"])assert.ok(components.includes(v+":var(--nv-"),v+" mapped to tokens");
 });
-test("Mobile and keyboard accessibility adjustments exist",()=>{
- assert.ok(css.includes("@media(max-width:570px)"));
- assert.ok(css.includes("@media(max-width:900px)"));
- assert.ok(css.includes(":focus-visible"));
- assert.ok(css.includes("prefers-reduced-motion"));
- assert.ok(css.includes("min-height:var(--ne-control-h)"));
+test("Navigation icons are inline SVG and decorative",()=>{
+ const nav=html.slice(html.indexOf('<nav aria-label="Menu principal"'),html.indexOf("</nav>"));
+ assert.ok(nav.includes("<svg"));
+ assert.ok(nav.includes('aria-hidden="true"'));
 });

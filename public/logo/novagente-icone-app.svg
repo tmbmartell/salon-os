@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="4 4 56 56" width="512" height="512">
+  <title>Novagente Estética — ícone do app</title>
+  <clipPath id="c"><rect x="4" y="4" width="56" height="56" rx="18"/></clipPath>
+  <g clip-path="url(#c)"><rect width="64" height="64" fill="#B8D8EA"/></g>
+  <path d="M21 44V24C21 18 27 17 29 23L35 41C37 47 43 46 43 40V20" fill="none" stroke="#26323B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

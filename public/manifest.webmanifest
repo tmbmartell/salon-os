@@ -1,12 +1,12 @@
 {
-  "name": "NOVAGENTE Estética — Gestão Integrada",
-  "short_name": "NOVAGENTE",
+  "name": "Novagente Estética",
+  "short_name": "Novagente",
   "description": "Gestão integrada de salões, estética, atendimento, agenda e operações.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f5f8fc",
-  "theme_color": "#122d4d",
+  "background_color": "#fafbfc",
+  "theme_color": "#b8d8ea",
   "orientation": "portrait-primary",
   "icons": [
     {

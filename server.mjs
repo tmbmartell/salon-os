@@ -24,6 +24,7 @@ import { installPhase8, handlePhase8Api } from "./phase8.mjs";
 import { installPhase9, handlePhase9Api, staffWindowForDate } from "./phase9.mjs";
 import { installPhase10, handlePhase10Api } from "./phase10.mjs";
 import { installPhase11, handlePhase11Api } from "./phase11.mjs";
+import { installPhase12, handlePhase12Api } from "./phase12.mjs";
 import { checkManualStatusTransition } from "./appointment-status.mjs";
 import { installCommercialAutomation, policy as commercialPolicy, registerIncoming, afterAppointmentCreated, afterAppointmentStatus, receptionistDraft } from "./commercial-automation.mjs";
 import { handleCommercialApi } from "./commercial-api.mjs";
@@ -171,7 +172,7 @@ if(!clientCols.includes("referral_reference"))run("alter table clients add colum
 
 function ensureSeed(){
   if(one("select id from tenants where id=?",[DEFAULT_TENANT]))return;
-  run("insert into tenants(id,name,slug,timezone,created_at) values(?,?,?,?,?)",[DEFAULT_TENANT,"Studio Aurora","studio-aurora","America/Porto_Velho",now()]);
+  run("insert into tenants(id,name,slug,timezone,created_at) values(?,?,?,?,?)",[DEFAULT_TENANT,"Novagente Estética","novagente-estetica","America/Porto_Velho",now()]);
   run("insert into users(id,tenant_id,name,email,role,created_at) values(?,?,?,?,?,?)",[id(),DEFAULT_TENANT,"Dona do Salão","dona@studio.local","owner",now()]);
   if(process.env.NOVAGENTE_EMPTY_INITIAL_TENANT==="true")return; // ambiente de pareamento sem clientes/horários fictícios
   const profs=[
@@ -220,6 +221,7 @@ installPhase8(db);
 installPhase9(db);
 installPhase10(db);
 installPhase11(db);
+installPhase12(db);
 ensureAgentProfiles(db,DEFAULT_TENANT);
 db.exec(`
 CREATE TABLE IF NOT EXISTS waitlist(
@@ -698,6 +700,8 @@ async function api(req,res,url){
   if(phase10Result!==false)return phase10Result;
   const phase11Result=await handlePhase11Api({req,res,url,db,user,tenant,send,parseBody,requirePermission,audit});
   if(phase11Result!==false)return phase11Result;
+  const phase12Result=await handlePhase12Api({req,res,url,db,user,tenant,send,requirePermission});
+  if(phase12Result!==false)return phase12Result;
 
   if(req.method==="GET"&&url.pathname==="/api/bootstrap"){
     guard("dashboard.read");
@@ -1027,7 +1031,7 @@ async function api(req,res,url){
   return send(res,404,{error:"not_found"});
 }
 
-const MIME={".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".svg":"image/svg+xml",".png":"image/png",".json":"application/json; charset=utf-8",".webmanifest":"application/manifest+json; charset=utf-8"};
+const MIME={".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".svg":"image/svg+xml",".woff2":"font/woff2",".png":"image/png",".json":"application/json; charset=utf-8",".webmanifest":"application/manifest+json; charset=utf-8"};
 // Proteção de origem em operações mutáveis de navegadores.
 // O webhook WAHA usa autenticação HMAC própria e é tratado separadamente.
 function sameOriginMutation(req,url){return browserMutationAllowed(req,url)}

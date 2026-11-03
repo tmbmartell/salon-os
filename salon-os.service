@@ -1,5 +1,5 @@
 [Unit]
-Description=Nova Gente Salon OS
+Description=Novagente Estética
 After=network-online.target
 Wants=network-online.target
 
