@@ -5,7 +5,7 @@
 :root {
   --nv-primary:#b8d8ea; --nv-primary-hover:#a5cce2; --nv-on-primary:#24323d; --nv-primary-soft:#e8f3f9; --nv-primary-ink:#2f5f7c;
   --nv-bg:#fafbfc; --nv-surface:#ffffff; --nv-surface-2:#f2f5f7; --nv-line:#e3e9ed;
-  --nv-ink:#26323b; --nv-ink-2:#53626d; --nv-ink-3:#677582;
+  --nv-ink:#26323b; --nv-ink-2:#53626d; --nv-ink-3:#5c6a76;
   --nv-ok:#25694a; --nv-ok-soft:#ddf2e6; --nv-warn:#7a5a0c; --nv-warn-soft:#fbf0cc; --nv-bad:#a23b48; --nv-bad-soft:#f9dfe1;
 
   --nv-font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
@@ -28,7 +28,7 @@
   :root:not([data-theme="light"]) {
   --nv-primary:#b8d8ea; --nv-primary-hover:#cbe3f1; --nv-on-primary:#1c2830; --nv-primary-soft:#2c414f; --nv-primary-ink:#cfe6f3;
   --nv-bg:#1a2229; --nv-surface:#222c34; --nv-surface-2:#2b3640; --nv-line:#3a4752;
-  --nv-ink:#eef3f6; --nv-ink-2:#c3ced6; --nv-ink-3:#96a4af;
+  --nv-ink:#eef3f6; --nv-ink-2:#c3ced6; --nv-ink-3:#a8b5bf;
   --nv-ok:#a9e3c3; --nv-ok-soft:#263f35; --nv-warn:#f3de9a; --nv-warn-soft:#423a20; --nv-bad:#f5b8c0; --nv-bad-soft:#4a2f35;
   color-scheme: dark;
   }
@@ -37,7 +37,7 @@
 :root[data-theme="dark"] {
   --nv-primary:#b8d8ea; --nv-primary-hover:#cbe3f1; --nv-on-primary:#1c2830; --nv-primary-soft:#2c414f; --nv-primary-ink:#cfe6f3;
   --nv-bg:#1a2229; --nv-surface:#222c34; --nv-surface-2:#2b3640; --nv-line:#3a4752;
-  --nv-ink:#eef3f6; --nv-ink-2:#c3ced6; --nv-ink-3:#96a4af;
+  --nv-ink:#eef3f6; --nv-ink-2:#c3ced6; --nv-ink-3:#a8b5bf;
   --nv-ok:#a9e3c3; --nv-ok-soft:#263f35; --nv-warn:#f3de9a; --nv-warn-soft:#423a20; --nv-bad:#f5b8c0; --nv-bad-soft:#4a2f35;
   color-scheme: dark;
 }

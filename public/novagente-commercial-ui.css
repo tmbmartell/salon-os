@@ -37,7 +37,7 @@
 .ne-auto-jobs{display:grid;gap:7px;padding:10px}
 .ne-auto-job{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px;border:1px solid var(--ne-outline);border-radius:8px;color:var(--ne-text);font-size:12px}
 .ne-auto-job small{color:var(--ne-text-secondary)}
-.ne-auto-feedback{color:#c24b4b;font-size:12px;margin:0}
+.ne-auto-feedback{color:var(--nv-bad);font-size:12px;margin:0}
 @media(max-width:1200px){.ne-auto-stages{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:700px){.ne-auto-metrics{grid-template-columns:1fr}.ne-auto-stages{grid-template-columns:repeat(2,minmax(0,1fr))}.ne-auto-policy-options{grid-template-columns:1fr}.ne-auto-summary{flex-wrap:wrap}.ne-auto-lead{flex-wrap:wrap}.ne-auto-status{margin-left:auto}}
 /* Etapa 24.1: simulador guiado de agendamento, leitura legível nos dois temas */
