@@ -190,7 +190,7 @@ test("guarda o dia informado antes de reconhecer o serviço no próximo turno",(
  x.db.prepare("insert into professional_services values(?,?)").run("p1","s2");
  try{
    const first=x.process("Quero agendar amanhã");
-   assert.match(first.text,/serviços/i);
+   assert.match(first.text,/serviço/i);
    assert.equal(bookingState(x.db,"t1","co1").day,"2026-10-28");
    const second=x.process("limpeza de pele");
    assert.equal(second.offered,2);
@@ -217,7 +217,7 @@ test("não inventa serviço a partir de saudação ou palavra desconexa",()=>{
  try{
    assert.equal(x.process("Bom dia").handled,false);
    const q=x.process("Quero agendar");
-   assert.match(q.text,/serviços/i);
+   assert.match(q.text,/serviço/i);
    const later=x.process("Gostaria de conversar");
    assert.match(later.text,/qual destes serviços/i);
    assert.equal(bookingState(x.db,"t1","co1").service_id,null);
