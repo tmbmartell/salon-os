@@ -84,7 +84,7 @@
   adminPanels.premium.append(premiumInfo);
   const inviteDialog=make("dialog","ne-stage8-dialog");
   inviteDialog.id="neInviteDialog";const inviteForm=make("form","ne-stage8-form");
-  inviteForm.append(make("h3","","Convidar uma pessoa"),make("p","ne-stage8-help","Convite válido por 48 horas. A pessoa criará sua própria senha."));
+  inviteForm.append(make("h3","","Convidar uma pessoa"),make("p","ne-stage8-help","Recepção e profissionais: link sem senha (15 min). Gerência: senha obrigatória (48 h)."));
   inviteForm.append(field("Nome","name","text",true),field("E-mail","email","email",true));
   const roleField=make("label","ne-stage8-field"),roles=make("select");roles.name="role";
   for(const r of ["manager","reception","professional"]){
@@ -98,6 +98,20 @@
   const inviteStatus=make("p","ne-stage8-help");inviteStatus.setAttribute("role","status");
   inviteForm.append(inviteActions,inviteStatus);
   inviteDialog.append(inviteForm);document.body.append(inviteDialog);
+  // O salão gera links de curta duração; nenhum e-mail ou WhatsApp é enviado sem autorização.
+  const accessDialog=make("dialog","ne-stage8-dialog");
+  accessDialog.id="neStaffAccessDialog";
+  document.body.append(accessDialog);
+  function showAccessLink(title,url,expiresAt){
+    const box=make("div","ne-stage8-form"),heading=make("h3","",title),
+      warning=make("p","ne-stage8-help","Link de uso único. Envie somente ao funcionário autorizado e não publique em grupos.");
+    const expiry=make("p","ne-stage8-help","Expira em "+new Date(expiresAt).toLocaleString("pt-BR")+".");
+    const input=make("input");input.readOnly=true;input.value=url;input.setAttribute("aria-label","Link temporário");
+    const copy=make("button","primary","Copiar link");copy.type="button";
+    copy.onclick=async()=>{try{await navigator.clipboard.writeText(url);copy.textContent="Copiado";}catch{input.focus();input.select()}};
+    const close=make("button","secondary","Fechar");close.type="button";close.onclick=()=>accessDialog.close();
+    box.append(heading,warning,expiry,input,copy,close);accessDialog.replaceChildren(box);accessDialog.showModal();
+  }
   const inviteFormOriginal=[...inviteForm.childNodes];
   inviteButton.hidden=true;
   inviteButton.onclick=()=>{inviteForm.replaceChildren(...inviteFormOriginal);inviteForm.reset();submitInvite.disabled=false;detailMessage(inviteStatus,"");inviteDialog.showModal()};
@@ -108,7 +122,7 @@
       const invite=await api("/api/admin/invitations",json("POST",body));
       const link=location.origin+location.pathname+"#invite="+encodeURIComponent(invite.token);
       const holder=make("div","ne-stage8-invite-link");
-      const info=make("p","","Convite criado. Copie este link e envie por um canal seguro. Ele aparece somente agora.");
+      const info=make("p","","Convite criado. Envie em particular; ele aparece somente agora e expira rapidamente.");
       const input=make("input");input.readOnly=true;input.value=link;input.setAttribute("aria-label","Link do convite");
       const copy=make("button","secondary","Copiar link");copy.type="button";
       copy.onclick=async()=>{
@@ -165,6 +179,28 @@
             try{await api("/api/admin/users/"+encodeURIComponent(u.id)+"/revoke-sessions",json("POST",{}));alert("Acessos encerrados.")}catch(e){alert(getError(e))}
           };
           actions.append(status,revoke);
+          if(u.active&&["reception","professional"].includes(u.role)){
+            const quick=make("button","secondary","Link para entrar");
+            quick.type="button";
+            quick.onclick=async()=>{
+              try{
+                const data=await api("/api/admin/users/"+encodeURIComponent(u.id)+"/access-link",json("POST",{}));
+                showAccessLink("Entrar sem senha — "+u.name,location.origin+location.pathname+"#access="+encodeURIComponent(data.token),data.expires_at);
+              }catch(e){alert(getError(e))}
+            };
+            actions.append(quick);
+          }
+          if(u.active&&["manager","reception","professional"].includes(u.role)){
+            const reset=make("button","secondary","Redefinir senha");
+            reset.type="button";
+            reset.onclick=async()=>{
+              try{
+                const data=await api("/api/admin/users/"+encodeURIComponent(u.id)+"/password-reset",json("POST",{}));
+                showAccessLink("Redefinir senha — "+u.name,location.origin+location.pathname+"?reset="+encodeURIComponent(data.token),data.expires_at);
+              }catch(e){alert(getError(e))}
+            };
+            actions.append(reset);
+          }
         }
         row.append(info,actions);usersControls.append(row);
       }
@@ -260,6 +296,8 @@
   // O convite via fragmento nunca é enviado em URLs de requisições HTTP.
   const inviteToken=new URLSearchParams(location.hash.slice(1)).get("invite");
   if(inviteToken){
+    // O fragmento não entra nas requisições HTTP nem permanece no histórico.
+    history.replaceState(null,"",location.pathname+location.search);
     const acceptance=make("dialog","ne-stage8-dialog ne-stage8-accept");
     const form=make("form","ne-stage8-form");
     form.append(make("h3","","Convite para NOVAGENTE Estética"),
@@ -270,6 +308,20 @@
     const button=make("button","primary","Criar meu acesso");button.type="submit";
     form.append(pw,pwAgain,button,hint);acceptance.append(form);document.body.append(acceptance);
     acceptance.showModal();
+    api("/api/auth/invitations/inspect",json("POST",{token:inviteToken})).then(detail=>{
+      if(!detail.passwordless_available)return;
+      const fast=make("button","primary","Ativar acesso sem senha");
+      fast.type="button";
+      const help=make("p","ne-stage8-help","Recepção e profissionais podem entrar diretamente. O link funciona uma vez.");
+      fast.onclick=async()=>{
+        fast.disabled=true;detailMessage(hint,"Validando convite…");
+        try{
+          await api("/api/auth/invitations/accept",json("POST",{token:inviteToken,passwordless:true}));
+          location.replace(location.pathname+location.search);
+        }catch(e){detailMessage(hint,getError(e));fast.disabled=false}
+      };
+      form.prepend(help,fast);
+    }).catch(()=>detailMessage(hint,"Este convite pode ter expirado. Solicite outro link."));
     form.onsubmit=async event=>{
       event.preventDefault();
       const password=form.elements.password.value;

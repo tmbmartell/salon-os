@@ -393,9 +393,12 @@ $("#neWhatsappRefresh").onclick=async()=>{
 $("#openClientFromChat").onclick=async()=>{const p=state.selectedConversation?.client_phone||"";activate("clients");$("#clientSearch").value=p;await loadClients(p)};
 $("#resourceForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{const x=await api("/api/resources",{method:"POST",body:JSON.stringify(b)});state.resources.push(x);renderResources();fillSelects();$("#resourceModal").close();e.target.reset();toast("Recurso cadastrado")}catch{toast("Erro ao salvar recurso")}};
 
-function showAuth(mode,name=""){const gate=$("#authGate");gate.classList.remove("hidden");$("#setupPanel").classList.toggle("hidden",mode!=="setup");$("#loginPanel").classList.toggle("hidden",mode!=="login");$("#resetPanel").classList.toggle("hidden",mode!=="reset");$("#mfaPanel").classList.toggle("hidden",mode!=="mfa");$("#authError").textContent="";if(name)$("#loginTenant").textContent="Acesso a "+name+"."}
+function showAuth(mode,name=""){const gate=$("#authGate");gate.classList.remove("hidden");$("#setupPanel").classList.toggle("hidden",mode!=="setup");$("#loginPanel").classList.toggle("hidden",mode!=="login");$("#resetPanel").classList.toggle("hidden",mode!=="reset");$("#mfaPanel").classList.toggle("hidden",mode!=="mfa");$("#pendingProfessionalPanel").classList.toggle("hidden",mode!=="pending");$("#authError").textContent="";if(name)$("#loginTenant").textContent="Acesso a "+name+"."}
 function hideAuth(){$("#authGate").classList.add("hidden")}
-async function initAuth(){const resetToken=new URLSearchParams(location.search).get("reset");if(resetToken){try{const info=await api("/api/auth/reset?token="+encodeURIComponent(resetToken));showAuth("reset");$("#resetIdentity").textContent="Redefinindo o acesso de "+info.email+".";return}catch{showAuth("login");$("#authError").textContent="Este link de redefinição expirou ou já foi usado.";return}}try{const s=await api("/api/auth/state");if(!s.claimed){showAuth("setup",s.tenant?.name);return}try{const me=await api("/api/auth/me");state.user=me.user;hideAuth();await bootstrap()}catch{showAuth("login",s.tenant?.name)}}catch{showAuth("login");$("#authError").textContent="Não foi possível verificar o acesso."}}
+function pendingProfessionalLink(user){if(user?.role==="professional"&&!user.professionalId){state.user=user;showAuth("pending");return true}return false}
+$("#pendingProfessionalRefresh").onclick=async()=>{try{const result=await api("/api/auth/me");if(pendingProfessionalLink(result.user))return toast("Aguardando vínculo da sua agenda pelo proprietário.");state.user=result.user;hideAuth();await bootstrap()}catch{showAuth("login");$("#authError").textContent="Não foi possível verificar. Entre novamente."}};
+$("#pendingProfessionalLogout").onclick=async()=>{try{await api("/api/auth/logout",{method:"POST",body:"{}"})}catch{}showAuth("login")};
+async function initAuth(){const resetToken=new URLSearchParams(location.search).get("reset");if(resetToken){try{const info=await api("/api/auth/reset?token="+encodeURIComponent(resetToken));showAuth("reset");$("#resetIdentity").textContent="Redefinindo o acesso de "+info.email+".";return}catch{showAuth("login");$("#authError").textContent="Este link de redefinição expirou ou já foi usado.";return}}try{const s=await api("/api/auth/state");if(!s.claimed){showAuth("setup",s.tenant?.name);return}try{const me=await api("/api/auth/me");state.user=me.user;if(pendingProfessionalLink(me.user))return;hideAuth();await bootstrap()}catch{showAuth("login",s.tenant?.name)}}catch{showAuth("login");$("#authError").textContent="Não foi possível verificar o acesso."}}
 $("#setupForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/auth/setup",{method:"POST",body:JSON.stringify(b)});showAuth("login");$("#loginForm").elements.email.value=b.email;toast("Acesso criado. Agora entre com sua senha.")}catch(err){$("#authError").textContent=err.data?.error==="password_too_short"?"Use uma senha com pelo menos 10 caracteres.":"Não foi possível criar o acesso."}};
 $("#resetForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target)),token=new URLSearchParams(location.search).get("reset");if(b.password!==b.confirm_password){$("#authError").textContent="As duas senhas precisam ser iguais.";return}try{await api("/api/auth/reset",{method:"POST",body:JSON.stringify({token,password:b.password})});history.replaceState({},document.title,location.pathname);showAuth("login");$("#authError").textContent="Senha redefinida. Entre com a nova senha."}catch(err){$("#authError").textContent=err.data?.error==="password_too_short"?"Use uma senha com pelo menos 10 caracteres.":"Não foi possível redefinir. Gere um novo link."}};
 let mfaLoginChallenge=null;
@@ -405,7 +408,7 @@ $("#loginForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries
     mfaLoginChallenge=out.challenge;showAuth("mfa");
     $("#mfaLoginForm").reset();$("#mfaLoginForm").elements.code.focus();return;
   }
-  state.user=out.user;hideAuth();await bootstrap();
+  state.user=out.user;if(pendingProfessionalLink(out.user))return;hideAuth();await bootstrap();
 }catch(err){
   if(err.data?.error==="workspace_required"){$("#workspaceLoginField").classList.remove("hidden");$("#authError").textContent="Este e-mail existe em mais de um salão. Informe o identificador da empresa."}
   else if(err.data?.error==="login_temporarily_blocked")$("#authError").textContent="Muitas tentativas. Aguarde 15 minutos e tente novamente.";
@@ -416,7 +419,7 @@ $("#mfaLoginForm").onsubmit=async e=>{
   const code=String(e.target.elements.code.value||"").trim();
   try{
     const out=await api("/api/auth/mfa/verify",{method:"POST",body:JSON.stringify({challenge:mfaLoginChallenge,code})});
-    mfaLoginChallenge=null;e.target.reset();state.user=out.user;hideAuth();await bootstrap();
+    mfaLoginChallenge=null;e.target.reset();state.user=out.user;if(pendingProfessionalLink(out.user))return;hideAuth();await bootstrap();
   }catch(err){
     $("#authError").textContent=err.status===429?"Limite de tentativas atingido. Volte ao login.":"Código inválido ou expirado.";
     e.target.elements.code.value="";
@@ -834,8 +837,13 @@ async function loadAgents(){
   try{
     const [meta,tasks]=await Promise.all([api("/api/agents"),api("/api/agents/tasks")]);
     $("#agentPendingBadge").textContent=meta.pending+" pendentes";state.agentProfiles=meta.profiles;
-    $("#agentProfileList").innerHTML=meta.profiles.map(a=>{const cfg=a.config||{},display=cfg.identity?.display_name||a.name,configBtn=a.agent_key==="receptionist"?'<button type="button" class="secondary smallBtn" data-agent-config="'+a.agent_key+'">Configurar agente</button><button type="button" class="secondary smallBtn" data-agent-explain="'+a.agent_key+'">Ver regras e prompt</button>':"";return '<article><div class="panelhead"><span class="chip">'+(a.agent_key==="receptionist"?(a.enabled?"habilitada":"pausada"):(a.enabled?"ativo":"pausado"))+'</span><strong>'+esc(display)+'</strong></div><p>'+esc(a.description)+'</p><label class="autonomyLabel">Autonomia <b>'+a.autonomy+'</b>/10<input type="range" min="0" max="10" value="'+a.autonomy+'" data-agent-autonomy="'+a.agent_key+'"></label><div class="agentCardActions">'+configBtn+'</div></article>'}).join("");
+    const technical=state.user?.platform_admin===true;
+    $("#agentProfileList").innerHTML=meta.profiles.map(a=>{const cfg=a.config||{},display=cfg.identity?.display_name||a.name,configBtn=technical&&a.agent_key==="receptionist"?'<button type="button" class="secondary smallBtn" data-agent-config="'+a.agent_key+'">Configurar agente</button><button type="button" class="secondary smallBtn" data-agent-explain="'+a.agent_key+'">Ver regras e prompt</button>':"";
+    const autonomy=technical?'<label class="autonomyLabel">Autonomia <b>'+a.autonomy+'</b>/10<input type="range" min="0" max="10" value="'+a.autonomy+'" data-agent-autonomy="'+a.agent_key+'"></label>':"";
+    const operationalToggle=!technical&&a.agent_key==="receptionist"&&["owner","manager"].includes(state.user?.role)?'<button type="button" class="secondary smallBtn" data-agent-toggle="'+a.agent_key+'" data-enabled="'+Number(!!a.enabled)+'">'+(a.enabled?"Pausar atendimento IA":"Ativar atendimento IA")+'</button>':"";
+    return '<article><div class="panelhead"><span class="chip">'+(a.agent_key==="receptionist"?(a.enabled?"habilitada":"pausada"):(a.enabled?"ativo":"pausado"))+'</span><strong>'+esc(display)+'</strong></div><p>'+esc(a.description)+'</p>'+autonomy+'<div class="agentCardActions">'+operationalToggle+configBtn+'</div></article>'}).join("");
     $$("[data-agent-autonomy]").forEach(s=>s.onchange=async()=>{try{await api("/api/agents/profile",{method:"PATCH",body:JSON.stringify({agent_key:s.dataset.agentAutonomy,autonomy:Number(s.value)})});toast("Autonomia atualizada");await loadAgents()}catch{toast("Não foi possível alterar a autonomia")}});
+    $$("[data-agent-toggle]").forEach(b=>b.onclick=async()=>{if(!confirm("Alterar o atendimento automático da recepcionista?"))return;try{await api("/api/agents/profile",{method:"PATCH",body:JSON.stringify({agent_key:b.dataset.agentToggle,enabled:b.dataset.enabled!=="1"})});toast("Preferência operacional atualizada");await loadAgents()}catch{toast("Não foi possível alterar a IA")}});
     $$("[data-agent-config]").forEach(b=>b.onclick=()=>openAgentConfig(b.dataset.agentConfig));
     $$("[data-agent-explain]").forEach(b=>b.onclick=()=>openAgentExplain());
     $("#agentTaskList").innerHTML=tasks.slice(0,80).map(t=>{
@@ -884,7 +892,7 @@ async function openAgentExplain(){
     agentExplainPromptText=data.prompt_preview||"";
     prompt.textContent=agentExplainPromptText;
     $("#agentExplainPrivacy").textContent=data.preview_note||"Esta prévia não contém dados de clientes.";
-  }catch(err){status.textContent=err.status===403?"Apenas proprietária e gerência podem consultar essas instruções.":"Não foi possível consultar o estado do agente.";prompt.textContent="";agentExplainPromptText="";}
+  }catch(err){status.textContent=err.status===403?"Apenas a administração NOVAGENTE pode consultar essas instruções.":"Não foi possível consultar o estado do agente.";prompt.textContent="";agentExplainPromptText="";}
 }
 $("#agentExplainFromConfig").onclick=()=>openAgentExplain();
 $("#closeAgentExplain").onclick=()=>$("#agentExplainModal").close();

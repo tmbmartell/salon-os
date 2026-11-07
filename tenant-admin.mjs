@@ -97,7 +97,7 @@ export async function handleTenantAdministrationApi({req,res,url,db,user,tenant,
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||name.length<2||!["manager","reception","professional"].includes(role))
       return send(res,400,{error:"invalid_invitation"});
     if(one(db,"select id from users where tenant_id=? and lower(email)=?",[tenant,email]))return send(res,409,{error:"user_already_exists"});
-    const token=makeInviteToken(),tokenHash=sha(token),invitationId=crypto.randomUUID(),created=now(),expires=new Date(Date.now()+48*3600000).toISOString();
+    const token=makeInviteToken(),tokenHash=sha(token),invitationId=crypto.randomUUID(),created=now(),expires=new Date(Date.now()+(role==="manager"?48*3600000:15*60000)).toISOString();
     db.exec("BEGIN IMMEDIATE");
     try{
       run(db,"delete from user_invites where tenant_id=? and lower(email)=? and accepted_at is null",[tenant,email]);

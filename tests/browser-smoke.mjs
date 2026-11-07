@@ -77,22 +77,31 @@ try{
   await page.locator("#conversationStatusFilter").selectOption("");
   await page.locator("#conversationFiltersSummary").getByText("Nenhum filtro aplicado",{exact:false}).waitFor();
   await open("agents");
-  await page.locator('[data-agent-explain="receptionist"]').click();
-  await page.locator("#agentExplainModal[open]").waitFor({timeout:14000});
-  await page.locator("#agentExplainStatus").getByText("Execução automática:",{exact:false}).waitFor();
-  await page.locator("#agentExplainModal .agentExplainDetails").first().locator("summary").click();
-  await page.locator("#agentExplainRules").getByText("Responder preços",{exact:false}).waitFor();
-  await page.locator("#agentExplainModal .agentExplainDetails").nth(1).locator("summary").click();
-  await page.locator("#agentExplainPrompt").getByText("RECEPCIONISTA IA",{exact:false}).waitFor();
-  await page.screenshot({path:path.join(artifact,"14-transparencia-regras-prompt.png"),fullPage:true});
-  await page.locator("#closeAgentExplain").click();
-  await page.locator("#agentExplainModal").waitFor({state:"hidden"});
-  await page.locator('[data-agent-config="receptionist"]').click();
-  await page.locator("#agentConfigModal[open]").waitFor();
-  await page.locator("#agentExplainFromConfig").click();
-  await page.locator("#agentExplainModal[open]").waitFor();
-  await page.locator("#closeAgentExplain").click();
-  await page.locator("#agentConfigModal [data-close]").first().click();
+  // Proprietária do salão administra o negócio, mas não consulta prompt nem chaves internas.
+  assert.equal(await page.locator('[data-agent-explain="receptionist"]').count(),0);
+  assert.equal(await page.locator('[data-agent-config="receptionist"]').count(),0);
+  assert.equal(await page.locator('[data-agent-autonomy]').count(),0);
+  // Proprietária pode pausar/ativar operação sem modificar as regras internas.
+  const toggle=page.locator('[data-agent-toggle="receptionist"]');
+  await toggle.waitFor();
+  page.once("dialog",dialog=>dialog.accept());
+  await toggle.click();
+  await page.locator('[data-agent-toggle="receptionist"]:has-text("Ativar atendimento IA")').waitFor({timeout:12000});
+  page.once("dialog",dialog=>dialog.accept());
+  await page.locator('[data-agent-toggle="receptionist"]').click();
+  await page.locator('[data-agent-toggle="receptionist"]:has-text("Pausar atendimento IA")').waitFor({timeout:12000});
+  const access=await page.evaluate(async()=>{
+    const [prompts,config,profile]=await Promise.all([
+      fetch("/api/agents/receptionist/explain"),
+      fetch("/api/agents/receptionist/llm"),
+      fetch("/api/agents")]);
+    const data=await profile.json();
+    return {prompts:prompts.status,config:config.status,privateConfig:data.profiles.some(p=>p.config!==null)};
+  });
+  assert.equal(access.prompts,403);
+  assert.equal(access.config,403);
+  assert.equal(access.privateConfig,false);
+  await page.screenshot({path:path.join(artifact,"14-cliente-sem-configuracoes-tecnicas.png"),fullPage:true});
   await open("inbox");
   await page.locator("#syncWhatsappHistory").click();
   await page.locator("#whatsappBackfillDetails[open]").waitFor();
@@ -130,6 +139,52 @@ try{
   await page.screenshot({path:path.join(artifact,"08-diagnostico-piloto-sem-whatsapp.png"),fullPage:true});
 
   await page.screenshot({path:path.join(artifact,"05-administracao-desktop.png"),fullPage:true});
+
+  // Convite sem senha testado como funcionária real, em outro navegador e banco QA.
+  await page.locator('#admin [data-ne-tab="users"]').click();
+  await page.getByRole("button",{name:"+ Convidar pessoa"}).click();
+  await page.locator("#neInviteDialog [name=name]").fill("Profissional QA Sem Senha");
+  await page.locator("#neInviteDialog [name=email]").fill("profissional-qa@example.invalid");
+  await page.locator("#neInviteDialog [name=role]").selectOption("professional");
+  await page.locator('#neInviteDialog button[type="submit"]').click();
+  const inviteUrl=await page.locator("#neInviteDialog .ne-stage8-invite-link input").inputValue();
+  assert.match(inviteUrl,/#invite=/);
+  const staffContext=await browser.newContext({viewport:{width:390,height:844},locale:"pt-BR"});
+  const staffPage=await staffContext.newPage();
+  await staffPage.goto(inviteUrl,{waitUntil:"domcontentloaded"});
+  await staffPage.getByRole("button",{name:"Ativar acesso sem senha"}).waitFor({timeout:12000});
+  await staffPage.getByRole("button",{name:"Ativar acesso sem senha"}).click();
+  await staffPage.locator("#pendingProfessionalPanel:not(.hidden)").waitFor({timeout:22000});
+  const staffAccess=await staffPage.evaluate(async()=>{
+    const [me,clients]=await Promise.all([fetch("/api/auth/me"),fetch("/api/clients")]);
+    return {role:(await me.json()).user?.role,clients:clients.status};
+  });
+  assert.equal(staffAccess.role,"professional");
+  assert.equal(staffAccess.clients,403);
+  await staffPage.screenshot({path:path.join(artifact,"15-profissional-aguardando-vinculo.png"),fullPage:true});
+  await staffContext.close();
+  await page.keyboard.press("Escape");
+  await page.locator('#admin [data-ne-tab="users"]').click();
+  let userRow=page.locator(".ne-stage8-user-row").filter({hasText:"profissional-qa@example.invalid"});
+  const linking=userRow.locator('select[aria-label^="Profissional vinculada a"]');
+  const professionalId=await linking.locator("option").nth(1).getAttribute("value");
+  assert.ok(professionalId,"É preciso ter um cadastro profissional antes de vincular o acesso");
+  await linking.selectOption(professionalId);
+  await page.waitForTimeout(300);
+  userRow=page.locator(".ne-stage8-user-row").filter({hasText:"profissional-qa@example.invalid"});
+  await userRow.getByRole("button",{name:"Link para entrar"}).click();
+  const accessUrl=await page.locator("#neStaffAccessDialog input").inputValue();
+  assert.match(accessUrl,/#access=/);
+  const linkContext=await browser.newContext({viewport:{width:390,height:844},locale:"pt-BR"});
+  const linkPage=await linkContext.newPage();
+  await linkPage.goto(accessUrl,{waitUntil:"domcontentloaded"});
+  await linkPage.locator("#authGate").waitFor({state:"hidden",timeout:22000});
+  const linkRole=await linkPage.evaluate(async()=>{const r=await fetch("/api/auth/me");return (await r.json()).user?.role});
+  assert.equal(linkRole,"professional");
+  await linkPage.screenshot({path:path.join(artifact,"16-entrada-profissional-por-link.png"),fullPage:true});
+  await linkContext.close();
+  await page.locator("#neStaffAccessDialog").evaluate(el=>el.close());
+
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:path.join(artifact,"06-administracao-mobile.png"),fullPage:true});
   // Etapa 20: percorrer o fluxo essencial de recepção em telas pequenas.

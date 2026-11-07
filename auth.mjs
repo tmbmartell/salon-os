@@ -57,6 +57,14 @@ export function installAuth(db){
   if(!userCols.includes("professional_id"))db.exec("alter table users add column professional_id TEXT");
 }
 
+// Operação da NOVAGENTE não equivale ao papel de proprietária do salão.
+// Sem operador explicitamente configurado E segundo fator, ninguém vê prompts técnicos.
+export function isPlatformAdmin(db,user){
+  if(!user || user.role!=="owner")return false;
+  const allowed=String(process.env.NOVAGENTE_PLATFORM_ADMIN_USERS||"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);
+  return allowed.includes(String(user.email||"").toLowerCase()) && mfaEnabled(db,user.id,user.tenantId);
+}
+
 export function makePasswordHash(password){
   const salt=crypto.randomBytes(16).toString("hex");
   return "scrypt$"+salt+"$"+scrypt(password,salt);
@@ -182,29 +190,43 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
     }catch(e){db.exec("ROLLBACK");throw e}
     return {handled:true,result:send(res,200,{ok:true})};
   }
+  if(url.pathname==="/api/auth/invitations/inspect"&&req.method==="POST"){
+    const body=await parseBody(req),token=String(body.token||"");
+    const row=token.length>=30?db.prepare("select name,role,email,expires_at from user_invites where token_hash=? and accepted_at is null and expires_at>? limit 1").get(sha(token),new Date().toISOString()):null;
+    if(!row)return {handled:true,result:send(res,410,{error:"invitation_invalid_or_expired"})};
+    return {handled:true,result:send(res,200,{name:row.name,email:row.email,role:row.role,expires_at:row.expires_at,passwordless_available:["reception","professional"].includes(row.role)})};
+  }
   // Convites: o token só é retornado uma vez à proprietária, jamais listado.
   // Aceitação não concede acesso de proprietária e exige senha própria.
   if(url.pathname==="/api/auth/invitations/accept"&&req.method==="POST"){
     const b=await parseBody(req),token=String(b.token||"").trim(),
-      password=String(b.password||"");
-    if(token.length<30||password.length<12||password.length>128)
+      password=String(b.password||""),passwordless=b.passwordless===true;
+    if(token.length<30 || (!passwordless && (password.length<12||password.length>128)) || (passwordless&&password.length))
       return {handled:true,result:send(res,400,{error:"invalid_invite_or_password"})};
-    let result;
+    let result,sessionCookieValue=null;
     db.exec("BEGIN IMMEDIATE");
     try{
       const invite=db.prepare(`select * from user_invites where token_hash=? and accepted_at is null and expires_at>?`).get(sha(token),new Date().toISOString());
       if(!invite||!["manager","reception","professional"].includes(invite.role))
         throw Object.assign(new Error("invitation_invalid_or_expired"),{status:410});
+      if(passwordless && !["reception","professional"].includes(invite.role))
+        throw Object.assign(new Error("passwordless_staff_only"),{status:403});
       const existing=db.prepare("select id from users where tenant_id=? and lower(email)=?").get(invite.tenant_id,invite.email.toLowerCase());
       if(existing)throw Object.assign(new Error("user_already_exists"),{status:409});
       const userId=crypto.randomUUID(),stamp=new Date().toISOString();
       db.prepare(`insert into users(id,tenant_id,name,email,role,active,created_at,password_hash,updated_at)
-        values(?,?,?,?,?,1,?,?,?)`).run(userId,invite.tenant_id,invite.name,invite.email,invite.role,stamp,makePasswordHash(password),stamp);
+        values(?,?,?,?,?,1,?,?,?)`).run(userId,invite.tenant_id,invite.name,invite.email,invite.role,stamp,passwordless?null:makePasswordHash(password),stamp);
       db.prepare("update user_invites set accepted_at=? where id=? and accepted_at is null").run(stamp,invite.id);
+      if(passwordless){
+        const session=crypto.randomBytes(32).toString("base64url");
+        db.prepare(`insert into auth_sessions(id,tenant_id,user_id,token_hash,expires_at,created_at,last_seen_at,device_label)
+          values(?,?,?,?,?,?,?,?)`).run(crypto.randomUUID(),invite.tenant_id,userId,sha(session),new Date(Date.now()+7*DAY).toISOString(),stamp,stamp,String(req.headers["user-agent"]||"Dispositivo").slice(0,180));
+        sessionCookieValue=sessionCookie(req,session,7*24*3600);
+      }
       db.exec("COMMIT");
-      result={ok:true,email:invite.email,role:invite.role};
+      result={ok:true,email:invite.email,role:invite.role,user:{id:userId,tenantId:invite.tenant_id,name:invite.name,email:invite.email,role:invite.role,platform_admin:false}};
     }catch(e){db.exec("ROLLBACK");return {handled:true,result:send(res,e.status||400,{error:e.message||"invitation_failed"})}}
-    return {handled:true,result:send(res,201,result)};
+    return {handled:true,result:send(res,201,result,sessionCookieValue?{"set-cookie":sessionCookieValue}:{})};
   }
   if(url.pathname==="/api/auth/login"&&req.method==="POST"){
     const b=await parseBody(req),email=String(b.email||"").trim().toLowerCase().slice(0,200),password=String(b.password||""),workspace=String(b.workspace||"").trim().toLowerCase().slice(0,120);
@@ -233,7 +255,7 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
     const deviceLabel=String(req.headers["user-agent"]||"Dispositivo não identificado").slice(0,180);
     db.prepare("insert into auth_sessions(id,tenant_id,user_id,token_hash,expires_at,created_at,last_seen_at,device_label) values(?,?,?,?,?,?,?,?)")
       .run(crypto.randomUUID(),u.tenant_id,u.id,sha(token),expires.toISOString(),ts.toISOString(),ts.toISOString(),deviceLabel);
-    const user={id:u.id,tenantId:u.tenant_id,name:u.name,email:u.email,role:u.role};
+    const user={id:u.id,tenantId:u.tenant_id,name:u.name,email:u.email,role:u.role,platform_admin:isPlatformAdmin(db,{id:u.id,tenantId:u.tenant_id,email:u.email,role:u.role})};
     audit(db,user,"auth.login","user",u.id,{});
     return {handled:true,result:send(res,200,{ok:true,user},{"set-cookie":sessionCookie(req,token,7*24*3600)})};
   }
@@ -253,7 +275,7 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
     db.prepare("delete from auth_sessions where datetime(expires_at)<=datetime('now')").run();
     db.prepare("insert into auth_sessions(id,tenant_id,user_id,token_hash,expires_at,created_at,last_seen_at,device_label) values(?,?,?,?,?,?,?,?)")
       .run(crypto.randomUUID(),u.tenant_id,u.id,sha(token),expires.toISOString(),ts.toISOString(),ts.toISOString(),label);
-    const user={id:u.id,tenantId:u.tenant_id,name:u.name,email:u.email,role:u.role};
+    const user={id:u.id,tenantId:u.tenant_id,name:u.name,email:u.email,role:u.role,platform_admin:isPlatformAdmin(db,{id:u.id,tenantId:u.tenant_id,email:u.email,role:u.role})};
     if(result.attempt_key)db.prepare("delete from auth_login_attempts where attempt_key=?").run(result.attempt_key);
     audit(db,user,"auth.login.mfa","user",u.id,{});
     return {handled:true,result:send(res,200,{ok:true,user},{"set-cookie":sessionCookie(req,token,7*24*3600)})};
@@ -301,7 +323,7 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
   }
   if(url.pathname==="/api/auth/me"&&req.method==="GET"){
     const user=authenticate(req,db);
-    return {handled:true,result:user?send(res,200,{user}):send(res,401,{error:"unauthorized"})};
+    return {handled:true,result:user?send(res,200,{user:{...user,platform_admin:isPlatformAdmin(db,user)}}):send(res,401,{error:"unauthorized"})};
   }
   return {handled:false};
 }

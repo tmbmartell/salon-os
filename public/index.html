@@ -37,6 +37,12 @@
         <button class="primary wide">Entrar</button>
       </form>
     </div>
+    <div id="pendingProfessionalPanel" class="authPanel hidden">
+      <p class="eyebrow">ACESSO CRIADO</p><h2>Falta vincular sua agenda</h2>
+      <p>Seu acesso está ativo. O proprietário precisa associar seu perfil ao cadastro da equipe antes de liberar sua agenda e as clientes autorizadas.</p>
+      <button type="button" class="primary wide" id="pendingProfessionalRefresh">Verificar minha liberação</button>
+      <button type="button" class="secondary wide" id="pendingProfessionalLogout">Sair</button>
+    </div>
     <div id="mfaPanel" class="authPanel hidden">
       <p class="eyebrow">SEGURANÇA DA CONTA</p><h2>Verificação em duas etapas</h2>
       <p>Informe o código de seis dígitos do seu aplicativo autenticador ou um código de recuperação.</p>
@@ -1082,12 +1088,13 @@
   </form>
 </dialog>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
-<script src="/app.js?v=213" type="module"></script>
+<script src="/app.js?v=214" type="module"></script>
 <script src="/marketing-ui.js?v=1" defer></script>
 <script src="/novagente-commercial-ui.js?v=3" defer></script>
 <script src="/security-center.js?v=2" defer></script>
 <script src="/whatsapp-onboarding.js?v=2" defer></script>
-<script src="/admin-stage8.js?v=2" defer></script>
+<script src="/admin-stage8.js?v=3" defer></script>
+<script src="/staff-access-ui.js?v=1" defer></script>
 <script src="/mfa-security-ui.js?v=1" defer></script>
 <script src="/whatsapp-backfill-ui.js?v=1" defer></script>
 <script src="/free-preview-ui.js?v=1" defer></script>
