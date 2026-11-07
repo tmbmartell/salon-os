@@ -72,6 +72,19 @@ try{
     assert.equal(errors.length,0,"Erro JS após abrir "+view+": "+errors.join(" | "));
   }
   await open("inbox");
+  await page.locator("#waDiagnosticsDetails").waitFor({state:"visible"});
+  await page.locator("#waDiagnosticsDetails summary").click();
+  await page.waitForFunction(()=>document.querySelector("#waDiagInboundCount")?.textContent!=="—",{timeout:12000});
+  const diagResponse=await page.evaluate(async()=>{
+    const r=await fetch("/api/whatsapp/diagnostics");
+    const data=await r.json();
+    return {status:r.status,inCount:data.inbound?.past_24h,hasMessageBodies:!!data.messages};
+  });
+  assert.equal(diagResponse.status,200);
+  assert.equal(typeof diagResponse.inCount,"number");
+  assert.equal(diagResponse.hasMessageBodies,false);
+  await page.screenshot({path:path.join(artifact,"17-diagnostico-whatsapp.png"),fullPage:true});
+  await page.locator("#waDiagnosticsDetails summary").click();
   await page.locator("#conversationStatusFilter").selectOption("resolved");
   await page.locator("#conversationFiltersSummary").getByText("Status: Resolvida",{exact:false}).waitFor();
   await page.locator("#conversationStatusFilter").selectOption("");
