@@ -82,6 +82,23 @@ export async function wahaStatus(session=SESSION){
     return {...config,...publicStatus,connected:j.status==="WORKING"};
   }catch(e){return {...config,connected:false,status:"UNAVAILABLE",error:String(e.message||e).slice(0,160)}}
 }
+// Diagnóstico seguro: só retorna indicadores, sem chaves HMAC ou URL completa.
+export async function wahaWebhookDiagnostics(session=SESSION){
+  if(!wahaConfigured()||!session)return {checked:false,configured:false,official:false,reason:"not_configured"};
+  try{
+    const response=await request("/api/sessions/"+encodeURIComponent(session),{},true);
+    if(response.status===404)return {checked:true,configured:false,official:false,reason:"session_missing"};
+    const body=await response.json(),hooks=body.config?.webhooks||[];
+    const matching=hooks.find(x=>x.url===WEBHOOK_URL);
+    const origin=String(process.env.NOVAGENTE_PUBLIC_ORIGIN||"").replace(/\\/$/,"");
+    const official=!!origin && hooks.some(x=>x.url===origin+"/api/whatsapp/waha/webhook");
+    const signed=!!matching && matching.hmac?.key===WEBHOOK_SECRET;
+    const events=!!matching && ["message","message.ack","session.status"].every(e=>matching.events?.includes(e));
+    return {checked:true,configured:!!matching,official,signed,events,connected:body.status==="WORKING",status:body.status||"UNKNOWN"};
+  }catch{
+    return {checked:false,configured:false,official:false,reason:"provider_unavailable"};
+  }
+}
 function sessionPayload(session=SESSION){
   const webhooks=WEBHOOK_URL&&WEBHOOK_SECRET?[{url:WEBHOOK_URL,events:["message","message.ack","session.status"],hmac:{key:WEBHOOK_SECRET},retries:{policy:"exponential",delaySeconds:2,attempts:8}}]:[];
   return {name:session,config:{webhooks}};
