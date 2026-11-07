@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import {isPlatformAdmin} from "./auth.mjs";
 
 const uid=()=>crypto.randomUUID();
 const now=()=>new Date().toISOString();
@@ -283,17 +284,19 @@ export async function handlePhase4Api({req,res,url,db,user,tenant,send,parseBody
   ensureAgentProfiles(db,tenant);
   if(req.method==="GET"&&url.pathname==="/api/agents"){
     guard("agents.read");
-    const profiles=all(db,"select * from agent_profiles where tenant_id=? order by agent_key",[tenant]).map(p=>({...p,config:getAgentConfig(db,tenant,p.agent_key)}));
+    const profiles=all(db,"select * from agent_profiles where tenant_id=? order by agent_key",[tenant]).map(p=>({...p,config:isPlatformAdmin(user)?getAgentConfig(db,tenant,p.agent_key):null}));
     const tasks=one(db,"select count(*) pending from agent_tasks where tenant_id=? and status='pending'",[tenant])||{};
     return send(res,200,{profiles,pending:Number(tasks.pending||0)});
   }
   if(req.method==="PATCH"&&url.pathname==="/api/agents/profile"){
     guard("agents.write");
     const b=await parseBody(req),key=txt(b.agent_key,40),p=one(db,"select * from agent_profiles where tenant_id=? and agent_key=?",[tenant,key]);
+    if(!isPlatformAdmin(user)&&(b.config!==undefined||b.autonomy!==undefined))return send(res,403,{error:"platform_admin_only"});
     if(!p)return send(res,404,{error:"agent_not_found"});
     const enabled=b.enabled===undefined?Number(p.enabled):b.enabled?1:0,autonomy=b.autonomy===undefined?Number(p.autonomy):Math.max(0,Math.min(10,Number(b.autonomy)));
     let config=getAgentConfig(db,tenant,key);
     if(b.config!==undefined){
+      if(!isPlatformAdmin(user))return send(res,403,{error:"platform_admin_only"});
       if(key==="receptionist")config=sanitizeReceptionistConfig(b.config);
       else config=b.config&&typeof b.config==="object"?b.config:{};
     }
