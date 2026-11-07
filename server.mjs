@@ -6,7 +6,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import { installAuth, authenticate, handleAuthApi, requirePermission, can, audit } from "./auth.mjs";
+import { installAuth, authenticate, handleAuthApi, requirePermission, can, audit, isPlatformAdmin } from "./auth.mjs";
 import { isFreePreview, provisionFreePreview } from "./free-preview.mjs";
 import { browserMutationAllowed, requestIp } from "./request-security.mjs";
 import { installWhatsAppBackfill, handleWhatsAppBackfillApi } from "./whatsapp-backfill.mjs";
@@ -641,7 +641,7 @@ async function api(req,res,url){
 
   if(commercialResult!==false)return commercialResult;
   if(req.method==="GET"&&url.pathname==="/api/agents/receptionist/explain"){
-    guard("agents.write"); // Apenas proprietária e gerência veem instruções internas.
+    if(!isPlatformAdmin(user))return send(res,403,{error:"platform_admin_only"});
     const cfg=getAgentConfig(db,tenant,"receptionist");
     const profile=one("select enabled,updated_at from agent_profiles where tenant_id=? and agent_key='receptionist'",[tenant]);
     const flags={
@@ -697,7 +697,7 @@ async function api(req,res,url){
     });
   }
   if(req.method==="GET"&&url.pathname==="/api/agents/receptionist/llm"){
-    guard("agents.read");
+    if(!isPlatformAdmin(user))return send(res,403,{error:"platform_admin_only"});
     const cfg=getLlmConfig(db,tenant);
     return send(res,200,{...cfg,providers:[
       {id:"internal",name:"Margot / OpenCLAW interno",example:""},
@@ -709,7 +709,7 @@ async function api(req,res,url){
     ]});
   }
   if(req.method==="PUT"&&url.pathname==="/api/agents/receptionist/llm"){
-    guard("agents.write");
+    if(!isPlatformAdmin(user))return send(res,403,{error:"platform_admin_only"});
     try{
       const b=await parseBody(req),cfg=saveLlmConfig(db,tenant,b);
       audit(db,user,"agent.llm.update","agent_profile","receptionist",{provider:cfg.provider,model:cfg.model,enabled:cfg.enabled,has_api_key:cfg.has_api_key});
@@ -717,7 +717,7 @@ async function api(req,res,url){
     }catch(e){return send(res,e.status||400,{error:String(e.message||"llm_config_failed")})}
   }
   if(req.method==="POST"&&url.pathname==="/api/agents/receptionist/llm/test"){
-    guard("agents.write");
+    if(!isPlatformAdmin(user))return send(res,403,{error:"platform_admin_only"});
     try{
       const b=await parseBody(req),out=await testLlmConfig(db,tenant,b);
       audit(db,user,"agent.llm.test","agent_profile","receptionist",{provider:out.provider,model:out.model,ok:true});
@@ -856,8 +856,10 @@ async function api(req,res,url){
   if(req.method==="POST"&&url.pathname==="/api/professionals"){
     guard("team.write");
     const b=await parseBody(req),name=safeText(b.name,120);if(!name)return send(res,400,{error:"name_required"});
+    const phone=normalizePhone(b.phone);
+    if(phone&&(phone.length<10||phone.length>15))return send(res,400,{error:"invalid_professional_whatsapp"});
     const pid=id();
-    run("insert into professionals(id,tenant_id,name,phone,role,specialties,work_start,work_end,created_at) values(?,?,?,?,?,?,?,?,?)",[pid,tenant,name,normalizePhone(b.phone),safeText(b.role||"Profissional",80),JSON.stringify(Array.isArray(b.specialties)?b.specialties:[]),safeText(b.work_start||"09:00",5),safeText(b.work_end||"18:00",5),now()]);
+    run("insert into professionals(id,tenant_id,name,phone,role,specialties,work_start,work_end,created_at) values(?,?,?,?,?,?,?,?,?)",[pid,tenant,name,phone,safeText(b.role||"Profissional",80),JSON.stringify(Array.isArray(b.specialties)?b.specialties:[]),safeText(b.work_start||"09:00",5),safeText(b.work_end||"18:00",5),now()]);
     audit(db,user,"professional.create","professional",pid,{});
     return send(res,201,professionalView(one("select * from professionals where id=?",[pid])));
   }
