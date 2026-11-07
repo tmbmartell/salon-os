@@ -287,8 +287,8 @@ test("WAHA simulado: HMAC, mensagem, cliente CRM, conversa, agenda, resposta, AC
       payload:{id:"sent-qa-1",ackName:"READ"}});
     assert.equal(ack.status,200);
     const messages=await expect(owner,"/api/conversations/"+co.id+"/messages",200);
-    assert.equal(messages.length,2);
-    assert.equal(messages[1].delivery_status,"read");
+    assert.equal(messages.length,3);
+    assert.equal(messages[2].delivery_status,"read");
     // Webhook de áudio ou imagem: não entrega resposta automática e exige humano.
     const media=await app.webhook({event:"message",session:"qa-only",payload:{
       id:"qa-received-media-001",from:"556999988776@c.us",
