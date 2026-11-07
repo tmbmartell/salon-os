@@ -87,6 +87,12 @@ try{
   await page.screenshot({path:path.join(artifact,"14-transparencia-regras-prompt.png"),fullPage:true});
   await page.locator("#closeAgentExplain").click();
   await page.locator("#agentExplainModal").waitFor({state:"hidden"});
+  await page.locator('[data-agent-config="receptionist"]').click();
+  await page.locator("#agentConfigModal[open]").waitFor();
+  await page.locator("#agentExplainFromConfig").click();
+  await page.locator("#agentExplainModal[open]").waitFor();
+  await page.locator("#closeAgentExplain").click();
+  await page.locator("#agentConfigModal [data-close]").first().click();
   await open("inbox");
   await page.locator("#syncWhatsappHistory").click();
   await page.locator("#whatsappBackfillDetails[open]").waitFor();
