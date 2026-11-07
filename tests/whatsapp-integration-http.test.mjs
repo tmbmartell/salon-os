@@ -237,6 +237,13 @@ test("WAHA simulado: HMAC, mensagem, cliente CRM, conversa, agenda, resposta, AC
     assert.equal(co.unread_count,1);
     assert.equal(co.handling_mode,"human");
     assert.equal(co.last_message,"Olá, quanto custa uma coloração?");
+    assert.equal(co.category,"lead","interesse em preço deve sair de Geral automaticamente");
+    assert.equal(co.priority,"normal");
+    const trace=await expect(owner,"/api/conversations/"+co.id+"/classification-history",200);
+    assert.equal(trace.items.length,1);
+    assert.equal(trace.items[0].new_category,"lead");
+    assert.equal(trace.items[0].applied,1);
+    assert.match(trace.items[0].reason,/valor|orçamento|consulta comercial/i);
     const msgs=await expect(owner,"/api/conversations/"+co.id+"/messages",200);
     assert.equal(msgs.length,1);
     assert.equal(msgs[0].direction,"in");
@@ -247,6 +254,18 @@ test("WAHA simulado: HMAC, mensagem, cliente CRM, conversa, agenda, resposta, AC
     await expect(owner,"/api/conversations/"+co.id+"/meta",200,{method:"PATCH",body:{
       status:"open",category:"appointment",priority:"high",assigned_user_id:ownerId,labels:["Solicitou cor"]
     }});
+    // Mudança humana permanece soberana diante das classificações posteriores.
+    const second=await app.webhook({event:"message",session:"qa-only",payload:{
+      id:"qa-received-002",from:"556999988776@c.us",fromMe:false,
+      body:"Quero agendar para amanhã",pushName:"Cliente Piloto",hasMedia:false
+    }});
+    assert.equal(second.status,200);
+    const updated=(await expect(owner,"/api/conversations",200)).find(x=>x.id===co.id);
+    assert.equal(updated.category,"appointment");
+    assert.equal(updated.priority,"high");
+    const trace2=await expect(owner,"/api/conversations/"+co.id+"/classification-history",200);
+    assert.equal(trace2.items.length,2);
+    assert.equal(trace2.items[0].applied,0);
     // Horário fixo de QA dentro da jornada em Porto Velho (UTC-4), como em integration-http.
     const startDate=new Date(Date.now()+16*86400000);startDate.setUTCHours(14,0,0,0);
     const startAt=startDate.toISOString();
@@ -268,8 +287,8 @@ test("WAHA simulado: HMAC, mensagem, cliente CRM, conversa, agenda, resposta, AC
       payload:{id:"sent-qa-1",ackName:"READ"}});
     assert.equal(ack.status,200);
     const messages=await expect(owner,"/api/conversations/"+co.id+"/messages",200);
-    assert.equal(messages.length,2);
-    assert.equal(messages[1].delivery_status,"read");
+    assert.equal(messages.length,3);
+    assert.equal(messages[2].delivery_status,"read");
     // Webhook de áudio ou imagem: não entrega resposta automática e exige humano.
     const media=await app.webhook({event:"message",session:"qa-only",payload:{
       id:"qa-received-media-001",from:"556999988776@c.us",

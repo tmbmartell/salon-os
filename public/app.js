@@ -250,6 +250,32 @@ function renderConversationDetail(){
   const info=[];if(co.client_email)info.push(co.client_email);if(co.client_source)info.push("Origem: "+co.client_source);if(co.client_birthday)info.push("Nascimento: "+co.client_birthday);if(co.client_notes)info.push(co.client_notes);
   $("#detailClientInfo").textContent=info.join(" · ")||"Sem informações adicionais cadastradas.";
 }
+async function loadClassificationHistory(){
+  const co=state.selectedConversation,details=$("#conversationClassificationDetails"),area=$("#conversationClassificationHistory");
+  if(!co||!details||!area)return;
+  area.textContent="Consultando motivos das classificações…";
+  try{
+    const data=await api("/api/conversations/"+encodeURIComponent(co.id)+"/classification-history");
+    if(state.selectedConversation?.id!==co.id)return;
+    const rows=(data.items||[]).slice(0,10);
+    area.replaceChildren();
+    if(!rows.length){area.textContent="Nenhuma classificação automática registrada nesta conversa.";return}
+    for(const x of rows){
+      const div=document.createElement("div");
+      div.className="ne-lead-trace-item";
+      const name=convCategoryName[x.new_category]||x.new_category||"Geral";
+      const when=x.created_at?new Date(x.created_at).toLocaleString("pt-BR",{timeZone:tenantZone()}):"";
+      const headline=document.createElement("strong");
+      headline.textContent=(x.applied?"Movido para ":"Analisado, sem alterar: ")+name;
+      const desc=document.createElement("small");
+      desc.textContent=x.reason+" · Confiança: "+Math.round((Number(x.confidence)||0)*100)+"% · "+when;
+      div.append(headline,desc);area.append(div);
+    }
+  }catch{area.textContent="Não foi possível consultar o histórico de classificação."}
+}
+$("#conversationClassificationDetails").addEventListener("toggle",()=>{
+  if($("#conversationClassificationDetails").open)loadClassificationHistory();
+});
 async function loadInbox(){
   try{
     const data=await Promise.all([api("/api/whatsapp/status"),api("/api/conversations"),api("/api/conversations/options")]),w=data[0],convs=data[1];
@@ -262,6 +288,7 @@ async function loadInbox(){
 async function openConversation(cid){
   const co=state.conversations.find(x=>x.id===cid);if(!co)return;state.selectedConversation=co;
   $("#chatEmpty").classList.add("hidden");$("#chatActive").classList.remove("hidden");$("#chatClient").textContent=co.client_name||"Cliente";$("#chatPhone").textContent=co.client_phone||"";updateChatModeButton();renderConversationDetail();
+  $("#conversationClassificationDetails").open=false;$("#conversationClassificationHistory").textContent="Abra para consultar a última decisão automática.";
   const msgs=await api("/api/conversations/"+cid+"/messages");co.unread_count=0;renderConversationList();
   $("#messageList").innerHTML=msgs.map(m=>'<div class="message '+(m.direction==="out"?"out":"in")+'"><div>'+esc(m.body).replace(/\n/g,"<br>")+'</div><small>'+new Date(m.created_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",timeZone:tenantZone()})+(m.direction==="out"?" · "+esc(m.delivery_status):"")+'</small></div>').join("")||'<div class="muted">Conversa sem mensagens.</div>';
   $("#messageList").scrollTop=$("#messageList").scrollHeight;

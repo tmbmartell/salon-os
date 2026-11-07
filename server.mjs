@@ -7,6 +7,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { installAuth, authenticate, handleAuthApi, requirePermission, can, audit, isPlatformAdmin } from "./auth.mjs";
+import {installLeadClassification,classifyIncomingLead,classificationHistory} from "./lead-classification.mjs";
 import {installProfessionalNoticeQueue,queueNoticesForAppointment} from "./professional-notice-queue.mjs";
 import { installStaffAccess, handleStaffAccessApi } from "./staff-access.mjs";
 import { isFreePreview, provisionFreePreview } from "./free-preview.mjs";
@@ -206,6 +207,7 @@ ensureSeed();
 installAuth(db);
 installStaffAccess(db);
 installProfessionalNoticeQueue(db);
+installLeadClassification(db);
 provisionFreePreview(db,DEFAULT_TENANT);
 installWhatsApp(db);
 installWhatsAppBackfill(db);
@@ -620,7 +622,19 @@ async function api(req,res,url){
     const commercialAiEnabled=liveReceptionistEnabled(targetTenant);
     const defaultHandlingMode=commercialAiEnabled&&receptionConfig.service?.auto_activate_new_conversations!==false?"ai":"human";
     const out=await ingestWahaEvent({db,tenantId:targetTenant,event:body,interpret,autoReply:commercialAiEnabled?receptionistAgentReply:null,allowAi:commercialAiEnabled,defaultHandlingMode});
-    if(out.accepted&&out.type==="message"&&out.clientId){try{registerIncoming(db,targetTenant,out.clientId,String(body?.payload?.body||""),{messageId:body?.payload?.id?.id||body?.payload?.id?._serialized||null,source:"whatsapp"});}catch(e){console.error("commercial_ingest_failed",String(e.message||e).slice(0,140))}}
+    if(out.accepted&&out.type==="message"&&out.clientId){
+      const rawId=body?.payload?.id;
+      const msgId=typeof rawId==="string"?rawId:String(rawId?._serialized||rawId?.id||"");
+      const text=String(body?.payload?.body||"");
+      try{registerIncoming(db,targetTenant,out.clientId,text,{messageId:msgId||null,source:"whatsapp"});}
+      catch(e){console.error("commercial_ingest_failed",String(e.message||e).slice(0,140))}
+      try{
+        if(msgId && out.conversationId)classifyIncomingLead(db,{
+          tenantId:targetTenant,conversationId:out.conversationId,clientId:out.clientId,messageId:msgId,
+          text,intent:out.intent,hasMedia:!!body?.payload?.hasMedia
+        });
+      }catch(e){console.error("lead_classification_failed",String(e.message||e).slice(0,140))}
+    }
     return send(res,200,{ok:true,...out});
   }
 
@@ -1022,6 +1036,13 @@ async function api(req,res,url){
     const users=all("select id,name,role from users where tenant_id=? and active=1 order by name",[tenant]);
     return send(res,200,{users,statuses:["open","pending","resolved"],priorities:["normal","high","urgent"],categories:["general","lead","appointment","waiting","finance","complaint","post_sale","vip","other"]});
   }
+  const classificationRoute=routeMatch(url.pathname,"/api/conversations/:id/classification-history");
+  if(req.method==="GET"&&classificationRoute){
+    guard("conversations.read");
+    const co=one("select id from conversations where tenant_id=? and id=?",[tenant,classificationRoute.id]);
+    if(!co)return send(res,404,{error:"conversation_not_found"});
+    return send(res,200,{items:classificationHistory(db,{tenantId:tenant,conversationId:co.id}),note:"Histórico automático; revisão manual tem prioridade."});
+  }
   const metaRoute=routeMatch(url.pathname,"/api/conversations/:id/meta");
   if(req.method==="PATCH"&&metaRoute){
     guard("conversations.write");
@@ -1033,7 +1054,7 @@ async function api(req,res,url){
     if(assigned&&!one("select id from users where id=? and tenant_id=? and active=1",[assigned,tenant]))return send(res,400,{error:"invalid_assignee"});
     let labels=co.labels||"[]";
     if(Array.isArray(b.labels))labels=JSON.stringify([...new Set(b.labels.map(x=>safeText(x,32)).filter(Boolean))].slice(0,12));
-    run("update conversations set status=?,priority=?,category=?,assigned_user_id=?,labels=?,updated_at=? where id=? and tenant_id=?",[status,priority,category,assigned,labels,now(),metaRoute.id,tenant]);
+    run("update conversations set status=?,priority=?,category=?,assigned_user_id=?,labels=?,classification_source='manual',updated_at=? where id=? and tenant_id=?",[status,priority,category,assigned,labels,now(),metaRoute.id,tenant]);
     audit(db,user,"conversation.classify","conversation",metaRoute.id,{status,priority,category,assigned_user_id:assigned,labels:JSON.parse(labels)});
     return send(res,200,{ok:true,status,priority,category,assigned_user_id:assigned,labels:JSON.parse(labels)});
   }
