@@ -76,28 +76,37 @@ test("agenda bloqueia passado, folga, fora da jornada e conflito; relatório usa
     const base={client_id:customer.data.id,service_id:service.id,professional_id:professional.id};
     const at=iso=>owner("/api/appointments",{method:"POST",body:{...base,start_at:iso}});
 
-    const ok=await at("2026-11-06T14:00:00.000Z");
+    // Data relativa: nunca usar agendamento fixo que vire passado após a publicação.
+    // Preferir quarta-feira (dia útil) para evitar false positives de domingo/folga.
+    const future=new Date(Date.now()+14*86400000);
+    const extraDays=(3-future.getUTCDay()+7)%7;
+    future.setUTCDate(future.getUTCDate()+extraDays);
+    const date=future.toISOString().slice(0,10);
+    const offDate=new Date(Date.parse(date+"T12:00:00Z")+7*86400000).toISOString().slice(0,10);
+    const local=(day,time)=>localTimeToUtc(day,time);
+    const ok=await at(local(date,"10:00"));
     assert.equal(ok.status,201,JSON.stringify(ok.data));
-    assert.equal(ok.data.start_at,"2026-11-06T14:00:00.000Z");
+    assert.equal(ok.data.start_at,local(date,"10:00"));
 
     assert.equal((await at("2026-10-01T14:00:00.000Z")).status,400);
-    assert.equal((await at("2026-11-06T14:30:00.000Z")).status,409);
-    const early=await at("2026-11-06T12:00:00.000Z");
+    assert.equal((await at(local(date,"10:30"))).status,409);
+    const early=await at(local(date,"08:00"));
     assert.equal(early.status,409);assert.equal(early.data.error,"professional_outside_schedule");
     assert.equal(early.data.window_start,"09:00");
-    const late=await at("2026-11-06T23:00:00.000Z");
+    const late=await at(local(date,"19:00"));
     assert.equal(late.status,409);assert.equal(late.data.error,"professional_outside_schedule");
 
-    const off=await owner("/api/staff/time-off",{method:"POST",body:{professional_id:professional.id,type:"day_off",start_date:"2026-11-10"}});
+    const off=await owner("/api/staff/time-off",{method:"POST",body:{professional_id:professional.id,type:"day_off",start_date:offDate}});
     assert.equal(off.status,201,JSON.stringify(off.data));
-    const blocked=await at("2026-11-10T14:00:00.000Z");
+    const blocked=await at(local(offDate,"10:00"));
     assert.equal(blocked.status,409);assert.equal(blocked.data.error,"professional_time_off");
 
-    // Período de relatório: 06/11 local começa 04:00Z e termina 04:00Z do dia seguinte.
-    const report=await owner("/api/reports/summary?from=2026-11-06&to=2026-11-06");
+    // Dia local começa às 04:00Z em Porto Velho; termina 03:59:59.999Z.
+    const nextDate=new Date(Date.parse(date+"T12:00:00Z")+86400000).toISOString().slice(0,10);
+    const report=await owner(`/api/reports/summary?from=${date}&to=${date}`);
     assert.equal(report.status,200);
-    assert.equal(report.data.range.from,"2026-11-06T04:00:00.000Z");
-    assert.equal(report.data.range.to,"2026-11-07T03:59:59.999Z");
+    assert.equal(report.data.range.from,local(date,"00:00"));
+    assert.equal(report.data.range.to,new Date(Date.parse(local(nextDate,"00:00"))-1).toISOString());
 
     // Profissional não exporta nem consulta financeiro.
     const invitation=await owner("/api/admin/invitations",{method:"POST",body:{email:"prof@example.invalid",name:"Prof QA",role:"professional"}});
