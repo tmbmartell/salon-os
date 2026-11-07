@@ -81,6 +81,15 @@ try{
   assert.equal(await page.locator('[data-agent-explain="receptionist"]').count(),0);
   assert.equal(await page.locator('[data-agent-config="receptionist"]').count(),0);
   assert.equal(await page.locator('[data-agent-autonomy]').count(),0);
+  // Proprietária pode pausar/ativar operação sem modificar as regras internas.
+  const toggle=page.locator('[data-agent-toggle="receptionist"]');
+  await toggle.waitFor();
+  page.once("dialog",dialog=>dialog.accept());
+  await toggle.click();
+  await page.locator('[data-agent-toggle="receptionist"]').getByText("Ativar atendimento IA").waitFor({timeout:12000});
+  page.once("dialog",dialog=>dialog.accept());
+  await page.locator('[data-agent-toggle="receptionist"]').click();
+  await page.locator('[data-agent-toggle="receptionist"]').getByText("Pausar atendimento IA").waitFor({timeout:12000});
   const access=await page.evaluate(async()=>{
     const [prompts,config,profile]=await Promise.all([
       fetch("/api/agents/receptionist/explain"),
