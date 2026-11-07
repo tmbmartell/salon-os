@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {DatabaseSync} from "node:sqlite";
 import {
   installProfessionalNoticeQueue,queueProfessionalNotices,
-  dueProfessionalNotices,previewProfessionalNotice,simulateProfessionalNotice
+  dueProfessionalNotices,previewProfessionalNotice,simulateProfessionalNotice,queueNoticesForAppointment
 } from "../professional-notice-queue.mjs";
 
 const clock="2026-11-07T12:00:00.000Z";
@@ -69,5 +69,39 @@ test("não envia para número ausente e mantém isolamento entre salões",()=>{
   assert.equal(dueProfessionalNotices(db,{tenantId:"sala-b",now:clock}).length,1);
   assert.equal(dueProfessionalNotices(db,{tenantId:"sala-a",now:clock}).length,0);
   assert.throws(()=>queueProfessionalNotices(db,{tenantId:"sala-a",appointment,professional:{id:"outro",phone:"69999998888"},now:clock}));
+ }finally{db.close()}
+});
+
+test("integra agendamento com dois profissionais, sem usar telefone da cliente",()=>{
+ const db=fixture();
+ try{
+  db.exec(`create table clients(id text,tenant_id text,name text,phone text);
+    create table appointments(id text,tenant_id text,client_id text,professional_id text,service_id text,start_at text,end_at text,status text);
+    create table appointment_items(id text,tenant_id text,appointment_id text,professional_id text,service_id text,sequence integer,start_at text,end_at text);
+    create table professionals(id text,tenant_id text,name text,phone text);
+    create table services(id text,tenant_id text,name text);`);
+  db.prepare("insert into clients values(?,?,?,?)").run("c1","sala-a","Cliente de Teste","69911112222");
+  db.prepare("insert into professionals values(?,?,?,?)").run("p1","sala-a","Júlia","69999998888");
+  db.prepare("insert into professionals values(?,?,?,?)").run("p2","sala-a","Carla","69999997777");
+  db.prepare("insert into services values(?,?,?)").run("s1","sala-a","Limpeza de Pele");
+  db.prepare("insert into services values(?,?,?)").run("s2","sala-a","Massagem");
+  db.prepare("insert into appointments values(?,?,?,?,?,?,?,?)").run(
+    "a1","sala-a","c1","p1","s1",start,"2026-11-20T17:00:00.000Z","confirmed");
+  db.prepare("insert into appointment_items values(?,?,?,?,?,?,?,?)").run(
+    "item1","sala-a","a1","p1","s1",0,start,end);
+  db.prepare("insert into appointment_items values(?,?,?,?,?,?,?,?)").run(
+    "item2","sala-a","a1","p2","s2",1,"2026-11-20T15:00:00.000Z","2026-11-20T16:30:00.000Z");
+  const first=queueNoticesForAppointment(db,{tenantId:"sala-a",appointmentId:"a1",now:clock});
+  assert.equal(first.professionals,2);assert.equal(first.scheduled,8);assert.equal(first.external_messages_sent,0);
+  const due=dueProfessionalNotices(db,{tenantId:"sala-a",now:clock});
+  assert.equal(due.length,2);
+  assert.deepEqual(new Set(due.map(x=>x.recipient_phone)),new Set(["69999998888","69999997777"]));
+  assert.ok(due.every(x=>x.recipient_phone!=="69911112222"));
+  assert.equal(queueNoticesForAppointment(db,{tenantId:"sala-a",appointmentId:"a1",now:clock}).scheduled,0);
+  db.prepare("update appointments set status='cancelled' where id=?").run("a1");
+  const cancel=queueNoticesForAppointment(db,{tenantId:"sala-a",appointmentId:"a1",event:"cancelled",now:clock});
+  assert.equal(cancel.scheduled,2);
+  assert.equal(dueProfessionalNotices(db,{tenantId:"sala-a",now:clock}).length,2);
+  assert.equal(count(db,"sala-a","superseded"),8);
  }finally{db.close()}
 });
