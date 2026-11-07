@@ -24,7 +24,7 @@ export function installLeadClassification(db){
 export function inferLeadClassification(text,{intent=null,hasMedia=false}={}){
   if(hasMedia)return {category:"waiting",priority:"normal",intent:"media",confidence:1,reason:"Mídia precisa de análise pela equipe",handoff:true};
   const t=normalize(text);
-  if(/\b(reclam|insatisfeit|machuc|queimad|prejuiz|denunci|processo|alergia|infec|diagnostic|medic|doenca)\b/.test(t))
+  if(/\b(reclam\w*|insatisfeit\w*|machuc\w*|queimad\w*|prejuiz\w*|denunci\w*|processo|alergia|infec\w*|diagnostic\w*|medic\w*|doenca)\b/.test(t))
     return {category:"complaint",priority:"urgent",intent:"sensitive",confidence:.99,reason:"Reclamação ou assunto sensível: encaminhamento humano",handoff:true};
   if(/\b(falar com (uma |um )?(pessoa|atendente|gerente)|atendimento humano|quero atendente|pessoa real)\b/.test(t))
     return {category:"waiting",priority:"high",intent:"human",confidence:.99,reason:"Solicitação explícita de atendimento humano",handoff:true};
