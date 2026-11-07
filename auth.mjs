@@ -5,6 +5,15 @@ import { installMfa, mfaEnabled, beginMfaLogin, completeMfaLogin, mfaStatus, enr
 const SESSION_COOKIE="salon_session";
 const DAY=86400000;
 const SESSION_IDLE_HOURS=8;
+const ACCESS_LINK_MINUTES=15;
+// A administração técnica é um privilégio da NOVAGENTE, nunca herdado por proprietários de salões.
+// Formato do ambiente: "tenant-uuid:user-uuid,tenant-uuid:user-uuid". Sem configuração, ninguém recebe acesso.
+export function isPlatformAdmin(user){
+  if(!user||user.role!=="owner")return false;
+  const expected=user.tenantId+":"+user.id;
+  return String(process.env.NOVAGENTE_PLATFORM_ADMIN_USERS||"").split(",").map(v=>v.trim()).filter(Boolean).includes(expected);
+}
+
 
 function sha(v){return crypto.createHash("sha256").update(String(v)).digest("hex")}
 function scrypt(password,salt){return crypto.scryptSync(password,salt,64).toString("hex")}
@@ -40,6 +49,12 @@ export function installAuth(db){
       expires_at TEXT NOT NULL,used_at TEXT,created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token_hash);
+    CREATE TABLE IF NOT EXISTS auth_access_links(
+      id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,user_id TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,expires_at TEXT NOT NULL,used_at TEXT,
+      created_by TEXT NOT NULL,created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_auth_access_links_user ON auth_access_links(tenant_id,user_id,expires_at);
     CREATE TABLE IF NOT EXISTS auth_login_attempts(
       attempt_key TEXT PRIMARY KEY, failures INTEGER NOT NULL,window_started TEXT NOT NULL,
       blocked_until TEXT
@@ -77,7 +92,7 @@ export function authenticate(req,db){
       and datetime(s.last_seen_at)>datetime('now','-${SESSION_IDLE_HOURS} hours') limit 1`).get(sha(token));
   if(!row||!row.active)return null;
   db.prepare("update auth_sessions set last_seen_at=? where id=?").run(new Date().toISOString(),row.session_id);
-  return {sessionId:row.session_id,tenantId:row.tenant_id,id:row.user_id,name:row.name,email:row.email,role:row.role,professionalId:row.professional_id||null};
+  return {sessionId:row.session_id,tenantId:row.tenant_id,id:row.user_id,name:row.name,email:row.email,role:row.role,professionalId:row.professional_id||null,platform_admin:isPlatformAdmin({tenantId:row.tenant_id,id:row.user_id,role:row.role})};
 }
 export function audit(db,user,action,entityType=null,entityId=null,metadata={}){
   db.prepare("insert into audit_log(id,tenant_id,user_id,action,entity_type,entity_id,metadata,created_at) values(?,?,?,?,?,?,?,?)")
@@ -182,12 +197,41 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
     }catch(e){db.exec("ROLLBACK");throw e}
     return {handled:true,result:send(res,200,{ok:true})};
   }
+  // Código de acesso de uso único. Sem email externo: o proprietário entrega por canal de confiança.
+  if(url.pathname==="/api/auth/access-link"&&req.method==="POST"){
+    const b=await parseBody(req),token=String(b.token||"").trim();
+    if(token.length<40||token.length>200)return {handled:true,result:send(res,410,{error:"link_invalid_or_expired"})};
+    const time=new Date(),ts=time.toISOString();
+    let result;
+    db.exec("BEGIN IMMEDIATE");
+    try{
+      const row=db.prepare(`select l.id link_id,l.tenant_id,u.id user_id,u.email,u.name,u.role,u.active
+        from auth_access_links l join users u on u.id=l.user_id and u.tenant_id=l.tenant_id
+        where l.token_hash=? and l.used_at is null and l.expires_at>? limit 1`).get(sha(token),ts);
+      if(!row||!row.active||!["reception","professional"].includes(row.role))throw new Error("link_invalid_or_expired");
+      const used=db.prepare("update auth_access_links set used_at=? where id=? and used_at is null").run(ts,row.link_id);
+      if(used.changes!==1)throw new Error("link_invalid_or_expired");
+      const sessionToken=crypto.randomBytes(32).toString("base64url");
+      const deviceLabel=String(req.headers["user-agent"]||"Dispositivo não identificado").slice(0,180);
+      db.prepare("insert into auth_sessions(id,tenant_id,user_id,token_hash,expires_at,created_at,last_seen_at,device_label) values(?,?,?,?,?,?,?,?)")
+        .run(crypto.randomUUID(),row.tenant_id,row.user_id,sha(sessionToken),new Date(time.getTime()+7*DAY).toISOString(),ts,ts,deviceLabel);
+      const user={id:row.user_id,tenantId:row.tenant_id,email:row.email,name:row.name,role:row.role,platform_admin:false};
+      audit(db,user,"auth.access_link.used","user",user.id,{});
+      result={sessionToken,user};db.exec("COMMIT");
+    }catch{db.exec("ROLLBACK");return {handled:true,result:send(res,410,{error:"link_invalid_or_expired"})}}
+    return {handled:true,result:send(res,200,{ok:true,user:result.user},{"set-cookie":sessionCookie(req,result.sessionToken,7*24*3600),"cache-control":"no-store"})};
+  }
+  if(url.pathname==="/api/auth/invitations/inspect"&&req.method==="POST"){
+    const b=await parseBody(req),token=String(b.token||"").trim();
+    const row=token.length>=40?db.prepare("select name,role,expires_at from user_invites where token_hash=? and accepted_at is null and expires_at>?").get(sha(token),new Date().toISOString()):null;
+    return {handled:true,result:row?send(res,200,{ok:true,name:row.name,role:row.role,expires_at:row.expires_at}):send(res,410,{error:"invitation_invalid_or_expired"})};
+  }
   // Convites: o token só é retornado uma vez à proprietária, jamais listado.
   // Aceitação não concede acesso de proprietária e exige senha própria.
   if(url.pathname==="/api/auth/invitations/accept"&&req.method==="POST"){
     const b=await parseBody(req),token=String(b.token||"").trim(),
       password=String(b.password||"");
-    if(token.length<30||password.length<12||password.length>128)
+    if(token.length<30||password.length>128)
       return {handled:true,result:send(res,400,{error:"invalid_invite_or_password"})};
     let result;
     db.exec("BEGIN IMMEDIATE");
@@ -195,16 +239,28 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
       const invite=db.prepare(`select * from user_invites where token_hash=? and accepted_at is null and expires_at>?`).get(sha(token),new Date().toISOString());
       if(!invite||!["manager","reception","professional"].includes(invite.role))
         throw Object.assign(new Error("invitation_invalid_or_expired"),{status:410});
+      const passwordless=b.passwordless===true&&["reception","professional"].includes(invite.role);
+      if(!passwordless&&password.length<12)throw Object.assign(new Error("invalid_invite_or_password"),{status:400});
       const existing=db.prepare("select id from users where tenant_id=? and lower(email)=?").get(invite.tenant_id,invite.email.toLowerCase());
       if(existing)throw Object.assign(new Error("user_already_exists"),{status:409});
       const userId=crypto.randomUUID(),stamp=new Date().toISOString();
       db.prepare(`insert into users(id,tenant_id,name,email,role,active,created_at,password_hash,updated_at)
-        values(?,?,?,?,?,1,?,?,?)`).run(userId,invite.tenant_id,invite.name,invite.email,invite.role,stamp,makePasswordHash(password),stamp);
+        values(?,?,?,?,?,1,?,?,?)`).run(userId,invite.tenant_id,invite.name,invite.email,invite.role,stamp,passwordless?null:makePasswordHash(password),stamp);
       db.prepare("update user_invites set accepted_at=? where id=? and accepted_at is null").run(stamp,invite.id);
       db.exec("COMMIT");
       result={ok:true,email:invite.email,role:invite.role};
+      if(passwordless){
+        const sessionToken=crypto.randomBytes(32).toString("base64url");
+        const deviceLabel=String(req.headers["user-agent"]||"Dispositivo não identificado").slice(0,180);
+        db.prepare("insert into auth_sessions(id,tenant_id,user_id,token_hash,expires_at,created_at,last_seen_at,device_label) values(?,?,?,?,?,?,?,?)")
+          .run(crypto.randomUUID(),invite.tenant_id,userId,sha(sessionToken),new Date(Date.now()+7*DAY).toISOString(),stamp,stamp,deviceLabel);
+        result.user={id:userId,tenantId:invite.tenant_id,name:invite.name,email:invite.email,role:invite.role,platform_admin:false};
+        result.sessionToken=sessionToken;
+      }
     }catch(e){db.exec("ROLLBACK");return {handled:true,result:send(res,e.status||400,{error:e.message||"invitation_failed"})}}
-    return {handled:true,result:send(res,201,result)};
+    const cookie=result.sessionToken?{"set-cookie":sessionCookie(req,result.sessionToken,7*24*3600),"cache-control":"no-store"}:{};
+    const response={...result};delete response.sessionToken;
+    return {handled:true,result:send(res,201,response,cookie)};
   }
   if(url.pathname==="/api/auth/login"&&req.method==="POST"){
     const b=await parseBody(req),email=String(b.email||"").trim().toLowerCase().slice(0,200),password=String(b.password||""),workspace=String(b.workspace||"").trim().toLowerCase().slice(0,120);
@@ -233,7 +289,7 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
     const deviceLabel=String(req.headers["user-agent"]||"Dispositivo não identificado").slice(0,180);
     db.prepare("insert into auth_sessions(id,tenant_id,user_id,token_hash,expires_at,created_at,last_seen_at,device_label) values(?,?,?,?,?,?,?,?)")
       .run(crypto.randomUUID(),u.tenant_id,u.id,sha(token),expires.toISOString(),ts.toISOString(),ts.toISOString(),deviceLabel);
-    const user={id:u.id,tenantId:u.tenant_id,name:u.name,email:u.email,role:u.role};
+    const user={id:u.id,tenantId:u.tenant_id,name:u.name,email:u.email,role:u.role,platform_admin:isPlatformAdmin({id:u.id,tenantId:u.tenant_id,role:u.role})};
     audit(db,user,"auth.login","user",u.id,{});
     return {handled:true,result:send(res,200,{ok:true,user},{"set-cookie":sessionCookie(req,token,7*24*3600)})};
   }
@@ -253,7 +309,7 @@ export async function handleAuthApi({req,res,url,db,send,parseBody,defaultTenant
     db.prepare("delete from auth_sessions where datetime(expires_at)<=datetime('now')").run();
     db.prepare("insert into auth_sessions(id,tenant_id,user_id,token_hash,expires_at,created_at,last_seen_at,device_label) values(?,?,?,?,?,?,?,?)")
       .run(crypto.randomUUID(),u.tenant_id,u.id,sha(token),expires.toISOString(),ts.toISOString(),ts.toISOString(),label);
-    const user={id:u.id,tenantId:u.tenant_id,name:u.name,email:u.email,role:u.role};
+    const user={id:u.id,tenantId:u.tenant_id,name:u.name,email:u.email,role:u.role,platform_admin:isPlatformAdmin({id:u.id,tenantId:u.tenant_id,role:u.role})};
     if(result.attempt_key)db.prepare("delete from auth_login_attempts where attempt_key=?").run(result.attempt_key);
     audit(db,user,"auth.login.mfa","user",u.id,{});
     return {handled:true,result:send(res,200,{ok:true,user},{"set-cookie":sessionCookie(req,token,7*24*3600)})};

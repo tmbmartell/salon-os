@@ -643,6 +643,8 @@
 <dialog id="professionalModal"><form id="professionalForm" class="modalForm">
   <div class="modalHead"><div><h3>Novo profissional</h3><p>Equipe operacional.</p></div><button type="button" class="x" data-close>×</button></div>
   <label>Nome<input name="name" required></label><label>Função<input name="role" placeholder="Ex.: Cabeleireira"></label>
+  <label>WhatsApp da profissional<input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Ex.: 69 99999-9999" maxlength="20"></label>
+  <small class="muted">Esse número será usado para avisos de agenda após a integração e homologação do envio.</small>
   <div class="split"><label>Início<input name="work_start" type="time" value="09:00"></label><label>Fim<input name="work_end" type="time" value="18:00"></label></div>
   <div class="stickyActions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Salvar</button></div>
 </form></dialog>
@@ -1082,12 +1084,12 @@
   </form>
 </dialog>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
-<script src="/app.js?v=213" type="module"></script>
+<script src="/app.js?v=214" type="module"></script>
 <script src="/marketing-ui.js?v=1" defer></script>
 <script src="/novagente-commercial-ui.js?v=3" defer></script>
 <script src="/security-center.js?v=2" defer></script>
 <script src="/whatsapp-onboarding.js?v=2" defer></script>
-<script src="/admin-stage8.js?v=2" defer></script>
+<script src="/admin-stage8.js?v=3" defer></script>
 <script src="/mfa-security-ui.js?v=1" defer></script>
 <script src="/whatsapp-backfill-ui.js?v=1" defer></script>
 <script src="/free-preview-ui.js?v=1" defer></script>

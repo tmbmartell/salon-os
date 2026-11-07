@@ -108,6 +108,43 @@ export async function handleTenantAdministrationApi({req,res,url,db,user,tenant,
     audit(db,user,"admin.invitation.create","user_invite",invitationId,{role,email});
     return send(res,201,{id:invitationId,name,email,role,expires_at:expires,token,delivery:"manual"});
   }
+  // Proprietária cria links seguros; não existe leitura posterior do token.
+  const accessRoute=url.pathname.match(/^\/api\/admin\/users\/([^/]+)\/access-link$/);
+  if(req.method==="POST"&&accessRoute){
+    if(!manage())return send(res,403,{error:"owner_only"});
+    const id=decodeURIComponent(accessRoute[1]);
+    const target=one(db,"select id,role,active from users where tenant_id=? and id=?",[tenant,id]);
+    if(!target)return send(res,404,{error:"user_not_found"});
+    if(!target.active||!["reception","professional"].includes(target.role))return send(res,403,{error:"access_link_not_allowed_for_role"});
+    const token=makeInviteToken(),created=now(),expires=new Date(Date.now()+15*60000).toISOString();
+    db.exec("BEGIN IMMEDIATE");
+    try{
+      run(db,"delete from auth_access_links where tenant_id=? and user_id=? and used_at is null",[tenant,id]);
+      run(db,"insert into auth_access_links(id,tenant_id,user_id,token_hash,expires_at,created_by,created_at) values(?,?,?,?,?,?,?)",
+        [crypto.randomUUID(),tenant,id,sha(token),expires,user.id,created]);
+      db.exec("COMMIT");
+    }catch(e){db.exec("ROLLBACK");throw e}
+    audit(db,user,"admin.access_link.create","user",id,{expires_at:expires});
+    return send(res,201,{ok:true,token,expires_at:expires,delivery:"manual"},{"cache-control":"no-store"});
+  }
+  const resetRoute=url.pathname.match(/^\/api\/admin\/users\/([^/]+)\/password-reset$/);
+  if(req.method==="POST"&&resetRoute){
+    if(!manage())return send(res,403,{error:"owner_only"});
+    const id=decodeURIComponent(resetRoute[1]);
+    const target=one(db,"select id,role,active from users where tenant_id=? and id=?",[tenant,id]);
+    if(!target)return send(res,404,{error:"user_not_found"});
+    if(!target.active||target.role==="owner")return send(res,403,{error:"reset_not_allowed_for_role"});
+    const token=makeInviteToken(),created=now(),expires=new Date(Date.now()+30*60000).toISOString();
+    db.exec("BEGIN IMMEDIATE");
+    try{
+      run(db,"delete from password_resets where tenant_id=? and user_id=? and used_at is null",[tenant,id]);
+      run(db,"insert into password_resets(id,user_id,tenant_id,token_hash,expires_at,used_at,created_at) values(?,?,?,?,?,null,?)",
+        [crypto.randomUUID(),id,tenant,sha(token),expires,created]);
+      db.exec("COMMIT");
+    }catch(e){db.exec("ROLLBACK");throw e}
+    audit(db,user,"admin.password_reset.create","user",id,{expires_at:expires});
+    return send(res,201,{ok:true,token,expires_at:expires,delivery:"manual"},{"cache-control":"no-store"});
+  }
   const revokeRoute=url.pathname.match(/^\/api\/admin\/users\/([^/]+)\/revoke-sessions$/);
   if(req.method==="POST"&&revokeRoute){
     if(!manage())return send(res,403,{error:"owner_only"});

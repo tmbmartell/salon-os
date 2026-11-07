@@ -71,28 +71,46 @@ try{
     await sleep(300);
     assert.equal(errors.length,0,"Erro JS após abrir "+view+": "+errors.join(" | "));
   }
+  // Proprietária cria convite operacional. A funcionária aceita sem senha em navegador independente.
+  await open("team");
+  await page.locator('#team [data-ne-tab="access"]').click();
+  await page.locator('#team .ne-stage8-team-access:not(.hidden)').waitFor();
+  await page.locator('#team .ne-stage8-heading button').first().click();
+  await page.locator('#neInviteDialog[open]').waitFor();
+  await page.locator('#neInviteDialog [name="name"]').fill('Recepcionista Browser QA');
+  await page.locator('#neInviteDialog [name="email"]').fill('recepcao-browser@example.invalid');
+  await page.locator('#neInviteDialog [name="role"]').selectOption('reception');
+  await page.locator('#neInviteDialog button[type="submit"]').click();
+  const share=page.locator('#neInviteDialog input[readonly]');
+  await share.waitFor({timeout:15000});
+  const inviteUrl=await share.inputValue();
+  assert.ok(inviteUrl.includes('#invite='),'Convite deve usar fragmento de URL');
+  await page.screenshot({path:path.join(artifact,'17-equipe-convites.png'),fullPage:true});
+  await page.evaluate(()=>document.querySelector('#neInviteDialog')?.close());
+  const coworkerContext=await browser.newContext({viewport:{width:390,height:844},locale:'pt-BR'});
+  try{
+    const coworker=await coworkerContext.newPage();
+    await coworker.goto(inviteUrl,{waitUntil:'domcontentloaded'});
+    const fast= coworker.getByRole('button',{name:'Aceitar convite e entrar sem senha'});
+    await fast.waitFor({state:'visible',timeout:15000});
+    await fast.click();
+    await coworker.locator('#authGate').waitFor({state:'hidden',timeout:20000});
+    assert.ok((await coworker.locator('#appUser').textContent()).includes('RECEPCIONISTA'));
+    await coworker.screenshot({path:path.join(artifact,'18-funcionaria-sem-senha.png'),fullPage:true});
+    assert.equal(errors.length,0);
+  }finally{await coworkerContext.close()}
   await open("inbox");
   await page.locator("#conversationStatusFilter").selectOption("resolved");
   await page.locator("#conversationFiltersSummary").getByText("Status: Resolvida",{exact:false}).waitFor();
   await page.locator("#conversationStatusFilter").selectOption("");
   await page.locator("#conversationFiltersSummary").getByText("Nenhum filtro aplicado",{exact:false}).waitFor();
   await open("agents");
-  await page.locator('[data-agent-explain="receptionist"]').click();
-  await page.locator("#agentExplainModal[open]").waitFor({timeout:14000});
-  await page.locator("#agentExplainStatus").getByText("Execução automática:",{exact:false}).waitFor();
-  await page.locator("#agentExplainModal .agentExplainDetails").first().locator("summary").click();
-  await page.locator("#agentExplainRules").getByText("Responder preços",{exact:false}).waitFor();
-  await page.locator("#agentExplainModal .agentExplainDetails").nth(1).locator("summary").click();
-  await page.locator("#agentExplainPrompt").getByText("RECEPCIONISTA IA",{exact:false}).waitFor();
-  await page.screenshot({path:path.join(artifact,"14-transparencia-regras-prompt.png"),fullPage:true});
-  await page.locator("#closeAgentExplain").click();
-  await page.locator("#agentExplainModal").waitFor({state:"hidden"});
-  await page.locator('[data-agent-config="receptionist"]').click();
-  await page.locator("#agentConfigModal[open]").waitFor();
-  await page.locator("#agentExplainFromConfig").click();
-  await page.locator("#agentExplainModal[open]").waitFor();
-  await page.locator("#closeAgentExplain").click();
-  await page.locator("#agentConfigModal [data-close]").first().click();
+  // Proprietária do salão tem o estado operacional, mas NÃO o prompt interno.
+  assert.equal(await page.locator('[data-agent-explain="receptionist"]').count(),0);
+  assert.equal(await page.locator('[data-agent-config="receptionist"]').count(),0);
+  const privateStatus=await page.evaluate(async()=>{const res=await fetch('/api/agents/receptionist/explain');return res.status});
+  assert.equal(privateStatus,403);
+  await page.screenshot({path:path.join(artifact,"14-status-agentes-sem-prompt.png"),fullPage:true});
   await open("inbox");
   await page.locator("#syncWhatsappHistory").click();
   await page.locator("#whatsappBackfillDetails[open]").waitFor();
