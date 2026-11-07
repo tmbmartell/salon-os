@@ -215,6 +215,10 @@
               <label>Etiquetas<input id="conversationLabels" placeholder="ex.: orçamento, retorno, noiva"></label>
             </div>
             <button id="saveConversationMeta" class="primary wide">Salvar classificação</button>
+            <details id="conversationClassificationDetails" class="ne-lead-trace">
+              <summary>Por que este lead está aqui?</summary>
+              <div id="conversationClassificationHistory" role="status" aria-live="polite">Selecione uma conversa para consultar a classificação.</div>
+            </details>
             <div class="detailInfo">
               <strong>Cliente</strong>
               <p id="detailClientInfo" class="muted"></p><div id="neClientContext" class="ne-client-context" aria-live="polite"></div>
@@ -1101,7 +1105,7 @@
   </form>
 </dialog>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
-<script src="/app.js?v=215" type="module"></script>
+<script src="/app.js?v=216" type="module"></script>
 <script src="/marketing-ui.js?v=1" defer></script>
 <script src="/novagente-commercial-ui.js?v=3" defer></script>
 <script src="/security-center.js?v=2" defer></script>
