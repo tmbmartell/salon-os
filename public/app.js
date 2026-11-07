@@ -178,6 +178,15 @@ function filteredConversations(){
 function renderConversationList(){
   const convs=filteredConversations();
   $("#conversationCount").textContent=convs.length+(convs.length!==state.conversations.length?" de "+state.conversations.length:"")+" conversas";
+  const active=[];
+  const searchText=$("#conversationSearch")?.value.trim();
+  if(searchText)active.push("Busca: "+searchText);
+  const status=$("#conversationStatusFilter");if(status?.value)active.push("Status: "+status.selectedOptions[0]?.textContent);
+  const priority=$("#conversationPriorityFilter");if(priority?.value)active.push("Prioridade: "+priority.selectedOptions[0]?.textContent);
+  if($("#conversationUnreadFilter")?.checked)active.push("Somente não lidas");
+  const summary=$("#conversationFiltersSummary");
+  if(summary){summary.textContent=active.length?"Filtros aplicados: "+active.join(" · ")+" — "+convs.length+" de "+state.conversations.length+" conversas exibidas.":"Nenhum filtro aplicado — "+convs.length+" conversas exibidas.";summary.classList.toggle("hasActiveFilters",active.length>0);}
+
   $("#conversationList").innerHTML=convs.map(c=>{
     const selected=state.selectedConversation?.id===c.id?" selected":"",labels=(c.labels||[]).slice(0,2).map(x=>'<span class="miniLabel">'+esc(x)+'</span>').join("");
     return '<button class="conversation priority-'+esc(c.priority||"normal")+selected+'" data-conversation="'+c.id+'">'+
@@ -629,205 +638,12 @@ $("#cashWithdrawForm").onsubmit=async e=>{
   if(!window.confirm("Confirmar retirada de "+moneyBR(b.amount)+" do caixa?"))return;
   try{await api("/api/cash/withdraw",{method:"POST",body:JSON.stringify(b)});
     form.reset();$("#cashWithdrawModal").close();await loadFinance();toast("Retirada registrada no caixa");
-  }catch(err){toast(err.data?.error==="insufficient_cash"?"O dinheiro em caixa é insuficiente":err.data?.error==="cash_not_open"?"Abra o caixa antes de retirar dinheiro":"Não foi possível registrar a retirada")}
-};
-$("#financePayForm").onsubmit=async e=>{
-  e.preventDefault();const form=e.target,b=Object.fromEntries(new FormData(form));
-  try{await api("/api/finance/entries/"+encodeURIComponent(b.entry_id)+"/pay",{method:"POST",body:JSON.stringify({payment_method:b.payment_method})});
-    form.reset();$("#financePayModal").close();await loadFinance();toast("Pagamento confirmado");
-  }catch(err){toast(err.data?.error==="already_paid"?"Esse lançamento já foi pago":err.data?.error==="cash_session_required"?"Abra o caixa para pagar em dinheiro":err.data?.error==="insufficient_cash"?"Saldo físico insuficiente para esse pagamento":"Não foi possível registrar o pagamento")}
-};
-async function loadAgendaPhase2(){await loadAgenda()}
-$("#checkoutForm").onsubmit=async e=>{
-  e.preventDefault();
-  const b=Object.fromEntries(new FormData(e.target));
-  try{
-    b.consumption=collectCheckoutConsumption();
-    const out=await api("/api/checkout",{method:"POST",body:JSON.stringify(b)});
-    $("#checkoutModal").close();e.target.reset();$("#checkoutConsumption").innerHTML="";
-    await loadAgendaPhase2();state.dashboard=await api("/api/dashboard");renderDashboard();await loadFinance();
-    toast("Atendimento finalizado · "+moneyBR(out.total));
-  }catch(err){
-    const code=err.data?.error;
-    toast(err.status===403?"Seu perfil não tem permissão para receber pagamentos. Solicite à recepção ou gerência":
-      code==="cash_session_required"?"Abra o caixa antes de receber em dinheiro":
-      code==="appointment_already_checked_out"?"Esse atendimento já foi finalizado":
-      code==="package_credit_required"?"Esta cliente não possui crédito válido deste serviço":
-      code==="insufficient_stock"?"Estoque insuficiente: "+(err.data?.product_name||"corrija o saldo do produto"):
-      code==="invalid_stock_quantity"||code==="invalid_consumption_product"?"Verifique o consumo informado e sua unidade":
-      code==="invalid_consumption_form"?"Informe quantidades válidas antes de finalizar":"Não foi possível finalizar");
-  }
-};
-
-async function loadDre(){
-  const month=$("#dreMonth").value||new Date().toISOString().slice(0,7);$("#dreMonth").value=month;
-  try{const d=await api("/api/reports/dre?month="+encodeURIComponent(month));$("#dreBody").innerHTML='<div class="dreHero"><div><span>Entradas</span><strong>'+moneyBR(d.income)+'</strong></div><div><span>Saídas</span><strong>'+moneyBR(d.expense)+'</strong></div><div><span>Resultado</span><strong>'+moneyBR(d.result)+'</strong></div></div><div class="stack">'+d.categories.map(c=>'<div class="row"><div><strong>'+c.category+'</strong><small>'+(c.kind==="income"?"receita":"despesa")+'</small></div><div class="money '+c.kind+'">'+moneyBR(c.total)+'</div></div>').join("")+'</div>'}catch{$("#dreBody").innerHTML='<p class="muted">Não foi possível calcular o DRE.</p>'}
-}
-$("#dreMonth").onchange=loadDre;
-function openCommissionPay(ids,total,label="comissões selecionadas"){
-  if(!ids.length){toast("Nenhuma comissão pendente selecionada");return}
-  state.neCommissionIds=ids;
-  $("#commissionPayForm").reset();
-  $("#neCommissionPayDescription").textContent=ids.length+" lançamento(s) · "+label+" · total "+moneyBR(total)+". Confira antes de registrar.";
-  $("#commissionPayModal").showModal();
-}
-$("#payPendingCommissions").onclick=e=>{
-  const ids=String(e.currentTarget.dataset.ids||"").split(",").filter(Boolean);
-  openCommissionPay(ids,Number(e.currentTarget.dataset.total||0),"todos os profissionais");
-};
-$("#commissionProfessionalPick").onchange=e=>{$("#payProfessionalCommissions").disabled=!e.target.value};
-$("#payProfessionalCommissions").onclick=()=>{
-  const id=$("#commissionProfessionalPick").value;
-  const list=(state.neCommissionRows||[]).filter(x=>x.status==="pending"&&x.professional_id===id);
-  if(!id||!list.length){toast("Selecione um profissional com comissões pendentes");return}
-  openCommissionPay(list.map(x=>x.id),list.reduce((sum,x)=>sum+Number(x.amount||0),0),list[0].professional_name||"profissional");
-};
-$("#commissionPayForm").onsubmit=async e=>{
-  e.preventDefault();
-  const form=e.target,method=form.elements.payment_method.value;
-  if(!state.neCommissionIds?.length){toast("Não há comissões selecionadas");return}
-  if(!window.confirm("Registrar essas "+state.neCommissionIds.length+" comissões como pagas?"))return;
-  try{
-    const out=await api("/api/commissions/pay",{method:"POST",body:JSON.stringify({ids:state.neCommissionIds,payment_method:method})});
-    state.neCommissionIds=[];form.reset();$("#commissionPayModal").close();await loadFinance();
-    toast(out.count+" comissões registradas · "+moneyBR(out.total));
-  }catch(err){toast(err.data?.error==="cash_session_required"?"Abra o caixa para pagar comissões em dinheiro":
-    err.data?.error==="insufficient_cash"?"O caixa não tem dinheiro suficiente para essas comissões":
-    err.data?.error==="commission_not_pending"?"Alguma comissão já foi paga. Atualize a lista.":"Não foi possível registrar as comissões")}
-};
-function purchaseRow(selected="",qty="",cost="",lot="",expiry=""){
-  return '<div class="purchaseRow"><select class="purchaseProduct"><option value="">Produto…</option>'+state.products.map(p=>'<option value="'+p.id+'" '+(p.id===selected?'selected':'')+'>'+p.name+' ('+p.unit+')</option>').join("")+'</select><input class="purchaseQty" type="number" step="0.01" min="0.01" value="'+qty+'" placeholder="Qtd."><input class="purchaseCost" type="number" step="0.0001" min="0" value="'+cost+'" placeholder="R$/un"><input class="purchaseLot" value="'+lot+'" placeholder="Lote"><input class="purchaseExpiry" type="date" value="'+expiry+'"><button type="button" class="x purchaseRemove">×</button></div>';
-}
-function bindPurchaseRemove(){$$(".purchaseRemove").forEach(b=>b.onclick=()=>b.closest(".purchaseRow").remove())}
-function fillPurchaseSupplier(){const s=$("#purchaseSupplier");if(!s)return;s.innerHTML='<option value="">Selecione…</option>'+state.suppliers.map(x=>'<option value="'+x.id+'">'+x.name+'</option>').join("")}
-$("#addPurchaseRow").onclick=()=>{$("#purchaseRows").insertAdjacentHTML("beforeend",purchaseRow());bindPurchaseRemove()};
-$('[data-open="purchaseModal"]').addEventListener("click",async()=>{if(!state.products.length)await loadInventory();if(!state.suppliers.length)await loadSuppliers();fillPurchaseSupplier();if(!$("#purchaseRows").children.length)$("#purchaseRows").innerHTML=purchaseRow();bindPurchaseRemove()});
-$("#purchaseForm").onsubmit=async e=>{e.preventDefault();const base=Object.fromEntries(new FormData(e.target)),items=$$(".purchaseRow",e.target).map(r=>({product_id:$(".purchaseProduct",r).value,qty:Number($(".purchaseQty",r).value||0),unit_cost:Number($(".purchaseCost",r).value||0),lot_code:$(".purchaseLot",r).value.trim(),expiry_date:$(".purchaseExpiry",r).value})).filter(x=>x.product_id&&x.qty>0);try{await api("/api/purchases",{method:"POST",body:JSON.stringify({...base,items})});e.target.reset();$("#purchaseRows").innerHTML="";$("#purchaseModal").close();await loadSuppliers();await loadFinance();await loadPurchaseArea();toast("Pedido de compra criado")}catch{toast("Não foi possível criar o pedido")}};
-
-async function loadPurchaseArea(){
-  try{
-    const [suggestions,purchases,prices]=await Promise.all([api("/api/purchases/suggestions"),api("/api/purchases"),api("/api/suppliers/price-history")]);
-    $("#purchaseSuggestionList").innerHTML=suggestions.map(s=>'<div class="tableRow"><div><strong>'+s.product_name+'</strong><small>Atual '+Number(s.stock_qty).toLocaleString("pt-BR")+' '+s.unit+' · mínimo '+Number(s.min_qty).toLocaleString("pt-BR")+' · ideal '+Number(s.ideal_qty).toLocaleString("pt-BR")+(s.supplier_name?' · '+s.supplier_name:'')+'</small></div><div><strong>'+Number(s.suggested_qty).toLocaleString("pt-BR")+' '+s.unit+'</strong><small>'+(s.days_left==null?'sem histórico':'~'+Number(s.days_left).toFixed(1)+' dias restantes')+'</small></div><span class="status pending">repor</span></div>').join("")||'<p class="muted">Nenhum produto abaixo do mínimo.</p>';
-    $("#purchaseList").innerHTML=purchases.map(p=>'<div class="tableRow"><div><strong>'+p.supplier_name+'</strong><small>'+p.item_count+' itens · pedido '+dateTimeBR(p.ordered_at)+(p.expected_at?' · previsão '+p.expected_at:'')+'</small></div><div class="money">'+moneyBR(p.total)+'</div>'+(p.status==="received"?'<span class="status paid">recebido</span>':'<button type="button" class="secondary smallBtn" data-receive-purchase="'+p.id+'">Receber</button>')+'</div>').join("")||'<p class="muted">Nenhum pedido criado ainda.</p>';
-    $("#supplierPriceList").innerHTML=prices.slice(0,60).map(x=>'<div class="tableRow"><div><strong>'+x.product_name+'</strong><small>'+x.supplier_name+' · '+dateTimeBR(x.recorded_at)+'</small></div><div><strong>'+moneyBR(x.unit_cost)+'/'+x.unit+'</strong><small>'+(x.change_pct==null?"primeiro registro":(x.change_pct>=0?"+":"")+Number(x.change_pct).toFixed(1)+"% vs. anterior")+'</small></div><span class="status '+(x.change_pct!=null&&x.change_pct>0?"pending":"paid")+'">'+(x.change_pct!=null&&x.change_pct>0?"subiu":"ok")+'</span></div>').join("")||'<p class="muted">O histórico aparece a partir do primeiro pedido.</p>';
-    $$("[data-receive-purchase]").forEach(b=>b.onclick=async()=>{try{await api("/api/purchases/"+b.dataset.receivePurchase+"/receive",{method:"POST",body:"{}"});await loadPurchaseArea();await loadInventory();toast("Compra recebida e estoque atualizado")}catch(err){toast(err.data?.error==="already_received"?"Esse pedido já foi recebido":"Não foi possível receber o pedido")}});
-  }catch(err){if(err.status!==403&&err.status!==401)toast("Não foi possível carregar os pedidos")}
-}
-async function openCheckout(appointmentId){
-  try{
-    const prep=await api("/api/checkout/"+appointmentId+"/prep");
-    $("#checkoutForm").elements.appointment_id.value=appointmentId;
-    $("#checkoutLabel").textContent=prep.client_name+" · "+prep.service_name+" · "+moneyBR(prep.price);
-    state.checkoutPackages=prep.packages||[];const cp=$("#checkoutPackage");cp.innerHTML='<option value="">Selecione…</option>'+state.checkoutPackages.map(p=>'<option value="'+p.client_package_id+'">'+p.package_name+' · '+p.remaining+' crédito(s) · até '+String(p.expires_at).slice(0,10)+' · valor '+moneyBR(p.allocated_unit)+'</option>').join("");$("#checkoutPaymentMethod").value="";updateCheckoutPaymentMode();
-    const shortages=[];
-    $("#checkoutConsumption").innerHTML=prep.recipe.length?prep.recipe.map(r=>{
-      const unit=String(r.unit||"ml"),stock=Number(r.stock_qty||0),standard=Number(r.qty_standard||0);
-      const avg=Number(r.client_avg_qty),suggested=r.client_avg_qty!=null&&Number.isFinite(avg)?avg:standard;
-      const hint=r.client_avg_qty!=null?"média desta cliente ("+r.client_samples+" atend.)":"padrão do serviço";
-      if(suggested>stock)shortages.push(r.product_name);
-      const step=["un","unidade","und"].includes(unit)?"1":"0.001";
-      return '<div class="consumptionRow" data-consumption-product="'+esc(r.product_id)+'" data-unit="'+esc(unit)+'"><div><strong>'+esc(r.product_name)+'</strong><small>'+hint+' · previsto '+standard.toLocaleString("pt-BR")+' '+esc(unit)+' · saldo '+stock.toLocaleString("pt-BR")+' '+esc(unit)+'</small></div><input type="number" step="'+step+'" min="0" max="'+stock+'" required value="'+Number(suggested.toFixed(3))+'"><span>'+esc(unit)+'</span></div>';
-    }).join(""):'<p class="muted">Este serviço ainda não tem produtos configurados. O financeiro e a comissão serão registrados normalmente.</p>';
-    $("#neCheckoutStockHint").textContent=shortages.length?"Atenção: saldo insuficiente para "+shortages.join(", ")+". Corrija o estoque antes de finalizar.":"Confira as quantidades. É permitido registrar zero quando um produto não foi usado.";
-    $("#checkoutModal").showModal();
-  }catch(err){
-    // Perfil sem checkout.write não abre formulário de recebimento.
-    if(err.status===403){toast("Somente a recepção ou a gestão pode finalizar e receber pagamentos. Solicite a finalização do atendimento.");return}
-    if(err.status===404){toast("Atendimento não encontrado ou fora do seu escopo.");return}
-    if(err.status===409)toast("Este atendimento não pode ser finalizado agora. Atualize a agenda.");
-    else toast("Não foi possível preparar o fechamento");
-  }
-}
-function collectCheckoutConsumption(){
-  return $$("#checkoutConsumption [data-consumption-product]").map(row=>{
-    const input=$("input",row),number=Number(input.value),unit=row.dataset.unit;
-    if(input.value.trim()===""||!input.checkValidity()||!Number.isFinite(number)||number<0||number>1000000||
-      ["un","unidade","und"].includes(unit)&&!Number.isInteger(number)){
-      input.focus();throw Object.assign(new Error("invalid_consumption_form"),{data:{error:"invalid_consumption_form"}});
-    }
-    return {product_id:row.dataset.consumptionProduct,actual_qty:number};
-  });
-}
-function payFinanceEntry(id){
-  const entry=state.financeEntries?.find(x=>x.id===id);
-  if(!entry||entry.status!=="pending"){toast("Lançamento não encontrado ou já pago");return}
-  const form=$("#financePayForm");form.reset();
-  form.elements.entry_id.value=id;
-  $("#neFinancePayDescription").textContent=entry.description+" · "+moneyBR(entry.amount);
-  $("#financePayModal").showModal();
-}
-
-function showOwnerTab(section){
-  const active=["attention","finance","services","team","clients"].includes(section)?section:"attention";
-  $$("[data-owner-panel]").forEach(el=>el.classList.toggle("hidden",el.dataset.ownerPanel!==active));
-  $$("[data-owner-tab]").forEach(btn=>{
-    const yes=btn.dataset.ownerTab===active;
-    btn.classList.toggle("is-active",yes);
-    if(btn.classList.contains("ne-owner-menu-item"))btn.setAttribute("aria-pressed",String(yes));
-  });
-}
-$$("[data-owner-tab]").forEach(btn=>btn.addEventListener("click",()=>showOwnerTab(btn.dataset.ownerTab)));
-function ownerEmpty(text){return '<p class="ne-owner-empty">'+esc(text)+'</p>'}
-function ownerRanking(items,valueLabel){
-  return items.length?items.map((item,i)=>'<div class="ne-owner-ranking-row"><span class="ne-owner-rank">'+(i+1)+'</span><div class="ne-owner-rank-name"><strong>'+esc(item.name)+'</strong><small>'+Number(item.count).toLocaleString("pt-BR")+' atendimentos</small></div><strong>'+moneyBR(item.volume)+'</strong></div>').join(""):ownerEmpty("Ainda não há atendimentos finalizados para este período.");
-}
-async function loadOwnerEye(){
-  const status=$("#neOwnerStatus");
-  if(!status)return;
-  status.textContent="Atualizando os indicadores do salão...";
-  try{
-    const snap=await api("/api/owner-eye/summary");
-    state.ownerEye=snap;
-    const date=day=>String(day||"").split("-").reverse().join("/");
-    status.textContent="Dados de "+date(snap.period.from)+" a "+date(snap.period.to)+" · Fuso "+snap.period.time_zone+" · Atualizado agora";
-    $("#oiRevenue").textContent=moneyBR(snap.money.income);
-    $("#neOwnerVisits").textContent=Number(snap.operations.completed_services).toLocaleString("pt-BR");
-    $("#oiTicket").textContent="ticket médio "+moneyBR(snap.operations.average_checkout);
-    $("#oiRepeat").textContent=snap.operations.repeat_rate==null?"Sem base":snap.operations.repeat_rate.toLocaleString("pt-BR")+"%";
-    $("#neOwnerRepeatCount").textContent=snap.operations.repeat_clients+" de "+snap.operations.clients_with_checkout+" clientes com checkout";
-    $("#neOwnerAlertsCount").textContent=String(snap.alerts.length);
-    $("#neOwnerStockBrief").textContent=snap.attention.critical_stock+" itens críticos no estoque";
-    $("#neOwnerRevenueChange").textContent=snap.money.income_change_pct==null?
-      "Sem período anterior comparável":(snap.money.income_change_pct>=0?"+":"")+snap.money.income_change_pct.toLocaleString("pt-BR")+"% ante os 30 dias anteriores";
-    $("#neOwnerIncome").textContent=moneyBR(snap.money.income);
-    $("#neOwnerExpenses").textContent=moneyBR(snap.money.expenses);
-    $("#neOwnerNet").textContent=moneyBR(snap.money.cash_net);
-    $("#neOwnerRepeated").textContent=String(snap.operations.repeat_clients);
-    $("#neOwnerBuyers").textContent=String(snap.operations.clients_with_checkout);
-    $("#neOwnerTasks").textContent=String(snap.attention.overdue_followups);
-    const allowed={stock:"inventory",bills:"finance",retention:"retention",attendance:"agenda"};
-    $("#intelligenceAlerts").innerHTML=snap.alerts.length?snap.alerts.map(al=>'<div class="ne-owner-alert '+esc(al.severity)+'"><div class="ne-owner-alert-content"><strong>'+esc(al.label)+'</strong><small>'+esc(al.detail)+'</small></div><button type="button" class="secondary smallBtn" data-owner-action="'+esc(al.id)+'">Resolver</button></div>').join(""):'<div class="ne-owner-calm"><strong>Nenhum alerta desta lista no momento.</strong><p>Continue acompanhando os indicadores e as tarefas da equipe.</p></div>';
-    $$("[data-owner-action]",$("#intelligenceAlerts")).forEach(btn=>btn.onclick=()=>{
-      const view=allowed[btn.dataset.ownerAction];
-      if(view)activate(view);
-    });
-    $("#serviceIntelList").innerHTML=ownerRanking(snap.lists.services);
-    $("#performanceList").innerHTML=ownerRanking(snap.lists.professionals);
-    const chart=snap.charts.cashflow14,max=Math.max(1,...chart.map(x=>Number(x.income||0)));
-    $("#neOwnerChart").innerHTML=chart.map(day=>{
-      const height=Math.round(Math.max(2,Number(day.income||0)/max*100));
-      const key=String(day.date).slice(5).split("-").reverse().join("/");
-      return '<div class="ne-owner-bar-column" title="'+esc(key)+" · "+esc(moneyBR(day.income))+'"><div class="ne-owner-bar" style="height:'+height+'%" aria-hidden="true"></div><small>'+esc(key)+'</small></div>';
-    }).join("");
-    $("#neOwnerChart").setAttribute("aria-label","Entradas recebidas nos últimos 14 dias: "+chart.map(x=>date(x.date)+" "+moneyBR(x.income)).join("; "));
-    const definitions=snap.definitions||{};
-    $("#neOwnerDefinitions").innerHTML=Object.entries(definitions).map(([key,text])=>'<p>'+esc(text)+'</p>').join("");
-  }catch(err){
-    status.textContent=err.status===403?"Esta visão é exclusiva da proprietária e da gerência.":"Não foi possível carregar o Olho do Dono. Nenhum indicador foi atualizado.";
-    if(err.status!==403&&err.status!==401)toast("Confira a conexão e atualize novamente");
-  }
-}
-$("#refreshIntelligence").onclick=loadOwnerEye;
-
-const agentNames={receptionist:"Recepcionista IA",commercial:"Comercial IA",manager:"Gerente IA",finance:"Financeiro IA",buyer:"Comprador IA",analyst:"Analista IA"};
-const actionNames={send_whatsapp:"Mensagem WhatsApp",review_finance:"Revisar financeiro",prepare_purchase:"Preparar compra",manager_review:"Revisão gerencial",insight:"Insight"};
-async function loadAgents(){
-  try{
-    const [meta,tasks]=await Promise.all([api("/api/agents"),api("/api/agents/tasks")]);
-    $("#agentPendingBadge").textContent=meta.pending+" pendentes";state.agentProfiles=meta.profiles;
-    $("#agentProfileList").innerHTML=meta.profiles.map(a=>{const cfg=a.config||{},display=cfg.identity?.display_name||a.name,configBtn=a.agent_key==="receptionist"?'<button type="button" class="secondary smallBtn" data-agent-config="'+a.agent_key+'">Configurar agente</button>':"";return '<article><div class="panelhead"><span class="chip">'+(a.enabled?"ativo":"pausado")+'</span><strong>'+esc(display)+'</strong></div><p>'+esc(a.description)+'</p><label class="autonomyLabel">Autonomia <b>'+a.autonomy+'</b>/10<input type="range" min="0" max="10" value="'+a.autonomy+'" data-agent-autonomy="'+a.agent_key+'"></label><div class="agentCardActions">'+configBtn+'</div></article>'}).join("");
+  }catch(err){toast(err.data?.error==="insufficient_cash"?"O dinheiro em ca
+…[sentinelx: truncated 19559 bytes]…
+ss="chip">'+(a.enabled?"ativo":"pausado")+'</span><strong>'+esc(display)+'</strong></div><p>'+esc(a.description)+'</p><label class="autonomyLabel">Autonomia <b>'+a.autonomy+'</b>/10<input type="range" min="0" max="10" value="'+a.autonomy+'" data-agent-autonomy="'+a.agent_key+'"></label><div class="agentCardActions">'+configBtn+'</div></article>'}).join("");
     $$("[data-agent-autonomy]").forEach(s=>s.onchange=async()=>{try{await api("/api/agents/profile",{method:"PATCH",body:JSON.stringify({agent_key:s.dataset.agentAutonomy,autonomy:Number(s.value)})});toast("Autonomia atualizada");await loadAgents()}catch{toast("Não foi possível alterar a autonomia")}});
     $$("[data-agent-config]").forEach(b=>b.onclick=()=>openAgentConfig(b.dataset.agentConfig));
+    $$("[data-agent-explain]").forEach(b=>b.onclick=()=>openAgentExplain());
     $("#agentTaskList").innerHTML=tasks.slice(0,80).map(t=>{
       const approve=t.status==="pending"&&Number(t.requires_approval)?'<button class="secondary smallBtn" data-agent-approve="'+t.id+'">Aprovar</button>':"";
       const execute=(t.status==="approved"||(!Number(t.requires_approval)&&t.status==="pending"))?'<button class="primary smallBtn" data-agent-execute="'+t.id+'">Executar</button>':"";
@@ -845,6 +661,42 @@ async function agentTaskAction(id,action){
 $("#runAgents").onclick=async()=>{try{const out=await api("/api/agents/run",{method:"POST",body:"{}"});toast("Varredura concluída · "+out.items+" sinais analisados");await loadAgents()}catch{toast("Não foi possível rodar os agentes")}};
 $("#agentCommandForm").onsubmit=async e=>{e.preventDefault();const text=$("#agentCommandText").value.trim();if(!text)return;$("#agentCommandResult").textContent="Roteando…";try{const r=await api("/api/agents/command",{method:"POST",body:JSON.stringify({text})});$("#agentCommandResult").innerHTML='<strong>'+r.agent_name+'</strong><br><small>fonte: '+r.source+(r.confidence!=null?' · confiança '+Math.round(Number(r.confidence)*100)+'%':'')+'</small>'}catch{$("#agentCommandResult").textContent="Não foi possível rotear o comando."}};
 
+
+let agentExplainPromptText="";
+async function openAgentExplain(){
+  const modal=$("#agentExplainModal"),status=$("#agentExplainStatus"),rules=$("#agentExplainRules"),prompt=$("#agentExplainPrompt");
+  if(!modal.open)modal.showModal();
+  status.textContent="Consultando estado real…";rules.replaceChildren();prompt.textContent="";
+  try{
+    const data=await api("/api/agents/receptionist/explain");
+    const connected=data.flags?.whatsapp_connected===true;
+    const allowed=data.runtime_allowed===true;
+    const yes=[];
+    if(!data.flags?.agent_enabled)yes.push("agente pausado no cadastro");
+    if(!data.flags?.receptionist_enabled)yes.push("automação de recepção desligada no servidor");
+    if(!data.flags?.automation_approved)yes.push("automação não aprovada");
+    if(!data.flags?.assistant_reply_allowed)yes.push("política de resposta automática bloqueada");
+    if(!connected)yes.push("WhatsApp desconectado");
+    const last=data.last_automatic_message;
+    const sent=last?"Último envio automático registrado: "+new Date(last.created_at).toLocaleString("pt-BR")+" (status: "+last.delivery_status+").":"Nenhum envio automático comprovado neste salão.";
+    status.innerHTML='<p><strong>Recepcionista:</strong> '+(data.flags?.agent_enabled?"habilitada no cadastro":"pausada")+'</p>'+
+      '<p><strong>Execução automática:</strong> '+(allowed?"liberada pelas condições atuais":"não liberada")+'</p>'+
+      (yes.length?'<p><strong>Motivos:</strong> '+esc(yes.join("; "))+'</p>':"")+
+      '<p><strong>WhatsApp:</strong> '+(connected?"conectado":"desconectado")+'</p>'+
+      '<p><strong>Evidência:</strong> '+esc(sent)+'</p>'+
+      '<p><strong>Total comprovado:</strong> '+Number(data.automatic_message_count||0)+' mensagens automáticas registradas.</p>';
+    const fragments=(data.rules||[]).map(rule=>'<div class="agentExplainRule"><span class="chip">'+(rule.enabled?"Ligada":"Desligada")+'</span><span>'+esc(rule.label)+'</span></div>');
+    rules.innerHTML=fragments.join("")||"Nenhuma regra encontrada.";
+    agentExplainPromptText=data.prompt_preview||"";
+    prompt.textContent=agentExplainPromptText;
+    $("#agentExplainPrivacy").textContent=data.preview_note||"Esta prévia não contém dados de clientes.";
+  }catch(err){status.textContent=err.status===403?"Apenas proprietária e gerência podem consultar essas instruções.":"Não foi possível consultar o estado do agente.";prompt.textContent="";agentExplainPromptText="";}
+}
+$("#closeAgentExplain").onclick=()=>$("#agentExplainModal").close();
+$("#copyAgentExplainPrompt").onclick=async()=>{
+  if(!agentExplainPromptText)return toast("Nenhum prompt carregado");
+  try{await navigator.clipboard.writeText(agentExplainPromptText);toast("Prompt copiado")}catch{toast("Selecione o texto para copiar")}
+};
 
 function setAgentField(form,name,value){
   const el=form.elements[name];if(!el)return;
