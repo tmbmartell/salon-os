@@ -6,7 +6,8 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import { installAuth, authenticate, handleAuthApi, requirePermission, can, audit } from "./auth.mjs";
+import { installAuth, authenticate, handleAuthApi, requirePermission, can, audit, isPlatformAdmin } from "./auth.mjs";
+import { installStaffAccess, handleStaffAccessApi } from "./staff-access.mjs";
 import { isFreePreview, provisionFreePreview } from "./free-preview.mjs";
 import { browserMutationAllowed, requestIp } from "./request-security.mjs";
 import { installWhatsAppBackfill, handleWhatsAppBackfillApi } from "./whatsapp-backfill.mjs";
@@ -202,6 +203,7 @@ function ensureSeed(){
 }
 ensureSeed();
 installAuth(db);
+installStaffAccess(db);
 provisionFreePreview(db,DEFAULT_TENANT);
 installWhatsApp(db);
 installWhatsAppBackfill(db);
@@ -594,6 +596,9 @@ async function api(req,res,url){
     });
   }
 
+  const staffAccess=await handleStaffAccessApi({req,res,url,db,send,parseBody});
+  if(staffAccess!==false)return staffAccess;
+
   if(url.pathname.startsWith("/api/auth/")){
     const handled=await handleAuthApi({req,res,url,db,send,parseBody,defaultTenant:DEFAULT_TENANT});
     if(handled.handled)return handled.result;
@@ -641,7 +646,7 @@ async function api(req,res,url){
 
   if(commercialResult!==false)return commercialResult;
   if(req.method==="GET"&&url.pathname==="/api/agents/receptionist/explain"){
-    guard("agents.write"); // Apenas proprietária e gerência veem instruções internas.
+    if(!isPlatformAdmin(db,user))return send(res,403,{error:"platform_admin_only"});
     const cfg=getAgentConfig(db,tenant,"receptionist");
     const profile=one("select enabled,updated_at from agent_profiles where tenant_id=? and agent_key='receptionist'",[tenant]);
     const flags={
@@ -697,7 +702,7 @@ async function api(req,res,url){
     });
   }
   if(req.method==="GET"&&url.pathname==="/api/agents/receptionist/llm"){
-    guard("agents.read");
+    if(!isPlatformAdmin(db,user))return send(res,403,{error:"platform_admin_only"});
     const cfg=getLlmConfig(db,tenant);
     return send(res,200,{...cfg,providers:[
       {id:"internal",name:"Margot / OpenCLAW interno",example:""},
@@ -709,7 +714,7 @@ async function api(req,res,url){
     ]});
   }
   if(req.method==="PUT"&&url.pathname==="/api/agents/receptionist/llm"){
-    guard("agents.write");
+    if(!isPlatformAdmin(db,user))return send(res,403,{error:"platform_admin_only"});
     try{
       const b=await parseBody(req),cfg=saveLlmConfig(db,tenant,b);
       audit(db,user,"agent.llm.update","agent_profile","receptionist",{provider:cfg.provider,model:cfg.model,enabled:cfg.enabled,has_api_key:cfg.has_api_key});
@@ -717,7 +722,7 @@ async function api(req,res,url){
     }catch(e){return send(res,e.status||400,{error:String(e.message||"llm_config_failed")})}
   }
   if(req.method==="POST"&&url.pathname==="/api/agents/receptionist/llm/test"){
-    guard("agents.write");
+    if(!isPlatformAdmin(db,user))return send(res,403,{error:"platform_admin_only"});
     try{
       const b=await parseBody(req),out=await testLlmConfig(db,tenant,b);
       audit(db,user,"agent.llm.test","agent_profile","receptionist",{provider:out.provider,model:out.model,ok:true});
