@@ -226,3 +226,18 @@ dialog[open]::backdrop{opacity:1;transition-duration:var(--nv-dur-base)}
 @media(max-width:620px){.homeActions{grid-template-columns:minmax(0,1fr)}.homeAction{min-height:0;grid-template-columns:40px minmax(0,1fr);column-gap:12px}.homeAction>span{grid-row:1/3;margin:0}.homeAction.main{padding:18px 16px}.dashNumbers summary{grid-template-columns:auto minmax(0,1fr) auto}.dashNumbers summary small{grid-column:2;grid-row:2}.dashNumbers summary i{grid-column:3;grid-row:1/3}.agMark{margin-left:0;width:100%}.agToolbar input[type=search]{flex:1 1 100%}}
 .agFilters .agStatusFilters{flex:1 1 100%}
 @media(min-width:1101px){.homeActions{display:flex}.homeAction{flex:1 1 0;min-width:0}.homeAction.main{flex:1.5 1 0}}
+
+/* Transparência compacta: o filtro exibe efeito sem deixar a tela pesada. */
+.filterActivityLine{margin:0 0 12px;color:var(--muted);font-size:.82rem;line-height:1.4}
+.filterActivityLine.hasActiveFilters{color:var(--text);font-weight:600}
+.agentExplainPanel{padding:20px;display:grid;gap:14px;max-height:85vh;overflow:auto}
+.agentExplainPanel .modalHead{display:flex;justify-content:space-between;gap:14px}
+.agentExplainNotice{font-size:.86rem;color:var(--muted);margin:0}
+#agentExplainStatus{display:grid;gap:4px;padding:12px;border:1px solid var(--line);border-radius:10px}
+#agentExplainStatus p{margin:0;font-size:.9rem}
+.agentExplainDetails{border-top:1px solid var(--line);padding-top:12px}
+.agentExplainDetails summary{cursor:pointer;font-weight:650}
+.agentExplainRules{display:grid;gap:8px;padding:14px 0}
+.agentExplainRule{display:flex;align-items:center;gap:10px;font-size:.9rem}
+.agentExplainRule .chip{min-width:76px;text-align:center}
+.agentExplainPrompt{white-space:pre-wrap;overflow-wrap:anywhere;max-height:48vh;overflow:auto;padding:12px;background:var(--surface,transparent);border:1px solid var(--line);border-radius:8px;font-size:.76rem;line-height:1.5}

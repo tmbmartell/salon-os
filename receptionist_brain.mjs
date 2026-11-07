@@ -89,6 +89,20 @@ function buildPrompt(ctx,message){
     "Se handoff=true, reply pode conter uma frase curta avisando que alguém da equipe continuará o atendimento."
   ].join("\n");
 }
+// Prévia transparente do MESMO template usado na execução, com dados privados substituídos.
+// Não envia ao modelo, não consulta cliente e não revela histórico ou chaves.
+export function buildReceptionistPromptPreview(cfg={}){
+  const context={
+    now:"<INSERIDO NO MOMENTO DA RESPOSTA>",
+    client:{info:"<DADOS DA CLIENTE INSERIDOS SOMENTE DURANTE O ATENDIMENTO>"},
+    agent:{identity:cfg.identity||{},voice:cfg.voice||{},service:cfg.service||{},sales:cfg.sales||{},limits:cfg.limits||{},custom_instructions:clip(cfg.custom_instructions,6000)},
+    services:["<CATÁLOGO ATIVO DO SALÃO, INSERIDO NA EXECUÇÃO>"],
+    upcoming:["<AGENDAMENTOS DA CLIENTE, INSERIDOS NA EXECUÇÃO>"],
+    packages:["<PACOTES DA CLIENTE, INSERIDOS NA EXECUÇÃO>"],
+    history:["<HISTÓRICO DE CONVERSA, INSERIDO NA EXECUÇÃO>"]
+  };
+  return buildPrompt(context,"<MENSAGEM RECEBIDA NO MOMENTO DO ATENDIMENTO>");
+}
 export function buildReceptionistPrompt({db,tenantId,client,conversation,text,cfg}){return buildPrompt(contextSnapshot(db,tenantId,client,conversation,cfg),text)}
 export async function runReceptionistBrain({db,tenantId,client,conversation,text,cfg}){
   const prompt=buildReceptionistPrompt({db,tenantId,client,conversation,text,cfg});

@@ -1,4 +1,4 @@
-import { runReceptionistBrain, brainHealth, buildReceptionistPrompt } from "./receptionist_brain.mjs";
+import { runReceptionistBrain, brainHealth, buildReceptionistPrompt, buildReceptionistPromptPreview } from "./receptionist_brain.mjs";
 import { installLlmConfig, getLlmConfig, saveLlmConfig, testLlmConfig, callConfiguredLlm } from "./llm_config.mjs";
 import http from "node:http";
 import fs from "node:fs";
@@ -640,6 +640,62 @@ async function api(req,res,url){
     }});
 
   if(commercialResult!==false)return commercialResult;
+  if(req.method==="GET"&&url.pathname==="/api/agents/receptionist/explain"){
+    guard("agents.write"); // Apenas proprietária e gerência veem instruções internas.
+    const cfg=getAgentConfig(db,tenant,"receptionist");
+    const profile=one("select enabled,updated_at from agent_profiles where tenant_id=? and agent_key='receptionist'",[tenant]);
+    const flags={
+      agent_enabled:Number(profile?.enabled)===1,
+      receptionist_enabled:WAHA_AGENT_ENABLED,
+      automation_approved:process.env.NOVAGENTE_AUTOMATION_V2_APPROVED==="true",
+      assistant_reply_allowed:commercialPolicy(db,tenant,"assistant_reply")
+    };
+    const wa=await wahaStatus(sessionForTenant(db,tenant));
+    flags.whatsapp_connected=!!wa.connected;
+    const runtime_allowed=liveReceptionistEnabled(tenant)&&!!wa.connected;
+    const blocked=Object.entries(flags).filter(([,on])=>!on).map(([name])=>name);
+    // Só eventos realmente persistidos e marcados como resposta automática WhatsApp.
+    // Entrega "sent" significa enviada ao provedor, não necessariamente lida pela cliente.
+    const last=one(`select m.created_at,m.delivery_status from messages m
+      join conversations c on c.id=m.conversation_id and c.tenant_id=m.tenant_id
+      where m.tenant_id=? and c.channel='whatsapp' and m.direction='out'
+        and m.sender_type='assistant' and m.metadata like '%"automatic":true%'
+      order by m.created_at desc limit 1`,[tenant]);
+    const automatic_count=one(`select count(*) total from messages m
+      join conversations c on c.id=m.conversation_id and c.tenant_id=m.tenant_id
+      where m.tenant_id=? and c.channel='whatsapp' and m.direction='out'
+        and m.sender_type='assistant' and m.metadata like '%"automatic":true%'`,[tenant])?.total||0;
+    const rules=[
+      ...Object.entries({
+        auto_activate_new_conversations:"Ativar IA em novas conversas",
+        answer_prices:"Responder preços",
+        list_services:"Listar serviços",
+        suggest_appointments:"Sugerir horários",
+        allow_booking_flow:"Conduzir agendamentos",
+        allow_cancel:"Cancelar sem intervenção humana",
+        allow_reschedule:"Reagendar sem intervenção humana",
+        transfer_on_complaint:"Transferir reclamações",
+        transfer_on_ambiguity:"Transferir dúvidas sem resposta",
+        transfer_on_human_request:"Transferir quando solicitarem humano"
+      }).map(([key,label])=>({key,label,enabled:cfg.service?.[key]===true,category:"Atendimento"})),
+      ...Object.entries({
+        never_promise_unavailable_slot:"Não prometer horário indisponível",
+        never_invent_price:"Não inventar preço",
+        never_confirm_without_slot:"Não confirmar sem vaga real",
+        never_handle_payment_dispute:"Não decidir disputas financeiras",
+        sensitive_topics_handoff:"Transferir assuntos sensíveis"
+      }).map(([key,label])=>({key,label,enabled:cfg.limits?.[key]===true,category:"Limites"}))
+    ];
+    return send(res,200,{
+      agent:"receptionist",runtime_allowed,flags,blocked,
+      last_saved_at:profile?.updated_at||null,
+      last_automatic_message:last?{created_at:last.created_at,delivery_status:last.delivery_status||"unknown"}:null,
+      automatic_message_count:Number(automatic_count),
+      rules,provider:(()=>{const l=getLlmConfig(db,tenant);return {enabled:!!l.enabled,provider:l.provider,model:l.model||null}})(),
+      prompt_preview:buildReceptionistPromptPreview(cfg),
+      preview_note:"Prévia do template e regras salvas. Dados pessoais, histórico, catálogo e mensagem real só são inseridos durante o atendimento. Isto não comprova que uma regra foi executada."
+    });
+  }
   if(req.method==="GET"&&url.pathname==="/api/agents/receptionist/llm"){
     guard("agents.read");
     const cfg=getLlmConfig(db,tenant);

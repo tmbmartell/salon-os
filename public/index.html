@@ -179,6 +179,7 @@
         <select id="conversationPriorityFilter"><option value="">Todas as prioridades</option><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option></select>
         <label class="checkFilter"><input id="conversationUnreadFilter" type="checkbox"> Só não lidas</label>
       </div>
+      <div id="conversationFiltersSummary" class="filterActivityLine" role="status" aria-live="polite">Nenhum filtro aplicado.</div>
       <div class="inboxGrid messengerGrid">
         <article class="panel inboxListPanel">
           <div class="panelhead"><div><h2>Conversas</h2><p id="conversationCount">0 conversas</p></div></div>
@@ -840,6 +841,7 @@
   <form id="agentConfigForm" class="modalForm agentConfigForm">
     <div class="modalHead">
       <div><p class="eyebrow">WHATSAPP</p><h3>Configurar Recepcionista IA</h3><p>Defina como ela fala, o que pode fazer e quando deve chamar uma pessoa.</p></div>
+      <button type="button" class="secondary smallBtn" id="agentExplainFromConfig">Ver regras salvas e prompt</button>
       <button type="button" class="x" data-close>×</button>
     </div>
     <input type="hidden" name="agent_key" value="receptionist">
@@ -958,6 +960,21 @@
   </form>
 </dialog>
 
+
+<dialog id="agentExplainModal" class="wideDialog">
+  <div class="agentExplainPanel">
+    <div class="modalHead">
+      <div><p class="eyebrow">TRANSPARÊNCIA DA IA</p><h3>O que a Recepcionista IA está fazendo?</h3><p>Veja regras salvas, condições para resposta e histórico comprovável.</p></div>
+      <button type="button" class="x" id="closeAgentExplain" aria-label="Fechar">×</button>
+    </div>
+    <p class="agentExplainNotice">A configuração estar ligada não significa que a regra foi executada. Aqui mostramos as duas coisas separadamente.</p>
+    <div id="agentExplainStatus" role="status" aria-live="polite">Consultando estado real…</div>
+    <details class="agentExplainDetails"><summary>Quais regras e filtros estão configurados?</summary><div id="agentExplainRules" class="agentExplainRules"></div></details>
+    <details class="agentExplainDetails"><summary>Ver o prompt e as instruções salvas</summary><p id="agentExplainPrivacy" class="muted"></p><pre id="agentExplainPrompt" class="agentExplainPrompt" tabindex="0"></pre><button id="copyAgentExplainPrompt" type="button" class="secondary">Copiar prompt</button></details>
+    <p class="muted">Esta visualização não envia mensagens nem altera as regras. Para editar, use <strong>Configurar agente</strong>.</p>
+  </div>
+</dialog>
+
 <dialog id="staffManageModal"><form id="staffManageForm" class="modalForm">
   <div class="modalHead"><div><h3>Escala & meta</h3><p id="staffManageName">Profissional</p></div><button type="button" class="x" data-close>×</button></div>
   <input name="professional_id" type="hidden">
@@ -1065,7 +1082,7 @@
   </form>
 </dialog>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
-<script src="/app.js?v=212" type="module"></script>
+<script src="/app.js?v=213" type="module"></script>
 <script src="/marketing-ui.js?v=1" defer></script>
 <script src="/novagente-commercial-ui.js?v=3" defer></script>
 <script src="/security-center.js?v=2" defer></script>

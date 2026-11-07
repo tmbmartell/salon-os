@@ -178,6 +178,15 @@ function filteredConversations(){
 function renderConversationList(){
   const convs=filteredConversations();
   $("#conversationCount").textContent=convs.length+(convs.length!==state.conversations.length?" de "+state.conversations.length:"")+" conversas";
+  const active=[];
+  const searchText=$("#conversationSearch")?.value.trim();
+  if(searchText)active.push("Busca: "+searchText);
+  const status=$("#conversationStatusFilter");if(status?.value)active.push("Status: "+status.selectedOptions[0]?.textContent);
+  const priority=$("#conversationPriorityFilter");if(priority?.value)active.push("Prioridade: "+priority.selectedOptions[0]?.textContent);
+  if($("#conversationUnreadFilter")?.checked)active.push("Somente não lidas");
+  const summary=$("#conversationFiltersSummary");
+  if(summary){summary.textContent=active.length?"Filtros aplicados: "+active.join(" · ")+" — "+convs.length+" de "+state.conversations.length+" conversas exibidas.":"Nenhum filtro aplicado — "+convs.length+" conversas exibidas.";summary.classList.toggle("hasActiveFilters",active.length>0);}
+
   $("#conversationList").innerHTML=convs.map(c=>{
     const selected=state.selectedConversation?.id===c.id?" selected":"",labels=(c.labels||[]).slice(0,2).map(x=>'<span class="miniLabel">'+esc(x)+'</span>').join("");
     return '<button class="conversation priority-'+esc(c.priority||"normal")+selected+'" data-conversation="'+c.id+'">'+
@@ -825,9 +834,10 @@ async function loadAgents(){
   try{
     const [meta,tasks]=await Promise.all([api("/api/agents"),api("/api/agents/tasks")]);
     $("#agentPendingBadge").textContent=meta.pending+" pendentes";state.agentProfiles=meta.profiles;
-    $("#agentProfileList").innerHTML=meta.profiles.map(a=>{const cfg=a.config||{},display=cfg.identity?.display_name||a.name,configBtn=a.agent_key==="receptionist"?'<button type="button" class="secondary smallBtn" data-agent-config="'+a.agent_key+'">Configurar agente</button>':"";return '<article><div class="panelhead"><span class="chip">'+(a.enabled?"ativo":"pausado")+'</span><strong>'+esc(display)+'</strong></div><p>'+esc(a.description)+'</p><label class="autonomyLabel">Autonomia <b>'+a.autonomy+'</b>/10<input type="range" min="0" max="10" value="'+a.autonomy+'" data-agent-autonomy="'+a.agent_key+'"></label><div class="agentCardActions">'+configBtn+'</div></article>'}).join("");
+    $("#agentProfileList").innerHTML=meta.profiles.map(a=>{const cfg=a.config||{},display=cfg.identity?.display_name||a.name,configBtn=a.agent_key==="receptionist"?'<button type="button" class="secondary smallBtn" data-agent-config="'+a.agent_key+'">Configurar agente</button><button type="button" class="secondary smallBtn" data-agent-explain="'+a.agent_key+'">Ver regras e prompt</button>':"";return '<article><div class="panelhead"><span class="chip">'+(a.agent_key==="receptionist"?(a.enabled?"habilitada":"pausada"):(a.enabled?"ativo":"pausado"))+'</span><strong>'+esc(display)+'</strong></div><p>'+esc(a.description)+'</p><label class="autonomyLabel">Autonomia <b>'+a.autonomy+'</b>/10<input type="range" min="0" max="10" value="'+a.autonomy+'" data-agent-autonomy="'+a.agent_key+'"></label><div class="agentCardActions">'+configBtn+'</div></article>'}).join("");
     $$("[data-agent-autonomy]").forEach(s=>s.onchange=async()=>{try{await api("/api/agents/profile",{method:"PATCH",body:JSON.stringify({agent_key:s.dataset.agentAutonomy,autonomy:Number(s.value)})});toast("Autonomia atualizada");await loadAgents()}catch{toast("Não foi possível alterar a autonomia")}});
     $$("[data-agent-config]").forEach(b=>b.onclick=()=>openAgentConfig(b.dataset.agentConfig));
+    $$("[data-agent-explain]").forEach(b=>b.onclick=()=>openAgentExplain());
     $("#agentTaskList").innerHTML=tasks.slice(0,80).map(t=>{
       const approve=t.status==="pending"&&Number(t.requires_approval)?'<button class="secondary smallBtn" data-agent-approve="'+t.id+'">Aprovar</button>':"";
       const execute=(t.status==="approved"||(!Number(t.requires_approval)&&t.status==="pending"))?'<button class="primary smallBtn" data-agent-execute="'+t.id+'">Executar</button>':"";
@@ -845,6 +855,43 @@ async function agentTaskAction(id,action){
 $("#runAgents").onclick=async()=>{try{const out=await api("/api/agents/run",{method:"POST",body:"{}"});toast("Varredura concluída · "+out.items+" sinais analisados");await loadAgents()}catch{toast("Não foi possível rodar os agentes")}};
 $("#agentCommandForm").onsubmit=async e=>{e.preventDefault();const text=$("#agentCommandText").value.trim();if(!text)return;$("#agentCommandResult").textContent="Roteando…";try{const r=await api("/api/agents/command",{method:"POST",body:JSON.stringify({text})});$("#agentCommandResult").innerHTML='<strong>'+r.agent_name+'</strong><br><small>fonte: '+r.source+(r.confidence!=null?' · confiança '+Math.round(Number(r.confidence)*100)+'%':'')+'</small>'}catch{$("#agentCommandResult").textContent="Não foi possível rotear o comando."}};
 
+
+let agentExplainPromptText="";
+async function openAgentExplain(){
+  const modal=$("#agentExplainModal"),status=$("#agentExplainStatus"),rules=$("#agentExplainRules"),prompt=$("#agentExplainPrompt");
+  if(!modal.open)modal.showModal();
+  status.textContent="Consultando estado real…";rules.replaceChildren();prompt.textContent="";
+  try{
+    const data=await api("/api/agents/receptionist/explain");
+    const connected=data.flags?.whatsapp_connected===true;
+    const allowed=data.runtime_allowed===true;
+    const yes=[];
+    if(!data.flags?.agent_enabled)yes.push("agente pausado no cadastro");
+    if(!data.flags?.receptionist_enabled)yes.push("automação de recepção desligada no servidor");
+    if(!data.flags?.automation_approved)yes.push("automação não aprovada");
+    if(!data.flags?.assistant_reply_allowed)yes.push("política de resposta automática bloqueada");
+    if(!connected)yes.push("WhatsApp desconectado");
+    const last=data.last_automatic_message;
+    const sent=last?"Último envio automático registrado: "+new Date(last.created_at).toLocaleString("pt-BR")+" (status: "+last.delivery_status+").":"Nenhum envio automático comprovado neste salão.";
+    status.innerHTML='<p><strong>Recepcionista:</strong> '+(data.flags?.agent_enabled?"habilitada no cadastro":"pausada")+'</p>'+
+      '<p><strong>Execução automática:</strong> '+(allowed?"liberada pelas condições atuais":"não liberada")+'</p>'+
+      (yes.length?'<p><strong>Motivos:</strong> '+esc(yes.join("; "))+'</p>':"")+
+      '<p><strong>WhatsApp:</strong> '+(connected?"conectado":"desconectado")+'</p>'+
+      '<p><strong>Evidência:</strong> '+esc(sent)+'</p>'+
+      '<p><strong>Total comprovado:</strong> '+Number(data.automatic_message_count||0)+' mensagens automáticas registradas.</p>';
+    const fragments=(data.rules||[]).map(rule=>'<div class="agentExplainRule"><span class="chip">'+(rule.enabled?"Ligada":"Desligada")+'</span><span>'+esc(rule.label)+'</span></div>');
+    rules.innerHTML=fragments.join("")||"Nenhuma regra encontrada.";
+    agentExplainPromptText=data.prompt_preview||"";
+    prompt.textContent=agentExplainPromptText;
+    $("#agentExplainPrivacy").textContent=data.preview_note||"Esta prévia não contém dados de clientes.";
+  }catch(err){status.textContent=err.status===403?"Apenas proprietária e gerência podem consultar essas instruções.":"Não foi possível consultar o estado do agente.";prompt.textContent="";agentExplainPromptText="";}
+}
+$("#agentExplainFromConfig").onclick=()=>openAgentExplain();
+$("#closeAgentExplain").onclick=()=>$("#agentExplainModal").close();
+$("#copyAgentExplainPrompt").onclick=async()=>{
+  if(!agentExplainPromptText)return toast("Nenhum prompt carregado");
+  try{await navigator.clipboard.writeText(agentExplainPromptText);toast("Prompt copiado")}catch{toast("Selecione o texto para copiar")}
+};
 
 function setAgentField(form,name,value){
   const el=form.elements[name];if(!el)return;
