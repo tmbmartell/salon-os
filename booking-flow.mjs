@@ -126,7 +126,7 @@ function serviceQuestion(db,tenant,raw){
  if(!catalog.length)return "Vou chamar alguém da equipe para conferir o catálogo de serviços.";
  const relevant=catalog.filter(s=>serviceWords(s.name).some(w=>words.has(w))).slice(0,4);
  const choices=(relevant.length?relevant:catalog.slice(0,4)).map(s=>"• "+s.name).join("\n");
- return "Para eu consultar o horário certo, qual destes serviços você quer fazer?\n"+choices+"\nPode escrever o nome ou a modalidade.";
+ return "Qual serviço você quer fazer? Para consultar o horário certo, escolha uma das opções:\n"+choices+"\nPode escrever o nome ou a modalidade.";
 }
 function matchedProfessional(db,tenant,message,serviceId){
  const people=many(db,"SELECT p.id,p.name FROM professionals p WHERE p.tenant_id=? AND p.active=1 AND EXISTS(SELECT 1 FROM professional_services ps WHERE ps.professional_id=p.id AND ps.service_id=?)",[tenant,serviceId]);
