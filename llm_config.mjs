@@ -150,11 +150,22 @@ export async function callConfiguredLlm(db,tenantId,prompt,{maxTokens=800}={}){
     return {text,provider:"openai",model:data.model||model,id:data.id||null};
   }
   if(cfg.provider==="deepseek"){
-    const data=await fetchJson("https://api.deepseek.com/chat/completions",{
-      method:"POST",headers:{"authorization":"Bearer "+key,"content-type":"application/json"},
-      body:JSON.stringify({model,messages:[{role:"user",content:prompt}],max_tokens:maxTokens,temperature:0.4})
-    });
-    return {text:extractChat(data),provider:"deepseek",model,id:data.id||null};
+    reserveLlmCall(db,tenantId);
+    let data;
+    try{
+      data=await fetchJson("https://api.deepseek.com/responses",{
+        method:"POST",headers:{"authorization":"Bearer "+key,"content-type":"application/json"},
+        body:JSON.stringify({
+          model,input:prompt,max_output_tokens:Math.min(900,Math.max(180,maxTokens)),
+          reasoning:{effort:"none"},
+          text:{format:{type:"json_schema",name:"salon_receptionist",schema:RECEPTION_RESPONSE_SCHEMA}}
+        })
+      },25000);
+    }catch(error){recordLlmCall(db,tenantId,null,true);throw error}
+    recordLlmCall(db,tenantId,data);
+    const text=extractOpenAI(data);
+    if(!text)throw new Error("llm_empty_response");
+    return {text,provider:"deepseek",model:data.model||model,id:data.id||null};
   }
   if(cfg.provider==="openrouter"){
     const data=await fetchJson("https://openrouter.ai/api/v1/chat/completions",{
@@ -201,8 +212,11 @@ export async function testLlmConfig(db,tenantId,input={}){
     const data=await fetchJson("https://api.openai.com/v1/responses",{method:"POST",headers:{"authorization":"Bearer "+apiKey,"content-type":"application/json"},body:JSON.stringify({model,input:"Responda apenas: OK",store:false,max_output_tokens:12})},20000);
     result={text:extractOpenAI(data)};
   }else if(provider==="deepseek"){
-    const data=await fetchJson("https://api.deepseek.com/chat/completions",{method:"POST",headers:{"authorization":"Bearer "+apiKey,"content-type":"application/json"},body:JSON.stringify({model,messages:[{role:"user",content:"Responda apenas: OK"}],max_tokens:12})},20000);
-    result={text:extractChat(data)};
+    const data=await fetchJson("https://api.deepseek.com/responses",{
+      method:"POST",headers:{"authorization":"Bearer "+apiKey,"content-type":"application/json"},
+      body:JSON.stringify({model,input:"Responda apenas: OK",reasoning:{effort:"none"},max_output_tokens:32})
+    },20000);
+    result={text:extractOpenAI(data)};
   }else if(provider==="openrouter"){
     const data=await fetchJson("https://openrouter.ai/api/v1/chat/completions",{method:"POST",headers:{"authorization":"Bearer "+apiKey,"content-type":"application/json"},body:JSON.stringify({model,messages:[{role:"user",content:"Responda apenas: OK"}],max_tokens:12})},20000);
     result={text:extractChat(data)};
