@@ -72,6 +72,22 @@ try{
     assert.equal(errors.length,0,"Erro JS após abrir "+view+": "+errors.join(" | "));
   }
   await open("inbox");
+  await page.locator("#conversationStatusFilter").selectOption("resolved");
+  await page.locator("#conversationFiltersSummary").getByText("Status: Resolvida",{exact:false}).waitFor();
+  await page.locator("#conversationStatusFilter").selectOption("");
+  await page.locator("#conversationFiltersSummary").getByText("Nenhum filtro aplicado",{exact:false}).waitFor();
+  await open("agents");
+  await page.locator('[data-agent-explain="receptionist"]').click();
+  await page.locator("#agentExplainModal[open]").waitFor({timeout:14000});
+  await page.locator("#agentExplainStatus").getByText("Execução automática:",{exact:false}).waitFor();
+  await page.locator("#agentExplainModal .agentExplainDetails").first().locator("summary").click();
+  await page.locator("#agentExplainRules").getByText("Responder preços",{exact:false}).waitFor();
+  await page.locator("#agentExplainModal .agentExplainDetails").nth(1).locator("summary").click();
+  await page.locator("#agentExplainPrompt").getByText("RECEPCIONISTA IA",{exact:false}).waitFor();
+  await page.screenshot({path:path.join(artifact,"14-transparencia-regras-prompt.png"),fullPage:true});
+  await page.locator("#closeAgentExplain").click();
+  await page.locator("#agentExplainModal").waitFor({state:"hidden"});
+  await open("inbox");
   await page.locator("#syncWhatsappHistory").click();
   await page.locator("#whatsappBackfillDetails[open]").waitFor();
   await page.locator("#neBackfillStatus").getByText("Nenhuma importação iniciada.").waitFor({timeout:12000});
