@@ -7,6 +7,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { installAuth, authenticate, handleAuthApi, requirePermission, can, audit } from "./auth.mjs";
+import {installProfessionalNoticeQueue,queueNoticesForAppointment} from "./professional-notice-queue.mjs";
 import { isFreePreview, provisionFreePreview } from "./free-preview.mjs";
 import { browserMutationAllowed, requestIp } from "./request-security.mjs";
 import { installWhatsAppBackfill, handleWhatsAppBackfillApi } from "./whatsapp-backfill.mjs";
@@ -202,6 +203,7 @@ function ensureSeed(){
 }
 ensureSeed();
 installAuth(db);
+installProfessionalNoticeQueue(db);
 provisionFreePreview(db,DEFAULT_TENANT);
 installWhatsApp(db);
 installWhatsAppBackfill(db);
@@ -421,6 +423,8 @@ function createAppointmentRecord(tenant,user,b){
     for(const item of segments)run("insert into appointment_items(id,tenant_id,appointment_id,service_id,professional_id,qty,unit_price_cents,duration_min,sequence,start_at,end_at,created_at) values(?,?,?,?,?,?,?,?,?,?,?,?)",[id(),tenant,aid,item.service.id,item.professional.id,item.qty,Number(item.service.price_cents||0),Number(item.service.duration_min||60),item.sequence,item.start_at,item.end_at,createdAt]);
     audit(db,user,"appointment.create","appointment",aid,{clientId:client.id,itemCount:segments.length,tags,resourceId:resource?.id||null});
     db.exec("COMMIT");
+    try{queueNoticesForAppointment(db,{tenantId:tenant,appointmentId:aid,event:"created"})}
+    catch(error){console.error("professional_notice_queue_failed",String(error.message||error).slice(0,140))}
     return {id:aid,start_at:start.toISOString(),end_at:cursor.toISOString(),status:b.status||"scheduled",tags,items:segments.map(x=>({service_id:x.service.id,service_name:x.service.name,professional_id:x.professional.id,professional_name:x.professional.name,qty:x.qty,start_at:x.start_at,end_at:x.end_at,price:Number(x.service.price_cents||0)/100}))};
   }catch(e){try{db.exec("ROLLBACK")}catch{}throw e}
 }
@@ -982,6 +986,10 @@ async function api(req,res,url){
     const info=run("update appointments set status=?,updated_at=? where id=? and tenant_id=? and status=?",[status,now(),ap.id,tenant,current.status]);
     if(!info.changes)return send(res,409,{error:"status_changed_reload"});
     audit(db,user,"appointment.status","appointment",ap.id,{from:current.status,to:status});
+    if(["cancelled","confirmed"].includes(status)){
+      try{queueNoticesForAppointment(db,{tenantId:tenant,appointmentId:ap.id,event:status==="cancelled"?"cancelled":"created"})}
+      catch(error){console.error("professional_notice_queue_failed",String(error.message||error).slice(0,140))}
+    }
     try{afterAppointmentStatus(db,tenant,ap.id,status)}catch(e){console.error("commercial_status_hook_failed",String(e.message||e).slice(0,140))}
     return send(res,200,{ok:true,status});
   }
