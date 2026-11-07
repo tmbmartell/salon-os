@@ -834,7 +834,10 @@ async function loadAgents(){
   try{
     const [meta,tasks]=await Promise.all([api("/api/agents"),api("/api/agents/tasks")]);
     $("#agentPendingBadge").textContent=meta.pending+" pendentes";state.agentProfiles=meta.profiles;
-    $("#agentProfileList").innerHTML=meta.profiles.map(a=>{const cfg=a.config||{},display=cfg.identity?.display_name||a.name,configBtn=a.agent_key==="receptionist"?'<button type="button" class="secondary smallBtn" data-agent-config="'+a.agent_key+'">Configurar agente</button><button type="button" class="secondary smallBtn" data-agent-explain="'+a.agent_key+'">Ver regras e prompt</button>':"";return '<article><div class="panelhead"><span class="chip">'+(a.agent_key==="receptionist"?(a.enabled?"habilitada":"pausada"):(a.enabled?"ativo":"pausado"))+'</span><strong>'+esc(display)+'</strong></div><p>'+esc(a.description)+'</p><label class="autonomyLabel">Autonomia <b>'+a.autonomy+'</b>/10<input type="range" min="0" max="10" value="'+a.autonomy+'" data-agent-autonomy="'+a.agent_key+'"></label><div class="agentCardActions">'+configBtn+'</div></article>'}).join("");
+    const technical=state.user?.platform_admin===true;
+    $("#agentProfileList").innerHTML=meta.profiles.map(a=>{const cfg=a.config||{},display=cfg.identity?.display_name||a.name,configBtn=technical&&a.agent_key==="receptionist"?'<button type="button" class="secondary smallBtn" data-agent-config="'+a.agent_key+'">Configurar agente</button><button type="button" class="secondary smallBtn" data-agent-explain="'+a.agent_key+'">Ver regras e prompt</button>':"";
+    const autonomy=technical?'<label class="autonomyLabel">Autonomia <b>'+a.autonomy+'</b>/10<input type="range" min="0" max="10" value="'+a.autonomy+'" data-agent-autonomy="'+a.agent_key+'"></label>':"";
+    return '<article><div class="panelhead"><span class="chip">'+(a.agent_key==="receptionist"?(a.enabled?"habilitada":"pausada"):(a.enabled?"ativo":"pausado"))+'</span><strong>'+esc(display)+'</strong></div><p>'+esc(a.description)+'</p>'+autonomy+'<div class="agentCardActions">'+configBtn+'</div></article>'}).join("");
     $$("[data-agent-autonomy]").forEach(s=>s.onchange=async()=>{try{await api("/api/agents/profile",{method:"PATCH",body:JSON.stringify({agent_key:s.dataset.agentAutonomy,autonomy:Number(s.value)})});toast("Autonomia atualizada");await loadAgents()}catch{toast("Não foi possível alterar a autonomia")}});
     $$("[data-agent-config]").forEach(b=>b.onclick=()=>openAgentConfig(b.dataset.agentConfig));
     $$("[data-agent-explain]").forEach(b=>b.onclick=()=>openAgentExplain());
@@ -884,7 +887,7 @@ async function openAgentExplain(){
     agentExplainPromptText=data.prompt_preview||"";
     prompt.textContent=agentExplainPromptText;
     $("#agentExplainPrivacy").textContent=data.preview_note||"Esta prévia não contém dados de clientes.";
-  }catch(err){status.textContent=err.status===403?"Apenas proprietária e gerência podem consultar essas instruções.":"Não foi possível consultar o estado do agente.";prompt.textContent="";agentExplainPromptText="";}
+  }catch(err){status.textContent=err.status===403?"Apenas a administração NOVAGENTE pode consultar essas instruções.":"Não foi possível consultar o estado do agente.";prompt.textContent="";agentExplainPromptText="";}
 }
 $("#agentExplainFromConfig").onclick=()=>openAgentExplain();
 $("#closeAgentExplain").onclick=()=>$("#agentExplainModal").close();
