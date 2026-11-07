@@ -71,6 +71,34 @@ try{
     await sleep(300);
     assert.equal(errors.length,0,"Erro JS após abrir "+view+": "+errors.join(" | "));
   }
+  // Proprietária cria convite operacional. A funcionária aceita sem senha em navegador independente.
+  await open("team");
+  await page.locator('#team [data-ne-tab="access"]').click();
+  await page.locator('#team .ne-stage8-team-access:not(.hidden)').waitFor();
+  await page.locator('#team .ne-stage8-heading button').first().click();
+  await page.locator('#neInviteDialog[open]').waitFor();
+  await page.locator('#neInviteDialog [name="name"]').fill('Recepcionista Browser QA');
+  await page.locator('#neInviteDialog [name="email"]').fill('recepcao-browser@example.invalid');
+  await page.locator('#neInviteDialog [name="role"]').selectOption('reception');
+  await page.locator('#neInviteDialog button[type="submit"]').click();
+  const share=page.locator('#neInviteDialog input[readonly]');
+  await share.waitFor({timeout:15000});
+  const inviteUrl=await share.inputValue();
+  assert.ok(inviteUrl.includes('#invite='),'Convite deve usar fragmento de URL');
+  await page.screenshot({path:path.join(artifact,'17-equipe-convites.png'),fullPage:true});
+  await page.evaluate(()=>document.querySelector('#neInviteDialog')?.close());
+  const coworkerContext=await browser.newContext({viewport:{width:390,height:844},locale:'pt-BR'});
+  try{
+    const coworker=await coworkerContext.newPage();
+    await coworker.goto(inviteUrl,{waitUntil:'domcontentloaded'});
+    const fast= coworker.getByRole('button',{name:'Aceitar convite e entrar sem senha'});
+    await fast.waitFor({state:'visible',timeout:15000});
+    await fast.click();
+    await coworker.locator('#authGate').waitFor({state:'hidden',timeout:20000});
+    assert.ok((await coworker.locator('#appUser').textContent()).includes('RECEPCIONISTA'));
+    await coworker.screenshot({path:path.join(artifact,'18-funcionaria-sem-senha.png'),fullPage:true});
+    assert.equal(errors.length,0);
+  }finally{await coworkerContext.close()}
   await open("inbox");
   await page.locator("#conversationStatusFilter").selectOption("resolved");
   await page.locator("#conversationFiltersSummary").getByText("Status: Resolvida",{exact:false}).waitFor();
