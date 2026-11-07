@@ -997,6 +997,8 @@ async function loadReceptionistLlmForm(){
 $("#llmProvider").onchange=()=>{
   const f=$("#agentConfigForm"),p=f.elements.llm_provider.value;
   if(p==="internal")f.elements.llm_model.value="";
+  else if(p==="deepseek"&&(!f.elements.llm_model.value||f.elements.llm_model.value.startsWith("gpt-")))f.elements.llm_model.value="deepseek-flash";
+  else if(p==="openai"&&(!f.elements.llm_model.value||f.elements.llm_model.value.startsWith("deepseek-")))f.elements.llm_model.value="";
   updateLlmFields();
 };
 
