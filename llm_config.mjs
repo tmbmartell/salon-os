@@ -95,7 +95,7 @@ export function saveLlmConfig(db,tenantId,input={}){
   if(current?.provider!==provider)apiKeyEnc="";
   if(input.clear_api_key)apiKeyEnc="";
   if(typeof input.api_key==="string"&&input.api_key.trim())apiKeyEnc=enc(input.api_key.trim());
-  if(provider!=="internal"&&!apiKeyEnc)throw Object.assign(new Error("api_key_required"),{status:400});
+  if(provider!=="internal"&&enabled&&!apiKeyEnc)throw Object.assign(new Error("api_key_required"),{status:400});
   if(provider!=="internal"&&!model)throw Object.assign(new Error("model_required"),{status:400});
   const ts=now();
   if(current){
