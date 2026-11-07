@@ -219,7 +219,7 @@ test("não inventa serviço a partir de saudação ou palavra desconexa",()=>{
    const q=x.process("Quero agendar");
    assert.match(q.text,/serviço/i);
    const later=x.process("Gostaria de conversar");
-   assert.match(later.text,/qual destes serviços/i);
+   assert.match(later.text,/Qual serviço/i);
    assert.equal(bookingState(x.db,"t1","co1").service_id,null);
  }finally{x.db.close()}
 });
