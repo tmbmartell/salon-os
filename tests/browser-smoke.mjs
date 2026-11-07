@@ -77,22 +77,12 @@ try{
   await page.locator("#conversationStatusFilter").selectOption("");
   await page.locator("#conversationFiltersSummary").getByText("Nenhum filtro aplicado",{exact:false}).waitFor();
   await open("agents");
-  await page.locator('[data-agent-explain="receptionist"]').click();
-  await page.locator("#agentExplainModal[open]").waitFor({timeout:14000});
-  await page.locator("#agentExplainStatus").getByText("Execução automática:",{exact:false}).waitFor();
-  await page.locator("#agentExplainModal .agentExplainDetails").first().locator("summary").click();
-  await page.locator("#agentExplainRules").getByText("Responder preços",{exact:false}).waitFor();
-  await page.locator("#agentExplainModal .agentExplainDetails").nth(1).locator("summary").click();
-  await page.locator("#agentExplainPrompt").getByText("RECEPCIONISTA IA",{exact:false}).waitFor();
-  await page.screenshot({path:path.join(artifact,"14-transparencia-regras-prompt.png"),fullPage:true});
-  await page.locator("#closeAgentExplain").click();
-  await page.locator("#agentExplainModal").waitFor({state:"hidden"});
-  await page.locator('[data-agent-config="receptionist"]').click();
-  await page.locator("#agentConfigModal[open]").waitFor();
-  await page.locator("#agentExplainFromConfig").click();
-  await page.locator("#agentExplainModal[open]").waitFor();
-  await page.locator("#closeAgentExplain").click();
-  await page.locator("#agentConfigModal [data-close]").first().click();
+  // Proprietária do salão tem o estado operacional, mas NÃO o prompt interno.
+  assert.equal(await page.locator('[data-agent-explain="receptionist"]').count(),0);
+  assert.equal(await page.locator('[data-agent-config="receptionist"]').count(),0);
+  const privateStatus=await page.evaluate(async()=>{const res=await fetch('/api/agents/receptionist/explain');return res.status});
+  assert.equal(privateStatus,403);
+  await page.screenshot({path:path.join(artifact,"14-status-agentes-sem-prompt.png"),fullPage:true});
   await open("inbox");
   await page.locator("#syncWhatsappHistory").click();
   await page.locator("#whatsappBackfillDetails[open]").waitFor();
