@@ -251,3 +251,11 @@ dialog[open]::backdrop{opacity:1;transition-duration:var(--nv-dur-base)}
 .ne-wa-diagnostics-grid strong{font-size:1.1rem;line-height:1.4;overflow-wrap:anywhere}
 .ne-wa-diagnostics-grid small,.ne-wa-diagnostics-grid span{font-size:.77rem;line-height:1.45;color:var(--muted)}
 @media(max-width:530px){.ne-wa-diagnostics-grid{grid-template-columns:1fr}}
+
+/* Motivos da classificação permanecem recolhidos até o operador solicitar. */
+.ne-lead-trace{margin-top:12px;border-top:1px solid var(--line);padding:10px 0}
+.ne-lead-trace summary{cursor:pointer;font-weight:650;font-size:.87rem}
+#conversationClassificationHistory{display:grid;gap:10px;padding:11px 0;font-size:.82rem}
+.ne-lead-trace-item{display:grid;gap:4px;border-left:2px solid var(--line);padding:3px 0 5px 10px}
+.ne-lead-trace-item strong{font-size:.83rem}
+.ne-lead-trace-item small{font-size:.75rem;line-height:1.4;color:var(--muted)}
