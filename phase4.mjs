@@ -1,3 +1,4 @@
+import {isPlatformAdmin} from "./auth.mjs";
 import crypto from "node:crypto";
 
 const uid=()=>crypto.randomUUID();
@@ -283,13 +284,15 @@ export async function handlePhase4Api({req,res,url,db,user,tenant,send,parseBody
   ensureAgentProfiles(db,tenant);
   if(req.method==="GET"&&url.pathname==="/api/agents"){
     guard("agents.read");
-    const profiles=all(db,"select * from agent_profiles where tenant_id=? order by agent_key",[tenant]).map(p=>({...p,config:getAgentConfig(db,tenant,p.agent_key)}));
+    const technical=isPlatformAdmin(db,user);
+    const profiles=all(db,"select * from agent_profiles where tenant_id=? order by agent_key",[tenant]).map(p=>({...p,config:technical?getAgentConfig(db,tenant,p.agent_key):null}));
     const tasks=one(db,"select count(*) pending from agent_tasks where tenant_id=? and status='pending'",[tenant])||{};
     return send(res,200,{profiles,pending:Number(tasks.pending||0)});
   }
   if(req.method==="PATCH"&&url.pathname==="/api/agents/profile"){
     guard("agents.write");
     const b=await parseBody(req),key=txt(b.agent_key,40),p=one(db,"select * from agent_profiles where tenant_id=? and agent_key=?",[tenant,key]);
+    if(!isPlatformAdmin(db,user)&&(b.config!==undefined||b.autonomy!==undefined))return send(res,403,{error:"platform_admin_only"});
     if(!p)return send(res,404,{error:"agent_not_found"});
     const enabled=b.enabled===undefined?Number(p.enabled):b.enabled?1:0,autonomy=b.autonomy===undefined?Number(p.autonomy):Math.max(0,Math.min(10,Number(b.autonomy)));
     let config=getAgentConfig(db,tenant,key);
@@ -299,7 +302,7 @@ export async function handlePhase4Api({req,res,url,db,user,tenant,send,parseBody
     }
     run(db,"update agent_profiles set enabled=?,autonomy=?,config=?,updated_at=? where id=?",[enabled,autonomy,JSON.stringify(config),now(),p.id]);
     audit(db,user,"agent.profile.update","agent_profile",p.id,{enabled,autonomy,config_updated:b.config!==undefined});
-    return send(res,200,{ok:true,agent_key:key,enabled:!!enabled,autonomy,config});
+    return send(res,200,{ok:true,agent_key:key,enabled:!!enabled,autonomy,config:isPlatformAdmin(db,user)?config:null});
   }
   if(req.method==="POST"&&url.pathname==="/api/agents/run"){
     guard("agents.write");
