@@ -231,6 +231,19 @@
         </form>
         <div class="waActions"><button id="prepareWaha" class="secondary" type="button">Preparar conexão</button><button id="showQr" class="primary" type="button">Gerar QR Code</button><button id="neWhatsappRefresh" class="secondary" type="button">Verificar conexão</button></div>
         <p id="neWhatsappMessage" role="status" class="ne-wa-message">Para conectar: abra WhatsApp no celular → Dispositivos conectados → Conectar dispositivo. Aponte a câmera para o QR exibido aqui.</p>
+        <details id="waDiagnosticsDetails" class="ne-wa-diagnostics" hidden>
+          <summary>Ver o que chegou e o que foi enviado</summary>
+          <p class="muted">Indicadores do salão. Conectado não significa que uma mensagem foi recebida ou entregue.</p>
+          <div id="waDiagnosticsSummary" role="status" aria-live="polite">Abra para consultar o diagnóstico.</div>
+          <div class="ne-wa-diagnostics-grid">
+            <div><strong id="waDiagInboundCount">—</strong><small>Recebidas nas últimas 24h</small><span id="waDiagInboundLast">Último recebimento: —</span></div>
+            <div><strong id="waDiagOutboundCount">—</strong><small>Enviadas registradas nas últimas 24h</small><span id="waDiagOutboundLast">Último envio: —</span></div>
+            <div><strong id="waDiagWebhook">—</strong><small>Canal de recebimento</small><span id="waDiagDelivery">Entrega: sem verificação</span></div>
+            <div><strong id="waDiagAutomatic">—</strong><small>Resposta automática</small><span id="waDiagProfessional">Avisos profissionais: em teste</span></div>
+          </div>
+          <button id="waDiagnosticsRefresh" class="secondary" type="button">Atualizar diagnóstico</button>
+        </details>
+
         <img id="waQrImage" class="qrImage hidden" alt="QR Code temporário para vincular o WhatsApp do salão; mantenha esta tela aberta e escaneie com o próprio aplicativo">
       </article>
     </section>
@@ -1088,7 +1101,7 @@
   </form>
 </dialog>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
-<script src="/app.js?v=214" type="module"></script>
+<script src="/app.js?v=215" type="module"></script>
 <script src="/marketing-ui.js?v=1" defer></script>
 <script src="/novagente-commercial-ui.js?v=3" defer></script>
 <script src="/security-center.js?v=2" defer></script>
