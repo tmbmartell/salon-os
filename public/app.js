@@ -395,9 +395,28 @@ $("#resourceForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntr
 
 function showAuth(mode,name=""){const gate=$("#authGate");gate.classList.remove("hidden");$("#setupPanel").classList.toggle("hidden",mode!=="setup");$("#loginPanel").classList.toggle("hidden",mode!=="login");$("#resetPanel").classList.toggle("hidden",mode!=="reset");$("#mfaPanel").classList.toggle("hidden",mode!=="mfa");$("#authError").textContent="";if(name)$("#loginTenant").textContent="Acesso a "+name+"."}
 function hideAuth(){$("#authGate").classList.add("hidden")}
-async function initAuth(){const resetToken=new URLSearchParams(location.search).get("reset");if(resetToken){try{const info=await api("/api/auth/reset?token="+encodeURIComponent(resetToken));showAuth("reset");$("#resetIdentity").textContent="Redefinindo o acesso de "+info.email+".";return}catch{showAuth("login");$("#authError").textContent="Este link de redefinição expirou ou já foi usado.";return}}try{const s=await api("/api/auth/state");if(!s.claimed){showAuth("setup",s.tenant?.name);return}try{const me=await api("/api/auth/me");state.user=me.user;hideAuth();await bootstrap()}catch{showAuth("login",s.tenant?.name)}}catch{showAuth("login");$("#authError").textContent="Não foi possível verificar o acesso."}}
+let passwordResetToken="";
+async function initAuth(){
+  const fragment=new URLSearchParams(location.hash.slice(1)),accessToken=fragment.get("access");
+  const resetToken=fragment.get("reset")||new URLSearchParams(location.search).get("reset");
+  if(accessToken){
+    history.replaceState({},document.title,location.pathname);
+    showAuth("login");$("#authError").textContent="Validando seu link de acesso…";
+    try{const out=await api("/api/auth/access-link",{method:"POST",body:JSON.stringify({token:accessToken})});state.user=out.user;hideAuth();await bootstrap();return}
+    catch{$("#authError").textContent="Este link expirou ou já foi utilizado. Peça outro ao responsável do salão.";return}
+  }
+  if(resetToken){
+    passwordResetToken=resetToken;
+    history.replaceState({},document.title,location.pathname);
+    showAuth("reset");$("#resetIdentity").textContent="Defina sua nova senha com este link de uso único.";return;
+  }
+  try{const status=await api("/api/auth/state");if(!status.claimed){showAuth("setup",status.tenant?.name);return}
+    try{const me=await api("/api/auth/me");state.user=me.user;hideAuth();await bootstrap()}
+    catch{showAuth("login",status.tenant?.name)}
+  }catch{showAuth("login");$("#authError").textContent="Não foi possível verificar o acesso."}
+}
 $("#setupForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api("/api/auth/setup",{method:"POST",body:JSON.stringify(b)});showAuth("login");$("#loginForm").elements.email.value=b.email;toast("Acesso criado. Agora entre com sua senha.")}catch(err){$("#authError").textContent=err.data?.error==="password_too_short"?"Use uma senha com pelo menos 10 caracteres.":"Não foi possível criar o acesso."}};
-$("#resetForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target)),token=new URLSearchParams(location.search).get("reset");if(b.password!==b.confirm_password){$("#authError").textContent="As duas senhas precisam ser iguais.";return}try{await api("/api/auth/reset",{method:"POST",body:JSON.stringify({token,password:b.password})});history.replaceState({},document.title,location.pathname);showAuth("login");$("#authError").textContent="Senha redefinida. Entre com a nova senha."}catch(err){$("#authError").textContent=err.data?.error==="password_too_short"?"Use uma senha com pelo menos 10 caracteres.":"Não foi possível redefinir. Gere um novo link."}};
+$("#resetForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target)),token=passwordResetToken;if(b.password!==b.confirm_password){$("#authError").textContent="As duas senhas precisam ser iguais.";return}try{await api("/api/auth/reset",{method:"POST",body:JSON.stringify({token,password:b.password})});passwordResetToken="";history.replaceState({},document.title,location.pathname);showAuth("login");$("#authError").textContent="Senha redefinida. Entre com a nova senha."}catch(err){$("#authError").textContent=err.data?.error==="password_too_short"?"Use uma senha com pelo menos 10 caracteres.":"Não foi possível redefinir. Gere um novo link."}};
 let mfaLoginChallenge=null;
 $("#loginForm").onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{
   const out=await api("/api/auth/login",{method:"POST",body:JSON.stringify(b)});
@@ -834,7 +853,7 @@ async function loadAgents(){
   try{
     const [meta,tasks]=await Promise.all([api("/api/agents"),api("/api/agents/tasks")]);
     $("#agentPendingBadge").textContent=meta.pending+" pendentes";state.agentProfiles=meta.profiles;
-    $("#agentProfileList").innerHTML=meta.profiles.map(a=>{const cfg=a.config||{},display=cfg.identity?.display_name||a.name,configBtn=a.agent_key==="receptionist"?'<button type="button" class="secondary smallBtn" data-agent-config="'+a.agent_key+'">Configurar agente</button><button type="button" class="secondary smallBtn" data-agent-explain="'+a.agent_key+'">Ver regras e prompt</button>':"";return '<article><div class="panelhead"><span class="chip">'+(a.agent_key==="receptionist"?(a.enabled?"habilitada":"pausada"):(a.enabled?"ativo":"pausado"))+'</span><strong>'+esc(display)+'</strong></div><p>'+esc(a.description)+'</p><label class="autonomyLabel">Autonomia <b>'+a.autonomy+'</b>/10<input type="range" min="0" max="10" value="'+a.autonomy+'" data-agent-autonomy="'+a.agent_key+'"></label><div class="agentCardActions">'+configBtn+'</div></article>'}).join("");
+    $("#agentProfileList").innerHTML=meta.profiles.map(a=>{const cfg=a.config||{},display=cfg.identity?.display_name||a.name,configBtn=a.agent_key==="receptionist"&&state.user?.platform_admin===true?'<button type="button" class="secondary smallBtn" data-agent-config="'+a.agent_key+'">Configurar agente</button><button type="button" class="secondary smallBtn" data-agent-explain="'+a.agent_key+'">Ver regras e prompt</button>':"";return '<article><div class="panelhead"><span class="chip">'+(a.agent_key==="receptionist"?(a.enabled?"habilitada":"pausada"):(a.enabled?"ativo":"pausado"))+'</span><strong>'+esc(display)+'</strong></div><p>'+esc(a.description)+'</p><div class="agentAutonomyPublic"><small>Autonomia: '+a.autonomy+'/10 · Regras técnicas gerenciadas pela NOVAGENTE</small></div>'+(state.user?.platform_admin===true?'<label class="autonomyLabel">Ajustar autonomia <input type="range" min="0" max="10" value="'+a.autonomy+'" data-agent-autonomy="'+a.agent_key+'"></label>':'')+'<div class="agentCardActions">'+configBtn+'</div></article>'}).join("");
     $$("[data-agent-autonomy]").forEach(s=>s.onchange=async()=>{try{await api("/api/agents/profile",{method:"PATCH",body:JSON.stringify({agent_key:s.dataset.agentAutonomy,autonomy:Number(s.value)})});toast("Autonomia atualizada");await loadAgents()}catch{toast("Não foi possível alterar a autonomia")}});
     $$("[data-agent-config]").forEach(b=>b.onclick=()=>openAgentConfig(b.dataset.agentConfig));
     $$("[data-agent-explain]").forEach(b=>b.onclick=()=>openAgentExplain());
