@@ -93,11 +93,40 @@ export function handoffBooking(db,tenant,conversationId){
 }
 const response=message=>({handled:true,handoff:false,text:message});
 const human=(message,reason)=>({handled:true,handoff:true,reason,text:message});
-function matchedService(db,tenant,message){
+// A cliente pode dizer "limpeza de pele" mesmo que o catálogo tenha
+// "Limpeza de Pele Profunda". Aceitamos uma correspondência única; havendo
+// duas modalidades, pedimos esclarecimento em vez de escolher uma por conta.
+const SERVICE_STOP_WORDS=new Set(["quero","gostaria","preciso","fazer","marca","marcar","agendar","agendamento",
+  "reservar","uma","um","para","com","por","qual","que","vocês","voces","amanha","hoje","sexta",
+  "segunda","terca","quarta","quinta","sabado","domingo","servico","procedimento","horario","vaga",
+  "de","da","do","das","dos","a","o","as","os","e","em","no","na","ao","eu","meu","minha"]);
+const serviceWords=value=>(norm(value).match(/[a-z0-9]+/g)||[]).filter(w=>w.length>=3&&!SERVICE_STOP_WORDS.has(w));
+function matchedService(db,tenant,message,{awaitingService=false}={}){
  const options=many(db,"SELECT id,name,price_cents,duration_min FROM services WHERE tenant_id=? AND active=1 ORDER BY length(name) DESC,name",[tenant]);
- const found=options.filter(s=>norm(message).includes(norm(s.name)));
- const maximal=found.filter(s=>!found.some(x=>x.id!==s.id&&norm(x.name).includes(norm(s.name))));
- return maximal.length===1?maximal[0]:null;
+ const query=norm(message);
+ const full=options.filter(s=>query.includes(norm(s.name)));
+ const maximal=full.filter(s=>!full.some(x=>x.id!==s.id&&norm(x.name).includes(norm(s.name))));
+ if(maximal.length===1)return maximal[0];
+ if(maximal.length>1)return null;
+ const requestWords=[...new Set(serviceWords(message))];
+ if(!requestWords.length)return null;
+ const scored=options.map(service=>{
+   const words=[...new Set(serviceWords(service.name))];
+   const overlap=requestWords.filter(word=>words.includes(word)).length;
+   return {service,overlap,coverage:overlap/Math.max(1,words.length)};
+ }).filter(v=>v.overlap>=2||(awaitingService&&requestWords.length===1&&v.overlap===1));
+ if(!scored.length)return null;
+ scored.sort((a,b)=>b.overlap-a.overlap||b.coverage-a.coverage||a.service.name.localeCompare(b.service.name));
+ const [best,next]=scored;
+ return next&&best.overlap===next.overlap&&best.coverage===next.coverage?null:best.service;
+}
+function serviceQuestion(db,tenant,raw){
+ const words=new Set(serviceWords(raw));
+ const catalog=many(db,"SELECT name FROM services WHERE tenant_id=? AND active=1 ORDER BY name LIMIT 40",[tenant]);
+ if(!catalog.length)return "Vou chamar alguém da equipe para conferir o catálogo de serviços.";
+ const relevant=catalog.filter(s=>serviceWords(s.name).some(w=>words.has(w))).slice(0,4);
+ const choices=(relevant.length?relevant:catalog.slice(0,4)).map(s=>"• "+s.name).join("\n");
+ return "Para eu consultar o horário certo, qual destes serviços você quer fazer?\n"+choices+"\nPode escrever o nome ou a modalidade.";
 }
 function matchedProfessional(db,tenant,message,serviceId){
  const people=many(db,"SELECT p.id,p.name FROM professionals p WHERE p.tenant_id=? AND p.active=1 AND EXISTS(SELECT 1 FROM professional_services ps WHERE ps.professional_id=p.id AND ps.service_id=?)",[tenant,serviceId]);
@@ -181,14 +210,15 @@ export function bookingTurn({db,tenant,client,conversation,message,availability,
   }
   return response("Para confirmar o horário responda 1 ou 2. Se preferir outro dia, é só me dizer.");
  }
- let service=matchedService(db,tenant,raw);
+ let service=matchedService(db,tenant,raw,{awaitingService:state?.status==="await_service"});
  if(!service&&state?.service_id)service=one(db,"SELECT id,name,price_cents,duration_min FROM services WHERE tenant_id=? AND id=? AND active=1",[tenant,state.service_id]);
- if(!service){
-  save(db,tenant,conversationId,clientId,{status:"await_service"},nowMs);
-  return response("Vamos agendar! Qual serviço você quer fazer?");
- }
  const zone=one(db,"SELECT timezone FROM tenants WHERE id=?",[tenant])?.timezone||"America/Porto_Velho";
- const date=dateFromBookingText(raw,zone,nowMs);
+ const mentionedDay=dateFromBookingText(raw,zone,nowMs);
+ if(!service){
+  save(db,tenant,conversationId,clientId,{status:"await_service",day:mentionedDay||state?.day||null},nowMs);
+  return response(serviceQuestion(db,tenant,raw));
+ }
+ const date=mentionedDay||state?.day||null;
  const professional=matchedProfessional(db,tenant,raw,service.id);
  const professionalId=professional?.id||state?.professional_id||null;
  if(!date){
