@@ -898,7 +898,7 @@
           </select>
         </label>
         <label>Modelo
-          <input name="llm_model" id="llmModel" placeholder="Digite o ID exato do modelo">
+          <input name="llm_model" id="llmModel" placeholder="Ex.: gpt-6-luna">
         </label>
       </div>
       <label id="llmKeyLabel">Chave da API
@@ -908,7 +908,7 @@
         <small id="llmKeyStatus">Nenhuma chave carregada.</small>
         <button type="button" class="secondary" id="testLlmConfig">Testar conexão</button>
       </div>
-      <p class="muted llmHelp">A chave é criptografada no servidor e não volta para esta tela. Se o provedor externo falhar, a Recepcionista usa o cérebro interno como fallback.</p>
+      <p class="muted llmHelp">Chave protegida no servidor. Limite diário de chamadas e retorno às regras básicas se o provedor falhar. O modelo recebe histórico minimizado, sem telefone, documento ou dados médicos da ficha. Uso de API é cobrado separadamente pelo provedor.</p>
     </section>
 
     <section class="agentConfigSection">
@@ -1105,7 +1105,7 @@
   </form>
 </dialog>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
-<script src="/app.js?v=216" type="module"></script>
+<script src="/app.js?v=217" type="module"></script>
 <script src="/marketing-ui.js?v=1" defer></script>
 <script src="/novagente-commercial-ui.js?v=3" defer></script>
 <script src="/security-center.js?v=2" defer></script>

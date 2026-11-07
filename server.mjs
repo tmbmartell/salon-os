@@ -1,5 +1,5 @@
 import { runReceptionistBrain, brainHealth, buildReceptionistPrompt, buildReceptionistPromptPreview } from "./receptionist_brain.mjs";
-import { installLlmConfig, getLlmConfig, saveLlmConfig, testLlmConfig, callConfiguredLlm } from "./llm_config.mjs";
+import { installLlmConfig, getLlmConfig, saveLlmConfig, testLlmConfig, callConfiguredLlm, getLlmUsageToday } from "./llm_config.mjs";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -509,7 +509,12 @@ async function receptionistAgentReply({tenantId,client,conversation,text,intent}
   }
 
   let brain=null,externalError="";
-  if(llm.enabled&&llm.provider!=="internal"){
+  // Valores reais pertencem ao catálogo, não à imaginação de um LLM.
+  if((intent?.route==="price"||localIntent(text).route==="price")&&svc.answer_prices!==false){
+    const accurate=await deterministicReceptionReply({tenantId,text,intent});
+    if(accurate?.text||accurate?.handoff)return {...accurate,meta:{source:"catalog_price_guard"}};
+  }
+  if(llm.enabled&&llm.provider!=="internal"&&llm.has_api_key){
     try{
       const prompt=buildReceptionistPrompt({db,tenantId,client,conversation,text,cfg});
       const out=await callConfiguredLlm(db,tenantId,prompt,{maxTokens:800});
@@ -522,6 +527,13 @@ async function receptionistAgentReply({tenantId,client,conversation,text,intent}
       const fallback=await deterministicReceptionReply({tenantId,text,intent});
       return {...fallback,meta:{source:"fallback_rules",external_error:externalError||null,brain_error:String(e.message||e).slice(0,160)}};
     }
+  }
+  // Somente o fluxo de agendamento com gravação real pode confirmar uma vaga.
+  if(!String(brain.text||"").trim()){
+    return {handoff:true,reason:"llm_empty_reply",meta:{source:"response_safety_guard"}};
+  }
+  if(/(?:hor[aá]rio (?:j[aá] )?(?:confirmado|reservado)|agendamento (?:confirmado|realizado)|j[aá] (?:agendei|reservei|marquei) (?:seu|o) hor[aá]rio)/i.test(brain.text)){
+    return {handoff:true,reason:"unverified_booking_claim",meta:{source:"response_safety_guard"}};
   }
   const source=brain.meta?.source||"brain";
   if(brain.intent==="human"&&svc.transfer_on_human_request!==false)return {handoff:true,reason:"human_request",text:brain.text,meta:{source,...brain.meta}};
@@ -723,9 +735,9 @@ async function api(req,res,url){
   if(req.method==="GET"&&url.pathname==="/api/agents/receptionist/llm"){
     if(!isPlatformAdmin(db,user))return send(res,403,{error:"platform_admin_only"});
     const cfg=getLlmConfig(db,tenant);
-    return send(res,200,{...cfg,providers:[
+    return send(res,200,{...cfg,usage:getLlmUsageToday(db,tenant),providers:[
       {id:"internal",name:"Margot / OpenCLAW interno",example:""},
-      {id:"openai",name:"OpenAI",example:"gpt-5.6"},
+      {id:"openai",name:"OpenAI",example:"gpt-6-luna"},
       {id:"deepseek",name:"DeepSeek",example:"deepseek-chat"},
       {id:"openrouter",name:"OpenRouter",example:"openai/gpt-5.6"},
       {id:"anthropic",name:"Anthropic",example:"claude-sonnet-4-5"},
