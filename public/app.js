@@ -984,8 +984,9 @@ async function loadReceptionistLlmForm(){
     setAgentField(f,"llm_provider",cfg.provider||"internal");
     setAgentField(f,"llm_model",cfg.model||"");
     f.elements.llm_api_key.value="";
-    $("#llmKeyStatus").textContent=cfg.provider==="internal"?"Sem chave necessária.":(cfg.has_api_key?"Chave configurada e protegida.":"Nenhuma chave configurada.");
-    $("#llmStatusBadge").textContent=cfg.provider==="internal"?"interno":"configurado";
+    const limits=cfg.usage?" Hoje: "+cfg.usage.requests+"/"+cfg.usage.request_limit+" chamadas.":"";
+    $("#llmKeyStatus").textContent=(cfg.provider==="internal"?"Modo básico.":(cfg.has_api_key?"Chave protegida no servidor.":"Nenhuma chave configurada."))+limits;
+    $("#llmStatusBadge").textContent=cfg.provider==="internal"?"básico":(cfg.enabled&&cfg.has_api_key?"IA configurada":"não conectada");
     updateLlmFields();
   }catch{
     $("#llmStatusBadge").textContent="erro";
