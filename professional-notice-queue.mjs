@@ -112,3 +112,51 @@ export function simulateProfessionalNotice(db,{tenantId,id,now=nowIso()}){
     where id=? and tenant_id=? and status='pending'`).run(now,id,tenantId);
   return {simulated:result.changes===1,real_delivery:false};
 }
+
+/**
+ * Enfileira todos os profissionais de um atendimento real, inclusive multi-serviço.
+ * Nenhum envio é executado aqui. A confirmação de entrega exige integração futura.
+ */
+export function queueNoticesForAppointment(db,{tenantId,appointmentId,event="created",now=nowIso()}){
+  const a=db.prepare(`select a.id,a.status,a.start_at,a.end_at,a.professional_id,a.service_id,
+    c.name client_name from appointments a
+    join clients c on c.id=a.client_id and c.tenant_id=a.tenant_id
+    where a.id=? and a.tenant_id=?`).get(appointmentId,tenantId);
+  if(!a)return {scheduled:0,blocked_missing_phone:0,external_messages_sent:0,reason:"appointment_not_found"};
+  const items=db.prepare(`select ai.professional_id,ai.start_at,ai.end_at,
+    p.name professional_name,p.phone professional_phone,s.name service_name
+    from appointment_items ai
+    join professionals p on p.id=ai.professional_id and p.tenant_id=ai.tenant_id
+    join services s on s.id=ai.service_id and s.tenant_id=ai.tenant_id
+    where ai.appointment_id=? and ai.tenant_id=? order by ai.sequence`).all(appointmentId,tenantId);
+  if(!items.length){
+    const p=db.prepare(`select p.name professional_name,p.phone professional_phone,
+      s.name service_name from professionals p join services s on s.id=? and s.tenant_id=p.tenant_id
+      where p.id=? and p.tenant_id=?`).get(a.service_id,a.professional_id,tenantId);
+    if(p)items.push({...p,professional_id:a.professional_id,start_at:a.start_at,end_at:a.end_at});
+  }
+  const grouped=new Map();
+  for(const item of items){
+    const key=String(item.professional_id);
+    const v=grouped.get(key)||{
+      professional:{id:key,name:item.professional_name,phone:item.professional_phone},
+      appointment:{id:a.id,professional_id:key,client_name:a.client_name,
+        service_name:"",start_at:item.start_at,end_at:item.end_at,status:a.status},
+      services:new Set()
+    };
+    if(Date.parse(item.start_at)<Date.parse(v.appointment.start_at))v.appointment.start_at=item.start_at;
+    if(Date.parse(item.end_at)>Date.parse(v.appointment.end_at))v.appointment.end_at=item.end_at;
+    v.services.add(item.service_name);
+    grouped.set(key,v);
+  }
+  const summary={scheduled:0,blocked_missing_phone:0,external_messages_sent:0,professionals:grouped.size};
+  for(const v of grouped.values()){
+    v.appointment.service_name=[...v.services].join(" + ");
+    const result=queueProfessionalNotices(db,{
+      tenantId,appointment:v.appointment,professional:v.professional,event,now
+    });
+    summary.scheduled+=result.scheduled;
+    summary.blocked_missing_phone+=result.blocked_missing_phone;
+  }
+  return summary;
+}
