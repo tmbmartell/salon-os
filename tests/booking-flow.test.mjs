@@ -168,3 +168,58 @@ test("no availability produces an alternative-date question and no appointment",
  assert.equal(x.db.prepare("select count(*) n from appointments").get().n,0);
  x.db.close();
 });
+test("reconhece nome abreviado: limpeza de pele corresponde à modalidade única Profunda",()=>{
+ const x=fixture();
+ x.db.prepare("insert into services values(?,?,?,?,?,?)").run("s2","t1","Limpeza de Pele Profunda",1,15900,60);
+ x.db.prepare("insert into professional_services values(?,?)").run("p1","s2");
+ try{
+   const first=x.process("Quero agendar uma limpeza de pele");
+   assert.match(first.text,/Limpeza de Pele Profunda/);
+   assert.match(first.text,/qual dia/i);
+   assert.doesNotMatch(first.text,/qual serviço/i);
+   assert.equal(bookingState(x.db,"t1","co1").service_id,"s2");
+   const tomorrow=x.process("amanhã");
+   assert.equal(tomorrow.offered,2);
+   assert.match(tomorrow.text,/Limpeza de Pele Profunda/);
+   assert.equal(x.process("1").booked,true);
+ }finally{x.db.close()}
+});
+test("guarda o dia informado antes de reconhecer o serviço no próximo turno",()=>{
+ const x=fixture();
+ x.db.prepare("insert into services values(?,?,?,?,?,?)").run("s2","t1","Limpeza de Pele Profunda",1,15900,60);
+ x.db.prepare("insert into professional_services values(?,?)").run("p1","s2");
+ try{
+   const first=x.process("Quero agendar amanhã");
+   assert.match(first.text,/serviços/i);
+   assert.equal(bookingState(x.db,"t1","co1").day,"2026-10-28");
+   const second=x.process("limpeza de pele");
+   assert.equal(second.offered,2);
+   assert.equal(bookingState(x.db,"t1","co1").day,"2026-10-28");
+ }finally{x.db.close()}
+});
+test("não escolhe a modalidade errada quando há duas limpezas de pele",()=>{
+ const x=fixture();
+ x.db.prepare("insert into services values(?,?,?,?,?,?)").run("s2","t1","Limpeza de Pele Profunda",1,15900,60);
+ x.db.prepare("insert into services values(?,?,?,?,?,?)").run("s3","t1","Limpeza de Pele Simples",1,9900,35);
+ try{
+   const q=x.process("Quero agendar limpeza de pele");
+   assert.match(q.text,/Profunda/);
+   assert.match(q.text,/Simples/);
+   assert.equal(bookingState(x.db,"t1","co1").service_id,null);
+   const choice=x.process("profunda");
+   assert.equal(bookingState(x.db,"t1","co1").service_id,"s2");
+   assert.match(choice.text,/qual dia/i);
+ }finally{x.db.close()}
+});
+test("não inventa serviço a partir de saudação ou palavra desconexa",()=>{
+ const x=fixture();
+ x.db.prepare("insert into services values(?,?,?,?,?,?)").run("s2","t1","Limpeza de Pele Profunda",1,15900,60);
+ try{
+   assert.equal(x.process("Bom dia").handled,false);
+   const q=x.process("Quero agendar");
+   assert.match(q.text,/serviços/i);
+   const later=x.process("Gostaria de conversar");
+   assert.match(later.text,/qual destes serviços/i);
+   assert.equal(bookingState(x.db,"t1","co1").service_id,null);
+ }finally{x.db.close()}
+});
