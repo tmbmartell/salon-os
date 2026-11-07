@@ -86,10 +86,10 @@ try{
   await toggle.waitFor();
   page.once("dialog",dialog=>dialog.accept());
   await toggle.click();
-  await page.locator('[data-agent-toggle="receptionist"]').getByText("Ativar atendimento IA").waitFor({timeout:12000});
+  await page.locator('[data-agent-toggle="receptionist"]:has-text("Ativar atendimento IA")').waitFor({timeout:12000});
   page.once("dialog",dialog=>dialog.accept());
   await page.locator('[data-agent-toggle="receptionist"]').click();
-  await page.locator('[data-agent-toggle="receptionist"]').getByText("Pausar atendimento IA").waitFor({timeout:12000});
+  await page.locator('[data-agent-toggle="receptionist"]:has-text("Pausar atendimento IA")').waitFor({timeout:12000});
   const access=await page.evaluate(async()=>{
     const [prompts,config,profile]=await Promise.all([
       fetch("/api/agents/receptionist/explain"),
