@@ -64,13 +64,14 @@ async function mockWaha(){
   await new Promise(ok=>server.listen(0,"127.0.0.1",ok));
   return {server,received,get statusRequests(){return statusRequests},base:"http://127.0.0.1:"+server.address().port};
 }
-async function environment(){
+async function environment({enableAi=false}={}){
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),"ne-waha-qa-")),dbPath=path.join(dir,"qa.sqlite"),port=await freePort();
   const waha=await mockWaha(),secret="qa-hmac-secret-not-production";
   const child=spawn(process.execPath,["server.mjs"],{cwd:root,env:{
     ...process.env,PORT:String(port),HOST:"127.0.0.1",SALON_DB:dbPath,
     JEV_CONTROL_PLANE_URL:"http://127.0.0.1:1",
-    NOVAGENTE_ENABLE_RECEPTIONIST_AI:"false",
+    NOVAGENTE_ENABLE_RECEPTIONIST_AI:enableAi?"true":"false",
+    NOVAGENTE_AUTOMATION_V2_APPROVED:enableAi?"true":"false",
     WAHA_BASE_URL:waha.base,WAHA_API_KEY:"qa-waha-key",WAHA_SESSION:"qa-only",
     WAHA_WEBHOOK_HMAC_SECRET:secret,WAHA_WEBHOOK_URL:"http://127.0.0.1:"+port+"/api/whatsapp/waha/webhook"
   },stdio:["ignore","pipe","pipe"]});
@@ -320,4 +321,67 @@ test("WAHA simulado: HMAC, mensagem, cliente CRM, conversa, agenda, resposta, AC
     }finally{db.close()}
   }catch(error){error.message+="\nServidor:\n"+app.logs().slice(-1800);throw error}
   finally{await app.close()}
+});
+
+test("WhatsApp simulado continua o agendamento com nome de serviço abreviado em mensagens separadas", {timeout:70000},async()=>{
+  const app=await environment({enableAi:true});
+  try{
+    await expect(app.api,"/api/auth/setup",201,{method:"POST",body:{
+      email:"gestora-continuidade@example.invalid",name:"Gestora QA",password:"SenhaInternaSomenteQA2026!"
+    }});
+    const login=await app.api("/api/auth/login",{method:"POST",body:{
+      email:"gestora-continuidade@example.invalid",password:"SenhaInternaSomenteQA2026!"
+    }});
+    assert.equal(login.status,200);
+    const owner=(p,o={})=>app.api(p,{...o,cookie:login.cookie});
+    const boot=await expect(owner,"/api/bootstrap",200);
+    const db=new DatabaseSync(app.dbPath);
+    try{
+      for(const key of ["assistant_reply","assistant_booking"]){
+        db.prepare("insert into automation_policies(tenant_id,key,enabled,updated_at) values(?,?,1,?) on conflict(tenant_id,key) do update set enabled=1")
+          .run(boot.tenant.id,key,new Date().toISOString());
+      }
+      db.prepare("update agent_profiles set enabled=1 where tenant_id=? and agent_key='receptionist'")
+        .run(boot.tenant.id);
+      const service=boot.services.find(s=>s.active!==false);
+      assert.ok(service,"catálogo QA precisa ter um serviço");
+      db.prepare("update services set name='Limpeza de Pele Profunda' where tenant_id=? and id=?")
+        .run(boot.tenant.id,service.id);
+    }finally{db.close()}
+    const status=await expect(owner,"/api/whatsapp/status",200);
+    assert.equal(status.ai_enabled,true,JSON.stringify(status));
+    const first=await app.webhook({event:"message",session:"qa-only",payload:{
+      id:"qa-continuity-001",from:"556999977112@c.us",fromMe:false,
+      body:"Quero agendar uma limpeza de pele",pushName:"Cliente de Teste",hasMedia:false
+    }});
+    assert.equal(first.status,200,JSON.stringify(first.data));
+    assert.equal(first.data.automaticReply,true);
+    assert.equal(app.waha.received.length,1);
+    assert.match(app.waha.received[0].text,/Limpeza de Pele Profunda/);
+    assert.match(app.waha.received[0].text,/qual dia/i);
+    assert.doesNotMatch(app.waha.received[0].text,/Qual serviço você quer fazer/i);
+
+    const second=await app.webhook({event:"message",session:"qa-only",payload:{
+      id:"qa-continuity-002",from:"556999977112@c.us",fromMe:false,
+      body:"Amanhã",pushName:"Cliente de Teste",hasMedia:false
+    }});
+    assert.equal(second.status,200,JSON.stringify(second.data));
+    assert.equal(second.data.automaticReply,true);
+    assert.equal(app.waha.received.length,2);
+    assert.notEqual(app.waha.received[1].text,app.waha.received[0].text);
+    assert.doesNotMatch(app.waha.received[1].text,/Qual serviço você quer fazer/i);
+    const dup=await app.webhook({event:"message",session:"qa-only",payload:{
+      id:"qa-continuity-002",from:"556999977112@c.us",fromMe:false,body:"Amanhã"
+    }});
+    assert.equal(dup.data.type,"duplicate");
+    assert.equal(app.waha.received.length,2,"mensagem duplicada nunca dispara resposta extra");
+    const stored=new DatabaseSync(app.dbPath,{readOnly:true});
+    try{
+      const flow=stored.prepare("select status,service_id from receptionist_booking_flows where conversation_id=?")
+        .get(first.data.conversationId);
+      assert.ok(flow);
+      assert.notEqual(flow.status,"await_service");
+      assert.ok(flow.service_id);
+    }finally{stored.close()}
+  }finally{await app.close()}
 });
