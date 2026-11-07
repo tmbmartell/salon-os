@@ -5,6 +5,44 @@ import path from "node:path";
 const KEY_FILE=path.join(process.cwd(),"data","llm-secrets.key");
 const PROVIDERS=new Set(["internal","openai","deepseek","openrouter","anthropic","gemini"]);
 
+const RECEPTION_RESPONSE_SCHEMA={
+  type:"object",
+  properties:{
+    reply:{type:"string"},
+    intent:{type:"string",enum:["general","price","service","appointment_book","appointment_cancel","appointment_reschedule","complaint","human","other"]},
+    handoff:{type:"boolean"},reason:{type:"string"},confidence:{type:"number"},
+    entities:{type:"object",properties:{
+      service:{type:"string"},date:{type:"string"},time:{type:"string"},professional:{type:"string"}
+    },required:["service","date","time","professional"],additionalProperties:false}
+  },
+  required:["reply","intent","handoff","reason","confidence","entities"],additionalProperties:false
+};
+const dailyLimit=()=>{
+  const n=Number(process.env.NOVAGENTE_LLM_DAILY_LIMIT||120);
+  return Number.isInteger(n)&&n>0?Math.min(n,1000):120;
+};
+const usageDay=()=>new Date().toISOString().slice(0,10);
+function reserveLlmCall(db,tenantId){
+  const result=db.prepare(`insert into llm_usage_daily(tenant_id,day,requests,failures,input_tokens,output_tokens)
+    values(?,?,1,0,0,0) on conflict(tenant_id,day)
+    do update set requests=requests+1 where requests<?`).run(tenantId,usageDay(),dailyLimit());
+  if(!result.changes)throw Object.assign(new Error("llm_daily_limit_reached"),{status:429});
+}
+function recordLlmCall(db,tenantId,data,error=false){
+  const usage=data?.usage||{};
+  const input=Number(usage.input_tokens||0),output=Number(usage.output_tokens||0);
+  db.prepare(`update llm_usage_daily set input_tokens=input_tokens+?,output_tokens=output_tokens+?,
+     failures=failures+? where tenant_id=? and day=?`)
+    .run(Math.max(0,input),Math.max(0,output),error?1:0,tenantId,usageDay());
+}
+export function getLlmUsageToday(db,tenantId){
+  const row=db.prepare("select requests,failures,input_tokens,output_tokens from llm_usage_daily where tenant_id=? and day=?")
+    .get(tenantId,usageDay());
+  return {day:usageDay(),requests:row?.requests||0,failures:row?.failures||0,
+    input_tokens:row?.input_tokens||0,output_tokens:row?.output_tokens||0,request_limit:dailyLimit()};
+}
+
+
 function now(){return new Date().toISOString()}
 function ensureKey(){
   fs.mkdirSync(path.dirname(KEY_FILE),{recursive:true});
@@ -34,6 +72,7 @@ function dec(value){
 export function installLlmConfig(db){
   ensureKey();
   db.exec("CREATE TABLE IF NOT EXISTS llm_configs(id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL UNIQUE,provider TEXT NOT NULL DEFAULT 'internal',model TEXT NOT NULL DEFAULT '',api_key_enc TEXT NOT NULL DEFAULT '',enabled INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)");
+  db.exec("CREATE TABLE IF NOT EXISTS llm_usage_daily(tenant_id TEXT NOT NULL,day TEXT NOT NULL,requests INTEGER NOT NULL DEFAULT 0,failures INTEGER NOT NULL DEFAULT 0,input_tokens INTEGER NOT NULL DEFAULT 0,output_tokens INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(tenant_id,day))");
 }
 export function getLlmConfig(db,tenantId,{includeSecret=false}={}){
   const row=db.prepare("select * from llm_configs where tenant_id=?").get(tenantId);
@@ -52,6 +91,8 @@ export function saveLlmConfig(db,tenantId,input={}){
   const enabled=input.enabled===undefined?true:!!input.enabled;
   const current=db.prepare("select * from llm_configs where tenant_id=?").get(tenantId);
   let apiKeyEnc=current?.api_key_enc||"";
+  // Credenciais pertencem ao provedor; nunca reutilize uma chave ao trocar de fornecedor.
+  if(current?.provider!==provider)apiKeyEnc="";
   if(input.clear_api_key)apiKeyEnc="";
   if(typeof input.api_key==="string"&&input.api_key.trim())apiKeyEnc=enc(input.api_key.trim());
   if(provider!=="internal"&&!apiKeyEnc)throw Object.assign(new Error("api_key_required"),{status:400});
@@ -91,11 +132,22 @@ export async function callConfiguredLlm(db,tenantId,prompt,{maxTokens=800}={}){
   if(cfg.provider==="internal")throw new Error("llm_internal_provider");
   const key=cfg.api_key,model=cfg.model;
   if(cfg.provider==="openai"){
-    const data=await fetchJson("https://api.openai.com/v1/responses",{
-      method:"POST",headers:{"authorization":"Bearer "+key,"content-type":"application/json"},
-      body:JSON.stringify({model,input:prompt,store:false,max_output_tokens:maxTokens})
-    });
-    return {text:extractOpenAI(data),provider:"openai",model:data.model||model,id:data.id||null};
+    reserveLlmCall(db,tenantId);
+    let data;
+    try{
+      data=await fetchJson("https://api.openai.com/v1/responses",{
+        method:"POST",headers:{"authorization":"Bearer "+key,"content-type":"application/json"},
+        body:JSON.stringify({
+          model,input:prompt,store:false,max_output_tokens:Math.min(900,Math.max(120,maxTokens)),
+          ...(model.startsWith("gpt-6")?{reasoning:{effort:"none"}}:{}),
+          text:{format:{type:"json_schema",name:"salon_receptionist",strict:true,schema:RECEPTION_RESPONSE_SCHEMA}}
+        })
+      },25000);
+    }catch(error){recordLlmCall(db,tenantId,null,true);throw error}
+    recordLlmCall(db,tenantId,data);
+    const text=extractOpenAI(data);
+    if(!text)throw new Error("llm_empty_response");
+    return {text,provider:"openai",model:data.model||model,id:data.id||null};
   }
   if(cfg.provider==="deepseek"){
     const data=await fetchJson("https://api.deepseek.com/chat/completions",{
