@@ -90,7 +90,7 @@ export async function wahaWebhookDiagnostics(session=SESSION){
     if(response.status===404)return {checked:true,configured:false,official:false,reason:"session_missing"};
     const body=await response.json(),hooks=body.config?.webhooks||[];
     const matching=hooks.find(x=>x.url===WEBHOOK_URL);
-    const origin=String(process.env.NOVAGENTE_PUBLIC_ORIGIN||"").replace(/\\/$/,"");
+    const origin=String(process.env.NOVAGENTE_PUBLIC_ORIGIN||"").replace(/\/$/,"");
     const official=!!origin && hooks.some(x=>x.url===origin+"/api/whatsapp/waha/webhook");
     const signed=!!matching && matching.hmac?.key===WEBHOOK_SECRET;
     const events=!!matching && ["message","message.ack","session.status"].every(e=>matching.events?.includes(e));
