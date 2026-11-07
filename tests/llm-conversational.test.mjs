@@ -103,3 +103,79 @@ test("prompt minimiza documentos, telefone, aniversário, notas de saúde e e-ma
   assert.match(prompt,/Limpeza de Pele Profunda/);
   assert.match(prompt,/assistente virtual/);
 });
+
+test("DeepSeek Flash: Responses API em JSON Schema, continuidade e quota por salão",async()=>{
+  const db=new DatabaseSync(":memory:");
+  installLlmConfig(db);
+  const previousFetch=globalThis.fetch;
+  const previousQuota=process.env.NOVAGENTE_LLM_DAILY_LIMIT;
+  const requests=[];
+  process.env.NOVAGENTE_LLM_DAILY_LIMIT="2";
+  globalThis.fetch=async(url,options)=>{
+    const body=JSON.parse(options.body);
+    requests.push({url,body,headers:options.headers});
+    assert.equal(url,"https://api.deepseek.com/responses");
+    assert.equal(options.headers.authorization,"Bearer sk-deepseek-fake-key-for-unit-tests");
+    assert.equal(body.model,"deepseek-flash");
+    assert.equal(body.reasoning.effort,"none");
+    assert.equal(body.text.format.type,"json_schema");
+    assert.equal(body.text.format.name,"salon_receptionist");
+    assert.equal(body.text.format.schema.additionalProperties,false);
+    assert.equal(body.text.format.schema.properties.entities.additionalProperties,false);
+    assert.match(body.input,/JSON/);
+    return new Response(JSON.stringify({
+      id:"deepseek-response-mock",model:"deepseek-flash",status:"completed",
+      output:[{type:"message",content:[{type:"output_text",text:JSON.stringify(sample)}]}],
+      usage:{input_tokens:140,output_tokens:65}
+    }),{status:200,headers:{"content-type":"application/json"}});
+  };
+  try{
+    const cfg=saveLlmConfig(db,"salon-qa",{provider:"deepseek",model:"deepseek-flash",api_key:"sk-deepseek-fake-key-for-unit-tests"});
+    assert.equal(cfg.has_api_key,true);
+    assert.equal(cfg.api_key,"");
+    const raw=db.prepare("select api_key_enc from llm_configs where tenant_id=?").get("salon-qa");
+    assert.doesNotMatch(raw.api_key_enc,/deepseek-fake-key/);
+    const one=await callConfiguredLlm(db,"salon-qa","Retorne JSON para a recepcionista, cliente quer uma informação.");
+    assert.deepEqual(JSON.parse(one.text),sample);
+    const two=await callConfiguredLlm(db,"salon-qa","Responda com JSON ao próximo turno da conversa.");
+    assert.equal(two.provider,"deepseek");
+    assert.equal(requests.length,2);
+    const usage=getLlmUsageToday(db,"salon-qa");
+    assert.equal(usage.requests,2);
+    assert.equal(usage.input_tokens,280);
+    assert.equal(usage.output_tokens,130);
+    await assert.rejects(callConfiguredLlm(db,"salon-qa","Mais uma conversa"),/llm_daily_limit_reached/);
+    assert.equal(requests.length,2,"cota evita novas chamadas");
+    assert.equal(getLlmUsageToday(db,"salon-b").requests,0);
+    await assert.rejects(async()=>saveLlmConfig(db,"salon-qa",{provider:"openai",model:"gpt-6-luna"}),/api_key_required/);
+  }finally{
+    globalThis.fetch=previousFetch;
+    if(previousQuota===undefined)delete process.env.NOVAGENTE_LLM_DAILY_LIMIT;
+    else process.env.NOVAGENTE_LLM_DAILY_LIMIT=previousQuota;
+    db.close();
+  }
+});
+
+test("DeepSeek: validação da chave usa resposta mínima, sem dados pessoais",async()=>{
+  const db=new DatabaseSync(":memory:");installLlmConfig(db);
+  const old=globalThis.fetch;
+  let tested=false;
+  globalThis.fetch=async(url,options)=>{
+    assert.equal(url,"https://api.deepseek.com/responses");
+    const payload=JSON.parse(options.body);
+    assert.equal(payload.model,"deepseek-flash");
+    assert.equal(payload.input,"Responda apenas: OK");
+    assert.equal(payload.reasoning.effort,"none");
+    tested=true;
+    return new Response(JSON.stringify({output_text:"OK",model:"deepseek-flash"}),{
+      status:200,headers:{"content-type":"application/json"}
+    });
+  };
+  try{
+    const {testLlmConfig}=await import("../llm_config.mjs");
+    const result=await testLlmConfig(db,"salon-qa",{provider:"deepseek",model:"deepseek-flash",api_key:"sk-fake-key-for-tests"});
+    assert.equal(result.ok,true);
+    assert.equal(tested,true);
+    assert.equal(db.prepare("select count(*) n from llm_configs").get().n,0,"teste da chave não ativa o modelo");
+  }finally{globalThis.fetch=old;db.close()}
+});
