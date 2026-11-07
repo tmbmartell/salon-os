@@ -7,11 +7,12 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { installAuth, authenticate, handleAuthApi, requirePermission, can, audit, isPlatformAdmin } from "./auth.mjs";
+import {installProfessionalNoticeQueue,queueNoticesForAppointment} from "./professional-notice-queue.mjs";
 import { installStaffAccess, handleStaffAccessApi } from "./staff-access.mjs";
 import { isFreePreview, provisionFreePreview } from "./free-preview.mjs";
 import { browserMutationAllowed, requestIp } from "./request-security.mjs";
 import { installWhatsAppBackfill, handleWhatsAppBackfillApi } from "./whatsapp-backfill.mjs";
-import { installWhatsApp, wahaConfigured, wahaStatus, ensureWahaSession, wahaQr, verifyWebhook, listConversations, conversationMessages, markConversationRead, sendConversationMessage, ingestWahaEvent, sendText, registerTenantSession, sessionForTenant, tenantForWahaEvent, syncWahaHistory } from "./whatsapp.mjs";
+import { installWhatsApp, wahaConfigured, wahaStatus, wahaWebhookDiagnostics, ensureWahaSession, wahaQr, verifyWebhook, listConversations, conversationMessages, markConversationRead, sendConversationMessage, ingestWahaEvent, sendText, registerTenantSession, sessionForTenant, tenantForWahaEvent, syncWahaHistory } from "./whatsapp.mjs";
 import { installPhase2, handlePhase2Api } from "./phase2.mjs";
 import { installPhase3, handlePhase3Api } from "./phase3.mjs";
 import { handleOwnerEyeApi } from "./owner-eye.mjs";
@@ -204,6 +205,7 @@ function ensureSeed(){
 ensureSeed();
 installAuth(db);
 installStaffAccess(db);
+installProfessionalNoticeQueue(db);
 provisionFreePreview(db,DEFAULT_TENANT);
 installWhatsApp(db);
 installWhatsAppBackfill(db);
@@ -423,6 +425,9 @@ function createAppointmentRecord(tenant,user,b){
     for(const item of segments)run("insert into appointment_items(id,tenant_id,appointment_id,service_id,professional_id,qty,unit_price_cents,duration_min,sequence,start_at,end_at,created_at) values(?,?,?,?,?,?,?,?,?,?,?,?)",[id(),tenant,aid,item.service.id,item.professional.id,item.qty,Number(item.service.price_cents||0),Number(item.service.duration_min||60),item.sequence,item.start_at,item.end_at,createdAt]);
     audit(db,user,"appointment.create","appointment",aid,{clientId:client.id,itemCount:segments.length,tags,resourceId:resource?.id||null});
     db.exec("COMMIT");
+    // Enfileira somente. Nenhuma mensagem é enviada por este hook.
+    try{queueNoticesForAppointment(db,{tenantId:tenant,appointmentId:aid,event:"created"})}
+    catch(error){console.error("professional_notice_queue_failed",String(error.message||error).slice(0,140))}
     return {id:aid,start_at:start.toISOString(),end_at:cursor.toISOString(),status:b.status||"scheduled",tags,items:segments.map(x=>({service_id:x.service.id,service_name:x.service.name,professional_id:x.professional.id,professional_name:x.professional.name,qty:x.qty,start_at:x.start_at,end_at:x.end_at,price:Number(x.service.price_cents||0)/100}))};
   }catch(e){try{db.exec("ROLLBACK")}catch{}throw e}
 }
@@ -989,6 +994,10 @@ async function api(req,res,url){
     const info=run("update appointments set status=?,updated_at=? where id=? and tenant_id=? and status=?",[status,now(),ap.id,tenant,current.status]);
     if(!info.changes)return send(res,409,{error:"status_changed_reload"});
     audit(db,user,"appointment.status","appointment",ap.id,{from:current.status,to:status});
+    if(["cancelled","confirmed"].includes(status)){
+      try{queueNoticesForAppointment(db,{tenantId:tenant,appointmentId:ap.id,event:status==="cancelled"?"cancelled":"created"})}
+      catch(error){console.error("professional_notice_queue_failed",String(error.message||error).slice(0,140))}
+    }
     try{afterAppointmentStatus(db,tenant,ap.id,status)}catch(e){console.error("commercial_status_hook_failed",String(e.message||e).slice(0,140))}
     return send(res,200,{ok:true,status});
   }
@@ -1056,6 +1065,34 @@ async function api(req,res,url){
       audit(db,user,"whatsapp.sync","whatsapp",null,out);
       return send(res,200,{ok:true,...out});
     }catch(e){return send(res,503,{error:"whatsapp_sync_failed",detail:String(e.message||e).slice(0,180)})}
+  }
+  if(req.method==="GET"&&url.pathname==="/api/whatsapp/diagnostics"){
+    guard("conversations.read");
+    if(!["owner","manager"].includes(user.role))return send(res,403,{error:"management_only"});
+    const session=sessionForTenant(db,tenant);
+    const since24h=new Date(Date.now()-86400000).toISOString();
+    const lastByDirection=direction=>one("select max(created_at) at from messages where tenant_id=? and direction=?",[tenant,direction])?.at||null;
+    const countByDirection=direction=>Number(one("select count(*) n from messages where tenant_id=? and direction=?",[tenant,direction])?.n||0);
+    const count24=direction=>Number(one("select count(*) n from messages where tenant_id=? and direction=? and created_at>=?",[tenant,direction,since24h])?.n||0);
+    const outgoingDelivery=all("select coalesce(delivery_status,'unknown') as status,count(*) n from messages where tenant_id=? and direction='out' group by coalesce(delivery_status,'unknown')",[tenant])
+      .map(x=>({status:String(x.status||"unknown").slice(0,30),count:Number(x.n)}));
+    const [provider,webhook]=await Promise.all([wahaStatus(session),wahaWebhookDiagnostics(session)]);
+    return send(res,200,{
+      session_connected:provider.connected===true,
+      session_status:provider.status||"UNKNOWN",
+      webhook:{configured:webhook.configured===true,official:webhook.official===true,
+        signed:webhook.signed===true,events:webhook.events===true,checked:webhook.checked===true},
+      automatic_replies_ready:liveReceptionistEnabled(tenant)&&provider.connected===true,
+      automatic_replies_note:"A configuração pronta não comprova envio; confira as mensagens automáticas registradas.",
+      inbound:{total:countByDirection("in"),last_at:lastByDirection("in"),past_24h:count24("in")},
+      outbound:{total:countByDirection("out"),last_at:lastByDirection("out"),past_24h:count24("out"),delivery_statuses:outgoingDelivery},
+      professional_notices:{
+        pending:Number(one("select count(*) n from professional_notice_queue where tenant_id=? and status='pending'",[tenant])?.n||0),
+        missing_phone:Number(one("select count(*) n from professional_notice_queue where tenant_id=? and status='blocked_missing_phone'",[tenant])?.n||0),
+        external_delivery_enabled:false
+      },
+      inspected_at:new Date().toISOString()
+    });
   }
   if(req.method==="GET"&&url.pathname==="/api/whatsapp/status"){
     guard("conversations.read");
