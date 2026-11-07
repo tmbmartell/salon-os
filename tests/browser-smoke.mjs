@@ -130,6 +130,42 @@ try{
   await page.screenshot({path:path.join(artifact,"08-diagnostico-piloto-sem-whatsapp.png"),fullPage:true});
 
   await page.screenshot({path:path.join(artifact,"05-administracao-desktop.png"),fullPage:true});
+
+  // Convite sem senha testado como funcionária real, em outro navegador e banco QA.
+  await page.locator('#admin [data-ne-tab="users"]').click();
+  await page.getByRole("button",{name:"+ Convidar pessoa"}).click();
+  await page.locator("#neInviteDialog [name=name]").fill("Profissional QA Sem Senha");
+  await page.locator("#neInviteDialog [name=email]").fill("profissional-qa@example.invalid");
+  await page.locator("#neInviteDialog [name=role]").selectOption("professional");
+  await page.locator('#neInviteDialog button[type="submit"]').click();
+  const inviteUrl=await page.locator("#neInviteDialog .ne-stage8-invite-link input").inputValue();
+  assert.match(inviteUrl,/#invite=/);
+  const staffContext=await browser.newContext({viewport:{width:390,height:844},locale:"pt-BR"});
+  const staffPage=await staffContext.newPage();
+  await staffPage.goto(inviteUrl,{waitUntil:"domcontentloaded"});
+  await staffPage.getByRole("button",{name:"Ativar acesso sem senha"}).waitFor({timeout:12000});
+  await staffPage.getByRole("button",{name:"Ativar acesso sem senha"}).click();
+  await staffPage.locator("#authGate").waitFor({state:"hidden",timeout:22000});
+  const staffRole=await staffPage.evaluate(async()=>{const r=await fetch("/api/auth/me");return (await r.json()).user?.role});
+  assert.equal(staffRole,"professional");
+  await staffPage.screenshot({path:path.join(artifact,"15-primeiro-acesso-profissional-sem-senha.png"),fullPage:true});
+  await staffContext.close();
+  await page.keyboard.press("Escape");
+  await page.locator('#admin [data-ne-tab="users"]').click();
+  const userRow=page.locator(".ne-stage8-user-row").filter({hasText:"profissional-qa@example.invalid"});
+  await userRow.getByRole("button",{name:"Link para entrar"}).click();
+  const accessUrl=await page.locator("#neStaffAccessDialog input").inputValue();
+  assert.match(accessUrl,/#access=/);
+  const linkContext=await browser.newContext({viewport:{width:390,height:844},locale:"pt-BR"});
+  const linkPage=await linkContext.newPage();
+  await linkPage.goto(accessUrl,{waitUntil:"domcontentloaded"});
+  await linkPage.locator("#authGate").waitFor({state:"hidden",timeout:22000});
+  const linkRole=await linkPage.evaluate(async()=>{const r=await fetch("/api/auth/me");return (await r.json()).user?.role});
+  assert.equal(linkRole,"professional");
+  await linkPage.screenshot({path:path.join(artifact,"16-entrada-profissional-por-link.png"),fullPage:true});
+  await linkContext.close();
+  await page.locator("#neStaffAccessDialog").evaluate(el=>el.close());
+
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:path.join(artifact,"06-administracao-mobile.png"),fullPage:true});
   // Etapa 20: percorrer o fluxo essencial de recepção em telas pequenas.
