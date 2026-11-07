@@ -84,7 +84,7 @@
   adminPanels.premium.append(premiumInfo);
   const inviteDialog=make("dialog","ne-stage8-dialog");
   inviteDialog.id="neInviteDialog";const inviteForm=make("form","ne-stage8-form");
-  inviteForm.append(make("h3","","Convidar uma pessoa"),make("p","ne-stage8-help","Convite válido por 48 horas. A pessoa criará sua própria senha."));
+  inviteForm.append(make("h3","","Convidar uma pessoa"),make("p","ne-stage8-help","Convite válido por 48 horas. A equipe poderá entrar sem senha pelo convite. Gerentes criam uma senha própria."));
   inviteForm.append(field("Nome","name","text",true),field("E-mail","email","email",true));
   const roleField=make("label","ne-stage8-field"),roles=make("select");roles.name="role";
   for(const r of ["manager","reception","professional"]){
@@ -119,6 +119,21 @@
       await loadUsers();
     }catch(e){detailMessage(inviteStatus,getError(e));submitInvite.disabled=false}
   };
+  const accessDialog=make("dialog","ne-stage8-dialog");
+  document.body.append(accessDialog);
+  function showOneTimeAccess(title,link,expires){
+    accessDialog.replaceChildren();
+    const wrapper=make("div","ne-stage8-form"),heading=make("h3","",title);
+    const details=make("p","ne-stage8-help","Link único, válido até "+new Date(expires).toLocaleString("pt-BR")+". Envie por um canal de confiança. Não coloque em grupos.");
+    const linkInput=make("input");linkInput.readOnly=true;linkInput.value=link;linkInput.setAttribute("aria-label","Link temporário para compartilhar");
+    const copy=make("button","primary","Copiar link");copy.type="button";
+    const close=make("button","secondary","Fechar");close.type="button";
+    close.onclick=()=>{linkInput.value="";accessDialog.close()};
+    const info=make("p","ne-stage8-help");info.setAttribute("role","status");
+    copy.onclick=async()=>{try{await navigator.clipboard.writeText(linkInput.value);info.textContent="Link copiado. Compartilhe apenas com a pessoa autorizada."}catch{linkInput.focus();linkInput.select();info.textContent="Selecione e copie o link manualmente."}};
+    const controls=make("div","ne-stage8-dialog-actions");controls.append(copy,close);
+    wrapper.append(heading,details,linkInput,controls,info);accessDialog.append(wrapper);accessDialog.showModal();
+  }
   async function loadUsers(){
     if(!logged)return;
     usersControls.replaceChildren();invitationList.replaceChildren();matrix.replaceChildren();
@@ -164,6 +179,28 @@
           revoke.onclick=async()=>{if(!confirm("Desconectar todos os dispositivos de "+u.name+"?"))return;
             try{await api("/api/admin/users/"+encodeURIComponent(u.id)+"/revoke-sessions",json("POST",{}));alert("Acessos encerrados.")}catch(e){alert(getError(e))}
           };
+          if(["reception","professional"].includes(u.role)&&u.active){
+            const easy=make("button","primary","Link de acesso");easy.type="button";
+            easy.onclick=async()=>{
+              if(!confirm("Gerar um link de entrada por 15 minutos para "+u.name+"? O anterior deixará de funcionar."))return;
+              easy.disabled=true;
+              try{const answer=await api("/api/admin/users/"+encodeURIComponent(u.id)+"/access-link",json("POST",{}));
+                showOneTimeAccess("Acesso sem senha de "+u.name,location.origin+location.pathname+"#access="+encodeURIComponent(answer.token),answer.expires_at);
+              }catch(e){alert(getError(e))}finally{easy.disabled=false}
+            };
+            actions.append(easy);
+          }
+          if(u.active){
+            const resetPassword=make("button","secondary","Redefinir senha");resetPassword.type="button";
+            resetPassword.onclick=async()=>{
+              if(!confirm("Gerar link de redefinição para "+u.name+"? A senha anterior só deixará de funcionar depois da troca."))return;
+              resetPassword.disabled=true;
+              try{const answer=await api("/api/admin/users/"+encodeURIComponent(u.id)+"/password-reset",json("POST",{}));
+                showOneTimeAccess("Redefinição de senha de "+u.name,location.origin+location.pathname+"#reset="+encodeURIComponent(answer.token),answer.expires_at);
+              }catch(e){alert(getError(e))}finally{resetPassword.disabled=false}
+            };
+            actions.append(resetPassword);
+          }
           actions.append(status,revoke);
         }
         row.append(info,actions);usersControls.append(row);
@@ -224,11 +261,12 @@
   teamMenu.append(newCard("Profissionais","Cadastro e equipe","♙","professionals"),
     newCard("Desempenho","Metas e comissões","▥","performance"),
     newCard("Folgas e escalas","Disponibilidade","▦","leave"),
+    newCard("Acessos","Convites, links e senhas","◉","access"),
     newCard("RH avançado","Adicional futuro","✦","premium"));
   teamTitle.after(teamMenu);
   const teamPanels={
     professionals:section("ne-stage8-people"),performance:section("ne-stage8-performance"),
-    leave:section("ne-stage8-leave"),premium:section("ne-stage8-team-premium")
+    leave:section("ne-stage8-leave"),access:section("ne-stage8-team-access"),premium:section("ne-stage8-team-premium")
   };
   for(const [name,p]of Object.entries(teamPanels)){p.dataset.neTeamPanel=name;team.append(p)}
   const roster=$("#teamList"),performance=$("#staffPerformanceList")?.closest(".panel"),
@@ -236,10 +274,15 @@
   if(roster)teamPanels.professionals.append(roster);
   if(performance)teamPanels.performance.append(performance);
   if(timeOff)teamPanels.leave.append(timeOff);
+  teamPanels.access.append(usersHeading,usersControls,invitationList,make("h3","","Permissões por perfil"),matrix);
+  adminPanels.users.append(make("p","ne-stage8-help","Convites e redefinições agora ficam em Equipe → Acessos."));
+  const accessTab=teamMenu.querySelector('[data-ne-tab="access"]');
+  if(accessTab)accessTab.dataset.deny="manager reception professional";
   teamPanels.premium.append(make("h3","","RH avançado"),make("p","ne-stage8-help",
     "Opcional em desenvolvimento. Documentos, avaliações, treinamentos e rotinas trabalhistas exigem implementação e homologação próprias. Não há contratação ativada."));
   function teamTab(name){
     for(const [id,p]of Object.entries(teamPanels))p.classList.toggle("hidden",id!==name);
+    if(name==="access")api("/api/auth/me").then(({user})=>{logged=user;if(user.role==="owner")loadUsers();else teamPanels.access.textContent="Apenas a proprietária gerencia acessos."}).catch(()=>{teamPanels.access.textContent="Entre novamente para gerenciar acessos."});
     $$("[data-ne-tab]",teamMenu).forEach(b=>b.classList.toggle("is-active",b.dataset.neTab===name));
   }
   $$("[data-ne-tab]",teamMenu).forEach(b=>b.addEventListener("click",()=>teamTab(b.dataset.neTab)));
@@ -268,7 +311,16 @@
     const pwAgain=field("Confirmar senha","confirm_password","password",true);
     const hint=make("p","ne-stage8-help");hint.setAttribute("role","status");
     const button=make("button","primary","Criar meu acesso");button.type="submit";
-    form.append(pw,pwAgain,button,hint);acceptance.append(form);document.body.append(acceptance);
+    const quick=make("button","primary","Aceitar convite e entrar sem senha");quick.type="button";quick.hidden=true;
+    const option=make("p","ne-stage8-help","Para recepção e profissionais, um link de uso único substitui a senha. Se preferir, você ainda pode criar uma senha.");
+    quick.onclick=async()=>{
+      quick.disabled=true;
+      try{const done=await api("/api/auth/invitations/accept",json("POST",{token:inviteToken,passwordless:true}));
+        if(!done.user)throw Error("Acesso não criado");history.replaceState(null,"",location.pathname+location.search);location.reload();
+      }catch(e){detailMessage(hint,getError(e));quick.disabled=false}
+    };
+    form.append(option,quick,pw,pwAgain,button,hint);acceptance.append(form);document.body.append(acceptance);
+    api("/api/auth/invitations/inspect",json("POST",{token:inviteToken})).then(info=>{quick.hidden=!["reception","professional"].includes(info.role);option.hidden=quick.hidden}).catch(()=>{quick.hidden=true;option.hidden=true});
     acceptance.showModal();
     form.onsubmit=async event=>{
       event.preventDefault();
