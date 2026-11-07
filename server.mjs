@@ -861,8 +861,10 @@ async function api(req,res,url){
   if(req.method==="POST"&&url.pathname==="/api/professionals"){
     guard("team.write");
     const b=await parseBody(req),name=safeText(b.name,120);if(!name)return send(res,400,{error:"name_required"});
+    const phone=normalizePhone(b.phone);
+    if(phone && !/^(?:[0-9]{10,11}|55[0-9]{10,11})$/.test(phone))return send(res,400,{error:"invalid_professional_phone"});
     const pid=id();
-    run("insert into professionals(id,tenant_id,name,phone,role,specialties,work_start,work_end,created_at) values(?,?,?,?,?,?,?,?,?)",[pid,tenant,name,normalizePhone(b.phone),safeText(b.role||"Profissional",80),JSON.stringify(Array.isArray(b.specialties)?b.specialties:[]),safeText(b.work_start||"09:00",5),safeText(b.work_end||"18:00",5),now()]);
+    run("insert into professionals(id,tenant_id,name,phone,role,specialties,work_start,work_end,created_at) values(?,?,?,?,?,?,?,?,?)",[pid,tenant,name,phone,safeText(b.role||"Profissional",80),JSON.stringify(Array.isArray(b.specialties)?b.specialties:[]),safeText(b.work_start||"09:00",5),safeText(b.work_end||"18:00",5),now()]);
     audit(db,user,"professional.create","professional",pid,{});
     return send(res,201,professionalView(one("select * from professionals where id=?",[pid])));
   }
