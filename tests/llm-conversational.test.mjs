@@ -179,3 +179,16 @@ test("DeepSeek: validação da chave usa resposta mínima, sem dados pessoais",a
     assert.equal(db.prepare("select count(*) n from llm_configs").get().n,0,"teste da chave não ativa o modelo");
   }finally{globalThis.fetch=old;db.close()}
 });
+
+test("DeepSeek pode ser preparado desligado sem chave, sem ativar respostas externas",async()=>{
+  const db=new DatabaseSync(":memory:");installLlmConfig(db);
+  try{
+    const out=saveLlmConfig(db,"salon-new",{provider:"deepseek",model:"deepseek-flash",enabled:false});
+    assert.equal(out.provider,"deepseek");
+    assert.equal(out.enabled,false);
+    assert.equal(out.has_api_key,false);
+    await assert.rejects(callConfiguredLlm(db,"salon-new","Olá"),/llm_disabled/);
+    assert.equal(getLlmUsageToday(db,"salon-new").requests,0);
+    assert.throws(()=>saveLlmConfig(db,"salon-new",{provider:"deepseek",model:"deepseek-flash",enabled:true}),/api_key_required/);
+  }finally{db.close()}
+});
