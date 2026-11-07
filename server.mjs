@@ -623,7 +623,8 @@ async function api(req,res,url){
     const defaultHandlingMode=commercialAiEnabled&&receptionConfig.service?.auto_activate_new_conversations!==false?"ai":"human";
     const out=await ingestWahaEvent({db,tenantId:targetTenant,event:body,interpret,autoReply:commercialAiEnabled?receptionistAgentReply:null,allowAi:commercialAiEnabled,defaultHandlingMode});
     if(out.accepted&&out.type==="message"&&out.clientId){
-      const msgId=String(body?.payload?.id?._serialized||body?.payload?.id?.id||"");
+      const rawId=body?.payload?.id;
+      const msgId=typeof rawId==="string"?rawId:String(rawId?._serialized||rawId?.id||"");
       const text=String(body?.payload?.body||"");
       try{registerIncoming(db,targetTenant,out.clientId,text,{messageId:msgId||null,source:"whatsapp"});}
       catch(e){console.error("commercial_ingest_failed",String(e.message||e).slice(0,140))}
