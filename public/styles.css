@@ -241,3 +241,13 @@ dialog[open]::backdrop{opacity:1;transition-duration:var(--nv-dur-base)}
 .agentExplainRule{display:flex;align-items:center;gap:10px;font-size:.9rem}
 .agentExplainRule .chip{min-width:76px;text-align:center}
 .agentExplainPrompt{white-space:pre-wrap;overflow-wrap:anywhere;max-height:48vh;overflow:auto;padding:12px;background:var(--surface,transparent);border:1px solid var(--line);border-radius:8px;font-size:.76rem;line-height:1.5}
+
+/* Monitor operacional do WhatsApp: dados só aparecem quando solicitados. */
+.ne-wa-diagnostics{border-top:1px solid var(--line);margin-top:16px;padding-top:12px}
+.ne-wa-diagnostics summary{cursor:pointer;font-weight:650;line-height:1.5}
+.ne-wa-diagnostics p{font-size:.84rem;margin:9px 0;color:var(--muted)}
+.ne-wa-diagnostics-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:14px 0}
+.ne-wa-diagnostics-grid>div{border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:5px;min-width:0}
+.ne-wa-diagnostics-grid strong{font-size:1.1rem;line-height:1.4;overflow-wrap:anywhere}
+.ne-wa-diagnostics-grid small,.ne-wa-diagnostics-grid span{font-size:.77rem;line-height:1.45;color:var(--muted)}
+@media(max-width:530px){.ne-wa-diagnostics-grid{grid-template-columns:1fr}}

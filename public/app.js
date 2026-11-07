@@ -77,7 +77,7 @@ $$("[data-view]").forEach(b=>b.onclick=()=>activate(b.dataset.view));$$("[data-j
 $$(".navGroupBtn").forEach(b=>b.onclick=()=>b.parentElement.classList.toggle("open"));$("#appBack").onclick=()=>document.body.classList.toggle("navCollapsed");const setDrawer=open=>document.body.classList.toggle("navOpen",open);$("#mobileMenu").onclick=()=>setDrawer(!document.body.classList.contains("navOpen"));$("#navScrim").onclick=()=>setDrawer(false);$$(".sidebar [data-view]").forEach(b=>b.addEventListener("click",()=>setDrawer(false)));document.addEventListener("keydown",e=>{if(e.key==="Escape")setDrawer(false)});$("#appFullscreen").onclick=()=>document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();$("#appDate").textContent=new Date().toLocaleDateString("pt-BR");
 function applyTheme(mode){if(mode==="auto")delete document.documentElement.dataset.theme;else document.documentElement.dataset.theme=mode;try{mode==="auto"?localStorage.removeItem("nv-theme"):localStorage.setItem("nv-theme",mode)}catch{}$$("[data-theme-set]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.themeSet===mode)))}
 $$("[data-theme-set]").forEach(b=>b.onclick=()=>applyTheme(b.dataset.themeSet));applyTheme(document.documentElement.dataset.theme||"auto");
-async function bootstrap(){const [boot,health]=await Promise.all([api("/api/bootstrap"),api("/api/health")]);state.health=health;state.user=boot.user;state.tenant=boot.tenant||null;window.__neTenantZone=tenantZone();window.__neRole=boot.user?.role||null;applyRoleNavigation();window.__neApplyRole?.(boot.user?.role);const allowClientsExport=["owner","manager"].includes(state.user?.role);["#exportClients","#marketingExportClients"].forEach(sel=>{const el=$(sel);if(el)el.hidden=!allowClientsExport;});$$(`[data-view="ownerEye"],[data-jump="ownerEye"]`).forEach(el=>{el.hidden=!["owner","manager"].includes(state.user?.role)});$$("[data-deny]").forEach(el=>el.classList.toggle("hidden",el.dataset.deny.split(" ").includes(boot.user?.role)));if(boot.tenant?.name)$("#appTenant").textContent=boot.tenant.name.toUpperCase();$("#appUser").textContent=String(boot.user?.name||"").toUpperCase();$("#appAvatar").textContent=initials(boot.user?.name||"");state.professionals=boot.professionals;state.services=boot.services;state.resources=boot.resources||[];state.dashboard=boot.dashboard;state.whatsapp=boot.whatsapp;$("#health").textContent=health.jev?"Sistema + JEV online":"Sistema online · JEV fallback";$("#jevState").textContent=health.jev?"JEV online":"fallback ativo";renderDashboard();renderTeam();renderServices();renderResources();await loadClients();fillSelects();updateWahaUi();if(["owner","manager"].includes(state.user?.role))loadReports().catch(()=>{});if(["owner","manager","reception"].includes(state.user?.role))loadFinance().catch(()=>{});activate("dashboard")}
+async function bootstrap(){const [boot,health]=await Promise.all([api("/api/bootstrap"),api("/api/health")]);state.health=health;state.user=boot.user;$("#waDiagnosticsDetails").hidden=!["owner","manager"].includes(boot.user?.role);state.tenant=boot.tenant||null;window.__neTenantZone=tenantZone();window.__neRole=boot.user?.role||null;applyRoleNavigation();window.__neApplyRole?.(boot.user?.role);const allowClientsExport=["owner","manager"].includes(state.user?.role);["#exportClients","#marketingExportClients"].forEach(sel=>{const el=$(sel);if(el)el.hidden=!allowClientsExport;});$$(`[data-view="ownerEye"],[data-jump="ownerEye"]`).forEach(el=>{el.hidden=!["owner","manager"].includes(state.user?.role)});$$("[data-deny]").forEach(el=>el.classList.toggle("hidden",el.dataset.deny.split(" ").includes(boot.user?.role)));if(boot.tenant?.name)$("#appTenant").textContent=boot.tenant.name.toUpperCase();$("#appUser").textContent=String(boot.user?.name||"").toUpperCase();$("#appAvatar").textContent=initials(boot.user?.name||"");state.professionals=boot.professionals;state.services=boot.services;state.resources=boot.resources||[];state.dashboard=boot.dashboard;state.whatsapp=boot.whatsapp;$("#health").textContent=health.jev?"Sistema + JEV online":"Sistema online · JEV fallback";$("#jevState").textContent=health.jev?"JEV online":"fallback ativo";renderDashboard();renderTeam();renderServices();renderResources();await loadClients();fillSelects();updateWahaUi();if(["owner","manager"].includes(state.user?.role))loadReports().catch(()=>{});if(["owner","manager","reception"].includes(state.user?.role))loadFinance().catch(()=>{});activate("dashboard")}
 function renderDashboard(){const d=state.dashboard,hour=new Date().getHours(),first=String(state.user?.name||"").split(/\s+/)[0],n=d.appointments.length;$("#dashGreeting").textContent=(hour<12?"Bom dia":hour<18?"Boa tarde":"Boa noite")+(first?", "+first:"");$("#dashToday").textContent=new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long",timeZone:tenantZone()})+" · "+(n?n+(n===1?" atendimento hoje":" atendimentos hoje"):"nenhum atendimento hoje");$("#todayList").innerHTML=d.appointments.length?d.appointments.map(a=>`<div class="todayRow"><span class="time">${new Date(a.start_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",timeZone:tenantZone()})}</span><div><b>${esc(a.client_name)}</b><small>${esc(a.service_summary||a.service_name)} · ${esc(a.professional_summary||a.professional_name)}</small></div><span class="status ${esc(a.status)}">${statusLabel(a.status)}</span></div>`).join(""):`<div class="homeEmpty"><p>Nenhum atendimento marcado para hoje.</p><button type="button" class="secondary" id="todayMark">Marcar agendamento</button></div>`;if($("#todayMark"))$("#todayMark").onclick=()=>activate("agenda")}
 async function loadClients(q=""){state.clients=await api("/api/clients"+(q?`?q=${encodeURIComponent(q)}`:""));$("#clientCount").textContent=`${state.clients.length} encontrados`;$("#clientList").innerHTML=state.clients.map(c=>{const socials=[c.instagram?`Instagram: ${esc(c.instagram)}`:"",c.facebook?`Facebook: ${esc(c.facebook)}`:""].filter(Boolean).join(" · ");const ref=c.referral_reference?`Referência: ${esc(c.referral_reference)}`:"";const birthday=c.birthday?`Aniversário: ${esc(c.birthday.split("-").reverse().join("/"))}`:"";return `<article data-ne-client-id="${esc(c.id)}"><div class="who"><span class="avatar">${initials(c.name)}</span><div><h3>${esc(c.name)}</h3><p>${esc(c.phone||"Sem WhatsApp")}</p></div></div><div class="clientMeta">${birthday?`<small>${birthday}</small>`:""}${socials?`<small>${socials}</small>`:""}${ref?`<small>${ref}</small>`:""}</div>${c.notes?`<p>${esc(c.notes)}</p>`:""}<div class="tags">${(c.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div></article>`}).join("")||`<p class="muted">Nenhum cliente encontrado.</p>`;fillSelects();fillWaitlistSelects()}
 let searchTimer;$("#clientSearch").oninput=e=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadClients(e.target.value),220)};
@@ -160,6 +160,43 @@ function updateWahaUi(){
   $("#waSetupText").textContent=(w.connected?"Sessão "+w.session+" conectada.":w.status==="UNASSIGNED"?"É necessário vincular uma sessão exclusiva a este salão.":w.configured?"Sessão "+w.session+" cadastrada. Prepare a conexão e escaneie o QR Code.":"Conectividade WAHA indisponível ou credenciais não configuradas.")+aiNote;
   $("#prepareWaha").disabled=!w.configured||!w.session||!["owner","manager"].includes(state.user?.role);$("#showQr").disabled=!w.configured||!w.session||!["owner","manager"].includes(state.user?.role);
 }
+function formatWahaDiagnosticTime(timestamp){
+  if(!timestamp)return "nenhum registro";
+  const date=new Date(timestamp);
+  if(!Number.isFinite(date.getTime()))return "horário indisponível";
+  return date.toLocaleString("pt-BR",{timeZone:tenantZone(),dateStyle:"short",timeStyle:"short"});
+}
+let waDiagnosticBusy=false;
+async function loadWahaDiagnostics(){
+  const details=$("#waDiagnosticsDetails"),status=$("#waDiagnosticsSummary");
+  if(!details || details.hidden || waDiagnosticBusy)return;
+  waDiagnosticBusy=true;$("#waDiagnosticsRefresh").disabled=true;
+  status.textContent="Consultando a conexão e os registros…";
+  try{
+    const d=await api("/api/whatsapp/diagnostics");
+    $("#waDiagInboundCount").textContent=String(d.inbound?.past_24h??0);
+    $("#waDiagOutboundCount").textContent=String(d.outbound?.past_24h??0);
+    $("#waDiagInboundLast").textContent="Último recebimento: "+formatWahaDiagnosticTime(d.inbound?.last_at);
+    $("#waDiagOutboundLast").textContent="Último envio registrado: "+formatWahaDiagnosticTime(d.outbound?.last_at);
+    const ok=d.webhook?.official&&d.webhook?.signed&&d.webhook?.events;
+    $("#waDiagWebhook").textContent=ok?"Configurado":"Requer atenção";
+    const delivered=(d.outbound?.delivery_statuses||[]).map(x=>x.count+" "+x.status).join(" · ");
+    $("#waDiagDelivery").textContent=delivered?"Estados registrados: "+delivered:"Sem comprovantes de entrega registrados";
+    $("#waDiagAutomatic").textContent=d.automatic_replies_ready?"Habilitada":"Não liberada";
+    const queue=d.professional_notices||{};
+    $("#waDiagProfessional").textContent="Avisos profissionais em simulação: "+(queue.pending||0)+" aguardando; "+(queue.missing_phone||0)+" sem telefone.";
+    const statusLine=d.session_connected?"WhatsApp conectado ao WAHA.":"WhatsApp desconectado do WAHA.";
+    const endpointLine=ok?" Webhook oficial configurado e protegido.":" Verifique o webhook ou assinatura; pode estar usando endereço antigo.";
+    status.textContent=statusLine+endpointLine+" Registros são do sistema, não comprovantes de leitura no celular.";
+  }catch{
+    status.textContent="Não foi possível obter o diagnóstico. Confira a conexão e tente novamente.";
+  }finally{waDiagnosticBusy=false;$("#waDiagnosticsRefresh").disabled=false}
+}
+$("#waDiagnosticsDetails").addEventListener("toggle",()=>{
+  if($("#waDiagnosticsDetails").open)loadWahaDiagnostics();
+});
+$("#waDiagnosticsRefresh").onclick=loadWahaDiagnostics;
+
 const convStatusName={open:"Aberta",pending:"Pendente",resolved:"Resolvida"};
 const convPriorityName={normal:"Normal",high:"Alta",urgent:"Urgente"};
 const convCategoryName={general:"Geral",lead:"Lead",appointment:"Agendamento",waiting:"Aguardando",finance:"Financeiro",complaint:"Reclamação",post_sale:"Pós-venda",vip:"VIP",other:"Outro"};
