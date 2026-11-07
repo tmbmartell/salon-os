@@ -28,7 +28,7 @@ test("classifica preço e move o lead para respondeu, mas nunca inventa venda",(
   const r=decide(db,"Oi, qual é o preço da limpeza de pele?");
   assert.equal(r.category,"lead");assert.equal(r.applied,true);assert.ok(r.confidence>=.8);
   const co=db.prepare("select category,priority from conversations where id='co1'").get();
-  assert.deepEqual(co,{category:"lead",priority:"normal"});
+  assert.equal(co.category,"lead");assert.equal(co.priority,"normal");
   const lead=db.prepare("select stage from commercial_leads where client_id='c1'").get();
   assert.equal(lead.stage,"respondeu");
   assert.equal(decide(db,"Oi, qual é o preço da limpeza de pele?").duplicate,true);
