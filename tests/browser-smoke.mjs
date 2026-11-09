@@ -99,6 +99,10 @@ try{
     return data.find(c=>c.id==="qa-kanban-chat")?.category;
   });
   assert.equal(saved,"lead");
+  await page.locator('.ne-kanban-lane-warming .ne-kanban-card[data-id="'+cardId+'"]').dragTo(page.locator('.ne-kanban-lane-appointment'));
+  await page.locator('.ne-kanban-lane-appointment .ne-kanban-card[data-id="'+cardId+'"]').waitFor({timeout:12000});
+  await page.locator('.ne-kanban-lane-appointment .ne-kanban-card[data-id="'+cardId+'"] select').selectOption('lead');
+  await page.locator('.ne-kanban-lane-warming .ne-kanban-card[data-id="'+cardId+'"]').waitFor({timeout:12000});
   await page.locator('.ne-kanban-lane-warming .ne-kanban-card[data-id="'+cardId+'"] .ne-kanban-card-open').click();
   await page.locator('#neMessengerWorkspace:not([hidden])').waitFor({timeout:12000});
   await page.locator('#chatActive:not(.hidden)').waitFor({timeout:12000});
