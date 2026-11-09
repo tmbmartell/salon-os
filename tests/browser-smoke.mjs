@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import {DatabaseSync} from "node:sqlite";
 import {totpAt} from "../mfa.mjs";
 const sleep=t=>new Promise(r=>setTimeout(r,t));
 const root=process.cwd(),artifact=path.join(root,"artifacts","browser");
@@ -71,7 +72,47 @@ try{
     await sleep(300);
     assert.equal(errors.length,0,"Erro JS após abrir "+view+": "+errors.join(" | "));
   }
+  // O Kanban exibe o CRM real e altera categorias usando a API com login.
+  const demoDb=new DatabaseSync(path.join(temp,"qa.sqlite"));
+  let cardId;
+  try{
+    const tenant=demoDb.prepare("select id from tenants limit 1").get()?.id;
+    assert.ok(tenant);
+    const now=new Date().toISOString(),cid="qa-kanban-client",chatId="qa-kanban-chat";
+    demoDb.prepare(`insert into clients(id,tenant_id,name,phone,created_at,updated_at)
+      values(?,?,?,?,?,?)`).run(cid,tenant,"Cliente Kanban QA","69999991111",now,now);
+    demoDb.prepare(`insert into conversations(id,tenant_id,client_id,channel,status,created_at,category,priority,handling_mode,handling_mode_source)
+      values(?,?,?,?,?,?,?,?,?,?)`).run(chatId,tenant,cid,"whatsapp","open",now,"general","normal","human","manual");
+    cardId=chatId;
+  }finally{demoDb.close()}
   await open("inbox");
+  await page.locator("#refreshInbox").click();
+  await page.locator('#neMessengerBoard:not([hidden])').waitFor({timeout:12000});
+  assert.equal(await page.locator('.ne-kanban-lane').count(),5);
+  const card=page.locator('.ne-kanban-card[data-id="'+cardId+'"]');
+  await card.waitFor({timeout:12000});
+  assert.equal(await page.locator('#neMessengerWorkspace[hidden]').count(),1);
+  await card.locator('select').selectOption('lead');
+  await page.locator('.ne-kanban-lane-warming .ne-kanban-card[data-id="'+cardId+'"]').waitFor({timeout:12000});
+  const saved=await page.evaluate(async()=>{
+    const r=await fetch("/api/conversations");const data=await r.json();
+    return data.find(c=>c.id==="qa-kanban-chat")?.category;
+  });
+  assert.equal(saved,"lead");
+  await page.locator('.ne-kanban-lane-warming .ne-kanban-card[data-id="'+cardId+'"] .ne-kanban-card-open').click();
+  await page.locator('#neMessengerWorkspace:not([hidden])').waitFor({timeout:12000});
+  await page.locator('#chatActive:not(.hidden)').waitFor({timeout:12000});
+  assert.equal(await page.locator("#chatClient").textContent(),"Cliente Kanban QA");
+  await page.locator("#neKanbanBack").click();
+  await page.locator('#neMessengerBoard:not([hidden])').waitFor({timeout:12000});
+  await page.locator("#neKanbanToggle").click();
+  await page.locator('#neMessengerWorkspace:not([hidden])').waitFor({timeout:12000});
+  await page.locator("#neKanbanToggle").click();
+  await page.locator('#neMessengerBoard:not([hidden])').waitFor({timeout:12000});
+  await page.screenshot({path:path.join(artifact,"18-kanban-mensageria-desktop.png"),fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:path.join(artifact,"19-kanban-mensageria-mobile.png"),fullPage:true});
+  await page.setViewportSize({width:1440,height:900});
   await page.locator("#waDiagnosticsDetails").waitFor({state:"visible"});
   await page.locator("#waDiagnosticsDetails summary").click();
   await page.waitForFunction(()=>document.querySelector("#waDiagInboundCount")?.textContent!=="—",{timeout:12000});
