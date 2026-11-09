@@ -233,6 +233,7 @@ function renderConversationList(){
       (Number(c.unread_count)>0?'<b class="unreadBadge">'+c.unread_count+'</b>':"")+'</button>';
   }).join("")||'<div class="muted emptyPad">Nenhuma conversa com esses filtros.</div>';
   if(window.organizeBeautyInbox)window.organizeBeautyInbox(convs);
+  window.dispatchEvent(new CustomEvent("ne:kanban-conversations",{detail:convs}));
   $$("[data-conversation]").forEach(b=>b.onclick=()=>openConversation(b.dataset.conversation));
 }
 function updateChatModeButton(){
@@ -285,6 +286,26 @@ async function loadInbox(){
     }
   }catch(err){if(err.status!==401)toast("Não foi possível carregar o atendimento")}
 }
+// Ponte controlada com o Kanban visual: usa a mesma API autenticada e o mesmo
+// estado de conversas. Categorizar manualmente bloqueia override automático da IA.
+window.neKanbanActions={
+  open:cid=>openConversation(cid),
+  moveCategory:async(cid,category)=>{
+    const co=state.conversations.find(x=>String(x.id)===String(cid));
+    if(!co)throw new Error("Conversa não encontrada");
+    const permitted=["general","lead","appointment","waiting","post_sale"];
+    if(!permitted.includes(category))throw new Error("Etapa inválida");
+    const currentCategory=co.category;
+    if(currentCategory===category)return;
+    const response=await api("/api/conversations/"+encodeURIComponent(cid)+"/meta",{
+      method:"PATCH",body:JSON.stringify({category})
+    });
+    Object.assign(co,response);
+    if(state.selectedConversation?.id===cid)Object.assign(state.selectedConversation,response);
+    await loadInbox();
+    toast("Etapa atualizada");
+  }
+};
 async function openConversation(cid){
   const co=state.conversations.find(x=>x.id===cid);if(!co)return;state.selectedConversation=co;
   $("#chatEmpty").classList.add("hidden");$("#chatActive").classList.remove("hidden");$("#chatClient").textContent=co.client_name||"Cliente";$("#chatPhone").textContent=co.client_phone||"";updateChatModeButton();renderConversationDetail();
